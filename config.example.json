@@ -1,0 +1,28 @@
+{
+  "_ayuda": "Configuración del addon de Home Assistant para Vitreus. Al guardar este archivo el panel se actualiza solo.",
+  "_url": "La dirección de tu Home Assistant, con http:// o https:// y el puerto (normalmente 8123).",
+  "url": "http://homeassistant.local:8123",
+  "_token": "Un token de larga duración: en Home Assistant, tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.",
+  "token": "PEGA_AQUI_TU_TOKEN",
+  "_insecure": "Ponlo a true solo si usas https con un certificado propio (autofirmado).",
+  "insecure": false,
+  "_rooms": "Las habitaciones, en este orden. name: su nombre. temperature y humidity (opcionales): un sensor de Home Assistant cuya lectura sale junto al nombre. items: sus fichas.",
+  "_items": "type: \"light\" (luz: clic enciende/apaga, clic derecho abre el brillo) o \"toggle\" (interruptor, input_boolean, enchufe...). icon: un nombre de Material Symbols (fonts.google.com/icons), por ejemplo lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage. on_text y off_text son opcionales. El tamaño de cada ficha se cambia en el panel, con el lápiz.",
+  "rooms": [
+    {
+      "name": "Salón",
+      "temperature": "sensor.salon_temperatura",
+      "humidity": "sensor.salon_humedad",
+      "items": [
+        { "type": "light",  "name": "Salón",      "icon": "lightbulb", "entity": "light.salon" },
+        { "type": "toggle", "name": "Modo noche", "icon": "bedtime",   "entity": "input_boolean.modo_noche", "on_text": "Activado", "off_text": "Desactivado" }
+      ]
+    },
+    {
+      "name": "Despacho",
+      "items": [
+        { "type": "light",  "name": "Escritorio", "icon": "desk",      "entity": "light.escritorio" }
+      ]
+    }
+  ]
+}

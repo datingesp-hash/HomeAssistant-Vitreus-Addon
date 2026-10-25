@@ -1,0 +1,375 @@
+language 0.1
+import "addon-palette.plm"
+
+//  Home Assistant, as a Vitreus add-on with a panel: the rooms listed in config.json (the scene's data folder, ~/.local/share/pleamar/homeassistant/),
+//  each with its name, its temperature and humidity if it has sensors for them, and a tile for each of its lights and switches, drawn in the shell's own
+//  manner (the control centre's tiles: a veil, a lit disc, Space Grotesk). A click toggles a tile; a right click on a light opens its brightness slider
+//  over the panel. The pencil puts the tiles in edit mode: each gets a handle in its corner that pulls it wider or taller, cell by cell.
+//  homeassistant.luau talks to Home Assistant's REST API with curl (the token goes in a file curl reads, never in its arguments), lays the tiles out
+//  (`col`, `cs`, `rs`, `yu`: where each goes and how big, in cells and unscaled pixels) and fills `hl_items` and `hl_rooms`.
+//  Icons are Material Symbols names ("lightbulb", "tv", "bedtime"…): the font is the one the lock screen uses.
+
+scene HomeAssistant {
+    surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4 }
+
+    permissions {
+        services: "files", "files.write"
+        run: "curl", "xdg-terminal-exec", "xdg-open", "hyprctl", "pleamar"
+    }
+
+    fact pal_ink_r = 0.9608
+    fact pal_ink_g = 0.9686
+    fact pal_ink_b = 0.9608
+    fact pal_faint_r = 0.7608
+    fact pal_faint_g = 0.7804
+    fact pal_faint_b = 0.8000
+    fact pal_mint_r = 0.6196
+    fact pal_mint_g = 0.8392
+    fact pal_mint_b = 0.7412
+    fact pal_mintlo_r = 0.4235
+    fact pal_mintlo_g = 0.7373
+    fact pal_mintlo_b = 0.6118
+    fact pal_minthi_r = 0.8627
+    fact pal_minthi_g = 0.9725
+    fact pal_minthi_b = 0.9255
+    fact pal_onmint_r = 0.0627
+    fact pal_onmint_g = 0.0863
+    fact pal_onmint_b = 0.1020
+    fact pal_tint_r = 0.1059
+    fact pal_tint_g = 0.1294
+    fact pal_tint_b = 0.1529
+    fact pal_panel_r = 0.0863
+    fact pal_panel_g = 0.1020
+    fact pal_panel_b = 0.1216
+    fact pal_deep_r = 0.0431
+    fact pal_deep_g = 0.0549
+    fact pal_deep_b = 0.0667
+    fact pal_off_r = 0.2275
+    fact pal_off_g = 0.2510
+    fact pal_off_b = 0.2824
+    fact pal_alert_r = 0.9373
+    fact pal_alert_g = 0.2667
+    fact pal_alert_b = 0.2667
+    fact look = 0
+
+    fact slot_open = false
+    fact slot_x = 0
+    fact slot_y = 0
+    fact slot_w = 0
+    fact slot_h = 0
+    fact slot_sw = 0                                  // the size of the monitor the panel is on (0: not told yet, every copy draws)
+    fact slot_sh = 0
+    //  Which copy draws. Vitreus says the size of the monitor the panel is on, which does not tell two monitors of the same size apart, so the logic
+    //  also works out the copy itself (`hl_mon`): the monitor Hyprland has focused when the panel opens —the one the pill was clicked on— and which
+    //  copy is on it, read from the name each copy writes below. -1: not known, by size as Vitreus says · -2: still working it out, none draws.
+    fact hl_mon = -1
+    let by_size = if(slot_sw == 0 or (screen.width == slot_sw and screen.height == slot_sh), 1, 0)
+    let shown = if(slot_open, if(hl_mon >= 0, if(screen.index == hl_mon, 1, 0), if(hl_mon == -1, by_size, 0)), 0)
+
+    //  What the logic says (homeassistant.luau)
+    fact hl_state = 0                                 // 0 connecting · 1 connected · 2 an error (hl_msg says it) · 3 not set up yet
+    text hl_status = "Conectando…"
+    text hl_msg = ""
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number }      // kind 0 a light, 1 a switch · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
+    fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
+    fact hl_content = 0                               // how tall it all is, unscaled
+    event hl_tap ->                                   // a tile was clicked: its place
+    event hl_bri ->                                   // the slider let go: the brightness, 0 to 1 (`sl_i` says which light)
+    event hl_refresh ->
+    event hl_edit ->                                  // open config.json in an editor
+    event hl_resize ->                                // a tile pulled to a new size (`rz_w` by `rz_h` cells): its place
+    //  Edit mode: the tiles are not pressed but resized, by the handle in their corner
+    fact hl_editing = false
+    prop hl_ed = 0 ~quick
+    follow hl_ed = if(hl_editing, 1, 0)
+    fact rz_i = -1                                    // the tile being resized, and its size when it was taken and now, in cells
+    fact rz_w0 = 1
+    fact rz_h0 = 1
+    fact rz_w = 1
+    fact rz_h = 1
+    on change rz_w while rz_i >= 0 { emit hl_resize(rz_i) }
+    on change rz_h while rz_i >= 0 { emit hl_resize(rz_i) }
+
+    //  The brightness slider, over the panel
+    fact sl_open = false
+    fact sl_i = -1
+    fact sl_v = 0
+    fact sl_dirty = false                             // moved since it was last sent
+    text sl_name = ""
+    text sl_icon = "lightbulb"
+    fact sl_custom = false                            // the light's icon is an svg of its own (drawn from its record, below)
+    prop sl_k = 0 ~240ms
+    follow sl_k = if(sl_open, 1, 0)
+    prop sl_vs = 0 ~quick                             // the fill, a hair behind the finger
+    follow sl_vs = sl_v
+
+    fact hl_sc = 0                                    // how far the list has scrolled, for what is inside it (a layout cannot read its own `scroll` from within)
+    on change hl_list.scroll { hl_sc = hl_list.scroll }
+    prop hl_spin = 0
+    spin hl_spin by if(hl_state == 0, 1, 0)
+
+    let u = 1.1
+    let W = max(slot_w, 1)
+    let H = max(slot_h, 1)
+
+    //  The grid: as many columns as fit at 170 apiece, up to four (the logic works them out, and lays the tiles in them); a cell is 74 tall
+    let gx = 14 * u
+    let gtop = 60 * u
+    let gap = 10 * u
+    let cols = max(1, hl_cols)
+    let tw = (W - 2 * gx - (cols - 1) * gap) / cols
+    let th = 74 * u
+    let vh = max(H - gtop - 12 * u, 1)
+    let content = hl_content * u
+    let most = max(0, content - vh)
+
+    //  Each copy writes the name of its monitor, faint enough not to be seen, for the logic to read with `describe`: a scene cannot compare it itself.
+    text "hlmon {screen.name}" { at: 1, 1; size: 2; color: ink; opacity: 0.3% }
+
+    group {
+        show: shown > 0.5
+        group {
+            move: slot_x - W / 2, slot_y - H / 2
+
+            //  ── the head: how it is, and the refresh arrow and the gear ──
+            ellipse { at: 24 * u, 28 * u; radius: 4 * u; color: pick(hl_state, faint, mint, alert, faint) }
+            ellipse { at: 24 * u, 28 * u; radius: 8 * u; color: mint; opacity: if(hl_state == 1, 18%, 0%) }
+            text hl_status { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: faint; opacity: 1 - hl_ed; family: "Space Grotesk" }
+            text "Arrastra la esquina de una ficha" { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: mint; opacity: hl_ed; family: "Space Grotesk" }
+
+            //  the pencil: edit mode (lit, a tick, while it is on)
+            body {
+                color: mix(ink, mint, hl_ed)
+                opacity: 8% + 10% * hl_ed_z.hover + 82% * hl_ed
+                shadow: 0, 0, 10 * u * hl_ed, 35% * hl_ed, mint
+                ellipse { at: W - 121 * u, 28 * u; radius: 16 * u }
+            }
+            text pick(if(hl_editing, 1, 0), "edit", "check") { at: W - 121 * u, 28 * u; anchor: center; size: 19; color: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed); family: "Material Symbols Outlined" }
+            zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: pick(if(hl_editing, 1, 0), "Cambiar el tamaño de las fichas", "Terminar") }
+            on press hl_ed_z { toggle hl_editing; rz_i = -1 }
+
+            ellipse { at: W - 37 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_rf_z.hover }
+            text "refresh" { at: W - 37 * u, 28 * u; anchor: center; size: 20; color: mix(ink, mint, hl_rf_z.hover); family: "Material Symbols Outlined" }
+            zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: "Actualizar" }
+            on press hl_rf_z { emit hl_refresh }
+
+            ellipse { at: W - 79 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_gear_z.hover }
+            text "settings" { at: W - 79 * u, 28 * u; anchor: center; size: 20; color: mix(ink, mint, hl_gear_z.hover); family: "Material Symbols Outlined" }
+            zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: "Editar la configuración" }
+            on press hl_gear_z { emit hl_edit }
+
+            box { at: W / 2, 50 * u; size: W - 2 * gx, 1.5; color: ink; opacity: 12% }
+
+            //  ── the rooms and their tiles ──
+            //  One list that scrolls as the shell's own do (the wheel, a drag, the layout's spring): what it holds is laid out by the logic, in a single piece
+            //  as tall as all of it, so everything below is in that piece's own place, from its top (`hl_sc` is how far it has gone).
+            column hl_list ~quick {                  // (the spring the control centre's lists glide with: without one a list jumps a notch at a time)
+              at: 0, gtop
+              view: W, vh
+              step: if(sl_open, 0, 80 * u)          // most of a row of tiles a notch (none while the slider is over it: the wheel is the slider's then)
+              group {
+                size: W, max(content, vh)
+                //  a room's head: its name, and after it the temperature and the humidity, each with its sign, when the room has a sensor for them
+                for rm in hl_rooms {
+                    let hy = rm.yu * u
+                    row {
+                        at: gx + 4 * u, hy + 4 * u
+                        gap: 6 * u
+                        align: center
+                        show: hy - hl_sc > -40 * u and hy - hl_sc < vh
+                        text rm.name { size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                        space 4 * u
+                        text "device_thermostat" { size: 16; color: faint; show: rm.has_t > 0.5; family: "Material Symbols Outlined" }
+                        text rm.temp { size: 12.5; weight: 600; color: faint; show: rm.has_t > 0.5; family: "Space Grotesk" }
+                        space 2 * u
+                        text "water_drop" { size: 15; color: faint; show: rm.has_h > 0.5; family: "Material Symbols Outlined" }
+                        text rm.hum { size: 12.5; weight: 600; color: faint; show: rm.has_h > 0.5; family: "Space Grotesk" }
+                    }
+                }
+                for r in hl_items {
+                    let held = rz_i == r.index
+                    let tcs = if(held, rz_w, r.cs)
+                    let trs = if(held, rz_h, r.rs)
+                    let cx0 = gx + r.col * (tw + gap)
+                    let cy0 = r.yu * u
+                    let tww = tcs * tw + (tcs - 1) * gap        // the tile's own size: as many cells as it takes, and the gaps between them
+                    let thh = trs * th + (trs - 1) * gap
+                    let tall = if(trs >= 2, 1, 0)               // two rows or more: the disc at the top, the name and the rest along the bottom
+                    let seen = cy0 - hl_sc > -thh and cy0 - hl_sc < vh
+                    //  a light shows the slider's value while the slider is on it
+                    let bv = if(sl_open and sl_i == r.index, sl_vs, r.bri)
+                    let lit = r.on * r.avail
+                    let dx = cx0 + mix(33, 36, tall) * u          // the disc's middle
+                    let dy = mix(cy0 + thh / 2, cy0 + 36 * u, tall)
+                    let tx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)                   // where the name starts, and how wide it may be
+                    let tmax = tww - mix(if(r.kind == 1, 112, 72), 36, tall) * u
+                    let ny = mix(cy0 + thh / 2 - 9 * u, cy0 + thh - if(r.kind == 0 and lit > 0.5, 46, 38) * u, tall)
+                    group {
+                        opacity: if(r.avail > 0.5, 100%, 45%)
+                        zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
+                        on press hl_tile_z { emit hl_tap(r.index) }
+                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 { sl_i = r.index; sl_v = r.bri; sl_dirty = false; sl_open = true }
+                        //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 13% * lit }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held, mint, ink); opacity: hl_ed * if(held, 90%, 22%) }
+                        //  the disc: hollow when off, lit and glowing when on (a little larger in a tall tile)
+                        body {
+                            color: mix(off, mint, lit)
+                            shadow: 0, 0, 10 * u * lit, 45% * lit, mint
+                            rim: 16% * lit
+                            ellipse { at: dx, dy; radius: mix(19, 22, tall) * u }
+                        }
+                        text r.icon { at: dx, dy; anchor: center; size: 22 + 4 * tall; color: mix(ink, onmint, lit); show: r.custom < 0.5; family: "Material Symbols Outlined" }
+                        //  an icon of its own: a white svg, tinted as the Material ones are
+                        image r.img { at: dx - (11 + 2 * tall) * u, dy - (11 + 2 * tall) * u; size: (22 + 4 * tall) * u, (22 + 4 * tall) * u; tint: mix(ink, onmint, lit); show: r.custom > 0.5 }
+                        //  the name and how it is
+                        text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; family: "Space Grotesk" }
+                        text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; color: if(lit > 0.5, mint, faint); family: "Space Grotesk" }
+                        //  a light: how bright, along the bottom
+                        group {
+                            show: r.kind == 0 and lit > 0.5
+                            let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
+                            let bw = mix(tww - 76 * u, tww - 36 * u, tall)
+                            box { from: bx, cy0 + thh - 13 * u; size: bw, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
+                            box { from: bx, cy0 + thh - 13 * u; size: max(3 * u, bw * bv), 3 * u; corner: 1.5 * u; color: mint }
+                        }
+                        //  a switch: the shell's pill, the knob sliding to the lit side (top right in a tall tile)
+                        group {
+                            show: r.kind == 1
+                            let sy = mix(cy0 + thh / 2, cy0 + 30 * u, tall)
+                            body {
+                                color: mix(off, mint, lit)
+                                shadow: 0, 0, 8 * u * lit, 40% * lit, mint
+                                rim: 16% * lit
+                                box { at: cx0 + tww - 34 * u, sy; size: 34 * u, 20 * u; corner: 10 * u }
+                            }
+                            ellipse { at: cx0 + tww - 42 * u + 16 * u * lit, sy; radius: 7.5 * u; color: ink; opacity: 70% + 30% * lit }
+                        }
+                        //  edit mode: the handle in the corner. While it is held its zone covers the panel, so the drag is not lost as the tile grows under it;
+                        //  the size it would take, in cells, in the middle of the tile
+                        group {
+                            opacity: hl_ed
+                            ellipse { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; radius: 11 * u; color: mint; opacity: if(held, 100%, 80% + 20% * hl_grip_z.hover) }
+                            text "open_in_full" { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; anchor: center; size: 13; color: onmint; family: "Material Symbols Outlined" }
+                            box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
+                            text "{rz_w} × {rz_h}" { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
+                        }
+                        zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "Cambiar el tamaño de {r.name}" }
+                        on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
+                        on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (tw + gap)), 1, cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
+                        on release hl_grip_z { rz_i = -1 }
+                    }
+                }
+              }
+            }
+            //  how far down the list is, when it does not all fit
+            box { from: W - 7 * u, gtop + hl_list.scroll / max(content, 1) * vh; size: 3 * u, vh * vh / max(content, vh); corner: 1.5 * u; color: ink; opacity: if(most > 0.5, 25%, 0%) }
+
+            //  ── when there is nothing to show ──
+            group {
+                show: hl_state == 0 and hl_items.count == 0
+                arc { at: W / 2, H / 2 - 18 * u; radius: 14 * u; span: 270deg; width: 3 * u; color: mint; rotate: mod(hl_spin * 260, 360) * 1deg }
+                text "Conectando con Home Assistant…" { at: W / 2, H / 2 + 14 * u; anchor: center; size: 13; weight: 600; color: faint; family: "Space Grotesk" }
+            }
+            group {
+                show: hl_state >= 2 and hl_items.count == 0
+                text pick(hl_state - 2, "cloud_off", "home_iot_device") { at: W / 2, H / 2 - 52 * u; anchor: center; size: 40; color: if(hl_state == 2, alert, mint); family: "Material Symbols Outlined" }
+                text pick(hl_state - 2, "Sin conexión", "Configura Home Assistant") { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                text hl_msg { at: W / 2, H / 2 + 4 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
+                zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: "Editar la configuración" }
+                on press hl_cfg_z { emit hl_edit }
+                body {
+                    color: mint
+                    shadow: 0, 0, 10 * u, 35% + 15% * hl_cfg_z.hover, mint
+                    rim: 16%
+                    box { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u }
+                }
+                text "Editar la configuración" { at: W / 2, H / 2 + 74 * u; anchor: center; size: 13.5; weight: 700; color: onmint; family: "Space Grotesk" }
+            }
+            group {
+                show: hl_state == 1 and hl_items.count == 0
+                text "add_home" { at: W / 2, H / 2 - 40 * u; anchor: center; size: 40; color: mint; family: "Material Symbols Outlined" }
+                text "Aún no hay nada aquí" { at: W / 2, H / 2 - 4 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                text "Añade luces e interruptores en config.json: el engranaje de arriba lo abre." { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
+            }
+
+            //  ── the brightness slider: a card over the panel, which a click outside it, its X or a right click shuts ──
+            group {
+                opacity: sl_k
+                let cw = min(W - 40 * u, 400 * u)
+                let ch = 186 * u
+                let cl = (W - cw) / 2
+                let ct = (H - ch) / 2 + 10 * u * (1 - sl_k)
+                let tl = cl + 22 * u
+                let tw2 = cw - 44 * u
+                let ty = ct + 98 * u
+                let kx = tl + 17 * u + (tw2 - 34 * u) * sl_vs
+                //  first the veil over the tiles, which shuts it (declared before the card, so the card's zones win over it)
+                box { from: 0, 0; size: W, H; color: deep; opacity: 45% }
+                zone box sl_scrim_z { from: 0, 0; size: W, H }
+                on press sl_scrim_z { sl_open = false }
+                on press right sl_scrim_z { sl_open = false }
+                body {
+                    color: card
+                    shadow: 0, 10 * u, 30 * u, 45%, deep
+                    rim: 10%
+                    box { from: cl, ct; size: cw, ch; corner: 20 * u }
+                }
+                zone box sl_card_z { from: cl, ct; size: cw, ch; corner: 20 * u }
+                on press right sl_card_z { sl_open = false }
+                //  the light: its disc, its name, the value
+                body {
+                    color: mix(off, mint, if(sl_vs > 0.004, 1, 0))
+                    shadow: 0, 0, 10 * u * if(sl_vs > 0.004, 1, 0), 45%, mint
+                    rim: 16%
+                    ellipse { at: cl + 42 * u, ct + 42 * u; radius: 20 * u }
+                }
+                text sl_icon { at: cl + 42 * u, ct + 42 * u; anchor: center; size: 22; color: if(sl_vs > 0.004, onmint, ink); show: not sl_custom; family: "Material Symbols Outlined" }
+                for r in hl_items {
+                    image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004, onmint, ink); show: sl_custom and r.index == sl_i }
+                }
+                text sl_name { at: cl + 72 * u, ct + 34 * u; anchor: left center; size: 15; weight: 700; width: cw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                text "Brillo" { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                text number(sl_vs * 100, 0, " %") { at: cl + cw - 58 * u, ct + 42 * u; anchor: right center; size: 24; weight: 700; color: ink; family: "Space Grotesk" }
+                ellipse { at: cl + cw - 30 * u, ct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * sl_x_z.hover }
+                text "close" { at: cl + cw - 30 * u, ct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, sl_x_z.hover); family: "Material Symbols Outlined" }
+                zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: "Cerrar" }
+                on press sl_x_z { sl_open = false }
+                //  the track: hollow, filled with the accent up to the knob
+                box { from: tl, ty - 17 * u; size: tw2, 34 * u; corner: 17 * u; color: ink; opacity: 9% }
+                body {
+                    gradient: tl, ty to tl + tw2, ty, mintlo, minthi
+                    shadow: 0, 0, 10 * u, 30%, mint
+                    rim: 16%
+                    box { from: tl, ty - 17 * u; size: max(34 * u, kx - tl + 17 * u), 34 * u; corner: 17 * u }
+                }
+                body {
+                    color: ink
+                    shadow: 0, 2 * u, 8 * u, 40%, deep
+                    ellipse { at: kx, ty; radius: (12 + 2 * sl_tr_z.hover) * u }
+                }
+                zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: "Brillo de {sl_name}"; role: slider; value: "{sl_vs * 100} %" }
+                on press sl_tr_z { sl_v = clamp((local.x - tl - 17 * u) / (tw2 - 34 * u), 0, 1); sl_dirty = true }
+                on drag sl_tr_z { sl_v = clamp((local.x - tl - 17 * u) / (tw2 - 34 * u), 0, 1); sl_dirty = true }
+                on scroll sl_card_z { sl_v = clamp(sl_v + wheel * 0.05, 0, 1); sl_dirty = true }
+                on release sl_tr_z { emit hl_bri(sl_v); sl_dirty = false }
+                //  a pause in the moving sends it too, so the light follows the finger without a request per frame
+                on still sl_v for 280ms while sl_open and sl_dirty { emit hl_bri(sl_v); sl_dirty = false }
+                //  the quick ones: off, a quarter, half, three quarters, full
+                let pw = (tw2 - 4 * 8 * u) / 5
+                repeat i in 0..5 {
+                    let px = tl + i * (pw + 8 * u)
+                    let pv = i * 0.25
+                    let here = abs(sl_v - pv) < 0.01
+                    zone box sl_p_z.$i { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: pick(i, "Apagar", "25 %", "50 %", "75 %", "100 %") }
+                    on press sl_p_z.$i { sl_v = pv; emit hl_bri(pv); sl_dirty = false }
+                    box { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; color: mint; opacity: if(here, 100%, 0%) }
+                    box { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; color: ink; opacity: if(here, 0%, 8% + 8% * sl_p_z.$i.hover) }
+                    text pick(i, "Apagar", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); family: "Space Grotesk" }
+                }
+            }
+        }
+    }
+}

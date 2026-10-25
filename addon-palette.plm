@@ -1,0 +1,15 @@
+//  Vitreus's colours as the add-on has them: three numbers each, which Vitreus sets on the add-on's scene as the `pal_*` facts it declares (addon.plm). A palette change is a change of facts, so the scene does not reload. Copied with the template: leave it as it is.
+
+library Palette {
+    let ink    = rgb(pal_ink_r, pal_ink_g, pal_ink_b)
+    let faint  = rgb(pal_faint_r, pal_faint_g, pal_faint_b)
+    let mint   = rgb(pal_mint_r, pal_mint_g, pal_mint_b)
+    let mintlo = rgb(pal_mintlo_r, pal_mintlo_g, pal_mintlo_b)
+    let minthi = rgb(pal_minthi_r, pal_minthi_g, pal_minthi_b)
+    let onmint = rgb(pal_onmint_r, pal_onmint_g, pal_onmint_b)
+    let tint   = rgb(pal_tint_r, pal_tint_g, pal_tint_b)
+    let card   = rgb(pal_panel_r, pal_panel_g, pal_panel_b)
+    let deep   = rgb(pal_deep_r, pal_deep_g, pal_deep_b)
+    let off    = rgb(pal_off_r, pal_off_g, pal_off_b)
+    let alert  = rgb(pal_alert_r, pal_alert_g, pal_alert_b)
+}
