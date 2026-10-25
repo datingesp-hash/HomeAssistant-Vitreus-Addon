@@ -14,7 +14,7 @@ scene HomeAssistant {
 
     permissions {
         services: "files", "files.write", "env"
-        run: "curl", "xdg-terminal-exec", "xdg-open", "hyprctl", "pleamar"
+        run: "curl", "xdg-terminal-exec", "xdg-open"
     }
 
     fact pal_ink_r = 0.9608
@@ -59,9 +59,9 @@ scene HomeAssistant {
     fact slot_h = 0
     fact slot_sw = 0                                  // the size of the monitor the panel is on (0: not told yet, every copy draws)
     fact slot_sh = 0
-    //  Which copy draws. Vitreus says the size of the monitor the panel is on, which does not tell two monitors of the same size apart, so the logic
-    //  also works out the copy itself (`hl_mon`): the monitor Hyprland has focused when the panel opens —the one the pill was clicked on— and which
-    //  copy is on it, read from the name each copy writes below. -1: not known, by size as Vitreus says · -2: still working it out, none draws.
+    text slot_mon = ""                                // the name of that monitor (DP-1...), which Vitreus sends before `slot_open`
+    //  Which copy draws: the one on the monitor Vitreus names (`slot_mon`; a scene cannot compare a text, so the logic finds the copy whose `screen.K.name`
+    //  it is, `hl_mon`). -1: no copy has that name (an older Vitreus does not send it), and the monitor's size decides, as before.
     fact hl_mon = -1
     let by_size = if(slot_sw == 0 or (screen.width == slot_sw and screen.height == slot_sh), 1, 0)
     let shown = if(slot_open, if(hl_mon >= 0, if(screen.index == hl_mon, 1, 0), if(hl_mon == -1, by_size, 0)), 0)
@@ -69,7 +69,20 @@ scene HomeAssistant {
     //  What the logic says (homeassistant.luau)
     fact hl_state = 0                                 // 0 connecting · 1 connected · 2 an error (hl_msg says it) · 3 not set up yet
     text hl_status = "Conectando…"
-    fact hl_en = false                                // the panel's language (config.json's "language"): false Spanish, true English
+    //  What the panel says: every word comes from the logic's table (`STR` in homeassistant.luau), in the language config.json asks for. A new language is a
+    //  new block there; nothing here changes.
+    text t_hint = ""                                  // edit mode's hint, in the head
+    text t_ed = ""                                    // the pencil's name: what pressing it does now
+    text t_refresh = ""
+    text t_edit_cfg = ""                              // the gear's name, and the button of the panel that is not set up
+    text t_connecting = ""
+    text t_title = ""                                 // the empty panel's title: it cannot connect, or it is not set up
+    text t_empty = ""
+    text t_empty_hint = ""
+    text t_brightness = ""
+    text t_close = ""
+    text t_off = ""
+    text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
     model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number }      // kind 0 a light, 1 a switch · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
@@ -111,7 +124,6 @@ scene HomeAssistant {
     spin hl_spin by if(hl_state == 0, 1, 0)
 
     let u = 1.1
-    let en = if(hl_en, 1, 0)                          // which of two texts: pick(en, "Spanish", "English")
     let W = max(slot_w, 1)
     let H = max(slot_h, 1)
 
@@ -126,8 +138,6 @@ scene HomeAssistant {
     let content = hl_content * u
     let most = max(0, content - vh)
 
-    //  Each copy writes the name of its monitor, faint enough not to be seen, for the logic to read with `describe`: a scene cannot compare it itself.
-    text "hlmon {screen.name}" { at: 1, 1; size: 2; color: ink; opacity: 0.3% }
 
     group {
         show: shown > 0.5
@@ -138,7 +148,7 @@ scene HomeAssistant {
             ellipse { at: 24 * u, 28 * u; radius: 4 * u; color: pick(hl_state, faint, mint, alert, faint) }
             ellipse { at: 24 * u, 28 * u; radius: 8 * u; color: mint; opacity: if(hl_state == 1, 18%, 0%) }
             text hl_status { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: faint; opacity: 1 - hl_ed; family: "Space Grotesk" }
-            text pick(en, "Arrastra la esquina de una ficha", "Drag a tile's corner") { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: mint; opacity: hl_ed; family: "Space Grotesk" }
+            text t_hint { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: mint; opacity: hl_ed; family: "Space Grotesk" }
 
             //  the pencil: edit mode (lit, a tick, while it is on)
             body {
@@ -148,17 +158,17 @@ scene HomeAssistant {
                 ellipse { at: W - 121 * u, 28 * u; radius: 16 * u }
             }
             text pick(if(hl_editing, 1, 0), "edit", "check") { at: W - 121 * u, 28 * u; anchor: center; size: 19; color: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed); family: "Material Symbols Outlined" }
-            zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: pick(if(hl_editing, 1, 0) + 2 * en, "Cambiar el tamaño de las fichas", "Terminar", "Resize the tiles", "Done") }
+            zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_ed }
             on press hl_ed_z { toggle hl_editing; rz_i = -1 }
 
             ellipse { at: W - 37 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_rf_z.hover }
             text "refresh" { at: W - 37 * u, 28 * u; anchor: center; size: 20; color: mix(ink, mint, hl_rf_z.hover); family: "Material Symbols Outlined" }
-            zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: pick(en, "Actualizar", "Refresh") }
+            zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_refresh }
             on press hl_rf_z { emit hl_refresh }
 
             ellipse { at: W - 79 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_gear_z.hover }
             text "settings" { at: W - 79 * u, 28 * u; anchor: center; size: 20; color: mix(ink, mint, hl_gear_z.hover); family: "Material Symbols Outlined" }
-            zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: pick(en, "Editar la configuración", "Edit the settings") }
+            zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_edit_cfg }
             on press hl_gear_z { emit hl_edit }
 
             box { at: W / 2, 50 * u; size: W - 2 * gx, 1.5; color: ink; opacity: 12% }
@@ -258,7 +268,7 @@ scene HomeAssistant {
                             box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
                             text "{rz_w} × {rz_h}" { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
                         }
-                        zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: pick(en, "Cambiar el tamaño de {r.name}", "Resize {r.name}") }
+                        zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "{t_resize} {r.name}" }
                         on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
                         on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (tw + gap)), 1, cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
                         on release hl_grip_z { rz_i = -1 }
@@ -273,14 +283,14 @@ scene HomeAssistant {
             group {
                 show: hl_state == 0 and hl_items.count == 0
                 arc { at: W / 2, H / 2 - 18 * u; radius: 14 * u; span: 270deg; width: 3 * u; color: mint; rotate: mod(hl_spin * 260, 360) * 1deg }
-                text pick(en, "Conectando con Home Assistant…", "Connecting to Home Assistant…") { at: W / 2, H / 2 + 14 * u; anchor: center; size: 13; weight: 600; color: faint; family: "Space Grotesk" }
+                text t_connecting { at: W / 2, H / 2 + 14 * u; anchor: center; size: 13; weight: 600; color: faint; family: "Space Grotesk" }
             }
             group {
                 show: hl_state >= 2 and hl_items.count == 0
                 text pick(hl_state - 2, "cloud_off", "home_iot_device") { at: W / 2, H / 2 - 52 * u; anchor: center; size: 40; color: if(hl_state == 2, alert, mint); family: "Material Symbols Outlined" }
-                text pick(hl_state - 2 + 2 * en, "Sin conexión", "Configura Home Assistant", "Can't connect", "Set up Home Assistant") { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                text t_title { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
                 text hl_msg { at: W / 2, H / 2 + 4 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
-                zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: pick(en, "Editar la configuración", "Edit the settings") }
+                zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: t_edit_cfg }
                 on press hl_cfg_z { emit hl_edit }
                 body {
                     color: mint
@@ -288,13 +298,13 @@ scene HomeAssistant {
                     rim: 16%
                     box { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u }
                 }
-                text pick(en, "Editar la configuración", "Edit the settings") { at: W / 2, H / 2 + 74 * u; anchor: center; size: 13.5; weight: 700; color: onmint; family: "Space Grotesk" }
+                text t_edit_cfg { at: W / 2, H / 2 + 74 * u; anchor: center; size: 13.5; weight: 700; color: onmint; family: "Space Grotesk" }
             }
             group {
                 show: hl_state == 1 and hl_items.count == 0
                 text "add_home" { at: W / 2, H / 2 - 40 * u; anchor: center; size: 40; color: mint; family: "Material Symbols Outlined" }
-                text pick(en, "Aún no hay nada aquí", "Nothing here yet") { at: W / 2, H / 2 - 4 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
-                text pick(en, "Añade luces e interruptores en config.json: el engranaje de arriba lo abre.", "Add lights and switches in config.json: the gear above opens it.") { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
+                text t_empty { at: W / 2, H / 2 - 4 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                text t_empty_hint { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
             }
 
             //  ── the brightness slider: a card over the panel, which a click outside it, its X or a right click shuts ──
@@ -333,11 +343,11 @@ scene HomeAssistant {
                     image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004, onmint, ink); show: sl_custom and r.index == sl_i }
                 }
                 text sl_name { at: cl + 72 * u, ct + 34 * u; anchor: left center; size: 15; weight: 700; width: cw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                text pick(en, "Brillo", "Brightness") { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                text t_brightness { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
                 text number(sl_vs * 100, 0, " %") { at: cl + cw - 58 * u, ct + 42 * u; anchor: right center; size: 24; weight: 700; color: ink; family: "Space Grotesk" }
                 ellipse { at: cl + cw - 30 * u, ct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * sl_x_z.hover }
                 text "close" { at: cl + cw - 30 * u, ct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, sl_x_z.hover); family: "Material Symbols Outlined" }
-                zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: pick(en, "Cerrar", "Close") }
+                zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
                 on press sl_x_z { sl_open = false }
                 //  the track: hollow, filled with the accent up to the knob
                 box { from: tl, ty - 17 * u; size: tw2, 34 * u; corner: 17 * u; color: ink; opacity: 9% }
@@ -352,7 +362,7 @@ scene HomeAssistant {
                     shadow: 0, 2 * u, 8 * u, 40%, deep
                     ellipse { at: kx, ty; radius: (12 + 2 * sl_tr_z.hover) * u }
                 }
-                zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: pick(en, "Brillo de {sl_name}", "{sl_name} brightness"); role: slider; value: "{sl_vs * 100} %" }
+                zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: "{t_brightness}: {sl_name}"; role: slider; value: "{sl_vs * 100} %" }
                 on press sl_tr_z { sl_v = clamp((local.x - tl - 17 * u) / (tw2 - 34 * u), 0, 1); sl_dirty = true }
                 on drag sl_tr_z { sl_v = clamp((local.x - tl - 17 * u) / (tw2 - 34 * u), 0, 1); sl_dirty = true }
                 on scroll sl_card_z { sl_v = clamp(sl_v + wheel * 0.05, 0, 1); sl_dirty = true }
@@ -365,11 +375,12 @@ scene HomeAssistant {
                     let px = tl + i * (pw + 8 * u)
                     let pv = i * 0.25
                     let here = abs(sl_v - pv) < 0.01
-                    zone box sl_p_z.$i { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: pick(i + 5 * en, "Apagar", "25 %", "50 %", "75 %", "100 %", "Off", "25 %", "50 %", "75 %", "100 %") }
+                    zone box sl_p_z.$i { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: "{t_brightness}: {i * 25} %" }
                     on press sl_p_z.$i { sl_v = pv; emit hl_bri(pv); sl_dirty = false }
                     box { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; color: mint; opacity: if(here, 100%, 0%) }
                     box { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; color: ink; opacity: if(here, 0%, 8% + 8% * sl_p_z.$i.hover) }
-                    text pick(i + 5 * en, "Apagar", "25 %", "50 %", "75 %", "100 %", "Off", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); family: "Space Grotesk" }
+                    text t_off { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i == 0; family: "Space Grotesk" }
+                    text pick(i, "", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i > 0; family: "Space Grotesk" }
                 }
             }
         }

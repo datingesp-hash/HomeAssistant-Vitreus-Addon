@@ -33,7 +33,7 @@ Necesita un Vitreus con add-ons, y `curl`.
 
 ## Configurar
 
-La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre, y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
+La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre en tu editor (`$VISUAL`, si no `$EDITOR`, si no `nvim`), y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
 
 - `language`: `"es"` (español) o `"en"` (inglés). Si no lo pones, el panel usa el idioma del sistema (`LANG`).
 - `url`: la dirección de tu Home Assistant, p. ej. `http://homeassistant.local:8123`.
@@ -79,6 +79,10 @@ hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --
 
 `ax_toggle` abre el primer addon que tenga panel.
 
+## Traducciones
+
+Todo lo que dice el panel está en una sola tabla, `STR`, al principio de `homeassistant.luau`, con un bloque `es` y otro `en`. Para añadir un idioma, copia el bloque `en` con un código nuevo (`fr = { ... }`), traduce los textos y pon `"language": "fr"`. Lo que falte en el bloque nuevo sale en inglés. Los pull requests con idiomas nuevos son bienvenidos.
+
 ## Privacidad
 
 El token nunca va en la línea de comandos de curl, donde otros programas podrían leerlo: el addon lo escribe en `auth.curl`, en su carpeta de datos, y curl lo lee de ahí con `-K`. Ese archivo y `config.json` guardan el token, así que ciérralos para otros usuarios:
@@ -89,7 +93,7 @@ chmod 600 ~/.local/share/pleamar/homeassistant/config.json ~/.local/share/pleama
 
 ## Notas
 
-- Con dos monitores del mismo tamaño, el panel sale en el que lo abriste (pregunta a Hyprland qué monitor tiene el foco).
+- Con dos monitores del mismo tamaño, el panel sale en el que Vitreus lo abre (Vitreus le dice al addon el nombre del monitor; con un Vitreus antiguo que no lo hace, se guía por el tamaño del monitor).
 - Hasta 12 habitaciones y 32 fichas.
 
 ## Licencia

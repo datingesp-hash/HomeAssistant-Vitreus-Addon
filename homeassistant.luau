@@ -90,7 +90,8 @@ local EXAMPLE = [[{
 }
 ]]
 
--- What the panel says, in Spanish and in English (config.json's "language"; without it, the system's: LANG and the like).
+-- What the panel says, in Spanish and in English (config.json's "language"; without it, the system's: LANG and the like). Every word the panel shows is
+-- here, the scene's too: another language is another block with the same keys (and its code accepted in `load`, below); a key it lacks is said in English.
 local STR = {
     es = {
         connecting = "Conectando…", connected = "Conectado · %d de %d %s", tile = "ficha", tiles = "fichas", no_tiles = "Conectado · sin fichas",
@@ -105,6 +106,12 @@ local STR = {
         e404 = "Home Assistant no reconoce la dirección (404): revisa la url", ehttp = "Home Assistant ha respondido con un error (%s)",
         bad = "Entidad no válida: %s", unavailable = "No disponible", light_on = "Encendida", light_off = "Apagada", on = "Activado", off = "Desactivado",
         room = "Habitación %d",
+        -- the scene's (homeassistant.plm takes them as the `t_*` texts)
+        hint = "Arrastra la esquina de una ficha", ed_start = "Cambiar el tamaño de las fichas", ed_done = "Terminar", refresh = "Actualizar",
+        edit_cfg = "Editar la configuración", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
+        title_setup = "Configura Home Assistant", empty = "Aún no hay nada aquí",
+        empty_hint = "Añade luces e interruptores en config.json: el engranaje de arriba lo abre.", brightness = "Brillo", close = "Cerrar",
+        off_btn = "Apagar", resize = "Cambiar el tamaño de",
     },
     en = {
         connecting = "Connecting…", connected = "Connected · %d of %d %s", tile = "tile", tiles = "tiles", no_tiles = "Connected · no tiles",
@@ -119,6 +126,12 @@ local STR = {
         e404 = "Home Assistant doesn't know that address (404): check the url", ehttp = "Home Assistant answered with an error (%s)",
         bad = "Invalid entity: %s", unavailable = "Unavailable", light_on = "On", light_off = "Off", on = "On", off = "Off",
         room = "Room %d",
+        -- the scene's (homeassistant.plm takes them as the `t_*` texts)
+        hint = "Drag a tile's corner", ed_start = "Resize the tiles", ed_done = "Done", refresh = "Refresh",
+        edit_cfg = "Edit the settings", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
+        title_setup = "Set up Home Assistant", empty = "Nothing here yet",
+        empty_hint = "Add lights and switches in config.json: the gear above opens it.", brightness = "Brightness", close = "Close",
+        off_btn = "Off", resize = "Resize",
     },
 }
 local lang = "en"
@@ -150,7 +163,24 @@ local function set_state(n, status, msg)
     fact.hl_state = n
     text.hl_status = status
     text.hl_msg = msg or ""
+    text.t_title = n == 2 and T("title_offline") or (n == 3 and T("title_setup") or "")
 end
+
+-- The scene's words, in the language now in use.
+local function scene_words()
+    text.t_hint = T("hint")
+    text.t_ed = fact.hl_editing == true and T("ed_done") or T("ed_start")
+    text.t_refresh = T("refresh")
+    text.t_edit_cfg = T("edit_cfg")
+    text.t_connecting = T("connecting_ha")
+    text.t_empty = T("empty")
+    text.t_empty_hint = T("empty_hint")
+    text.t_brightness = T("brightness")
+    text.t_close = T("close")
+    text.t_off = T("off_btn")
+    text.t_resize = T("resize")
+end
+on("fact:hl_editing", function() text.t_ed = fact.hl_editing == true and T("ed_done") or T("ed_start") end)
 
 -- an entity id is a domain, a dot and a name: anything else could break the template it is written into
 local function valid(e) return type(e) == "string" and e:match("^[%a_]+%.[%w_]+$") ~= nil end
@@ -361,8 +391,8 @@ local function load()
     end
     local ok, c = pcall(sys.ask, "files.read", CONFIG, "json")
     local want = ok and type(c) == "table" and type(c.language) == "string" and c.language:lower() or ""
-    lang = (want == "es" or want == "en") and want or system_lang()
-    fact.hl_en = lang == "en"
+    lang = STR[want] and want or system_lang()
+    scene_words()
     cfg = nil
     state = {}
     est = {}
@@ -505,9 +535,19 @@ on("hl_refresh", function()
     load()
 end)
 
+-- The gear: config.json in the user's editor ($VISUAL, then $EDITOR, then nvim), in a terminal so that one that lives in a terminal works; if that fails,
+-- whatever the desktop opens a .json with. A variable with arguments ("code -w") is split on its spaces.
 on("hl_edit", function()
     local path = folder .. "/" .. CONFIG
-    run("xdg-terminal-exec", { "nvim", path }, function(_, code)
+    local editor = "nvim"
+    for _, v in ipairs({ "VISUAL", "EDITOR" }) do
+        local ok, val = pcall(sys.ask, "env", v)
+        if ok and type(val) == "string" and val:match("%S") then editor = val; break end
+    end
+    local args = {}
+    for word in editor:gmatch("%S+") do args[#args + 1] = word end
+    args[#args + 1] = path
+    run("xdg-terminal-exec", args, function(_, code)
         if code ~= 0 then run("xdg-open", { path }, function() end) end
     end)
 end)
@@ -521,73 +561,34 @@ on("fact:slot_w", function(v)
     show()
 end)
 
--- Which monitor the panel is on. The scene has a copy on each monitor, and Vitreus says only the size of the panel's one, which does not tell
--- two monitors of the same size apart. So: the monitor Hyprland has focused (the pill was just clicked on it), and which copy is on that monitor,
--- read from what each copy writes (`hlmon NAME`, see homeassistant.plm), with `describe`. If any of that fails, by size as before (hl_mon -1).
-local copies = {}           -- monitor name → copy number, as `describe` last said
-local asked = 0             -- so that only the answer to the last question counts
-
-local function learn_copies(done)
-    run("pleamar", { "--say", "homeassistant", "describe" }, function(out, code)
-        if code == 0 and out then
-            local found, n = {}, 0
-            local cur = 0
-            for line in (out .. "\n"):gmatch("([^\n]*)\n") do
-                if not line:match("^%s") then
-                    cur = tonumber(line:match("%(screen (%d+)%)")) or 0
-                else
-                    local name = line:match("«hlmon (%S+)»")
-                    if name then found[name] = cur; n = n + 1 end
-                end
-            end
-            if n > 0 then copies = found end
-        end
-        done()
-    end)
-end
-
+-- Which monitor the panel is on: Vitreus sends its name (`slot_mon`) before `slot_open`, and the copy of this scene whose monitor has that name
+-- (`screen.K.name`) is the one that draws (`hl_mon`). No copy with that name (an older Vitreus sends none): -1, and the scene goes by the size.
 local function find_monitor()
-    asked = asked + 1
-    local mine = asked
-    run("hyprctl", { "monitors", "-j" }, function(out, code)
-        if mine ~= asked then return end
-        local focused
-        if code == 0 and out then
-            local ok, list = pcall(json.decode, out)
-            if ok and type(list) == "table" then
-                for _, m in ipairs(list) do
-                    if type(m) == "table" and m.focused == true then focused = m.name end
-                end
-            end
+    local name = text.slot_mon or ""
+    local k = -1
+    if name ~= "" then
+        for c = 0, 3 do
+            if text["screen." .. c .. ".name"] == name then k = c; break end
         end
-        if not focused then fact.hl_mon = -1 return end
-        local function pick()
-            if mine ~= asked then return end
-            local k = copies[focused]
-            fact.hl_mon = k or -1
-        end
-        if copies[focused] ~= nil then pick() else learn_copies(pick) end
-    end)
+    end
+    if fact.hl_mon ~= k then fact.hl_mon = k end
 end
+on("text:slot_mon", find_monitor)
 
--- Vitreus tells the panel it is out again every two seconds while it is: only a real opening (shut before) works out the monitor again, or the
--- panel would blink at every reminder and follow the mouse to the other monitor.
+-- Vitreus tells the panel it is out again every two seconds while it is: only a real opening (shut before) asks Home Assistant at once and ends
+-- edit mode on the way out.
 on("fact:slot_open", function(v)
     local was = open
     open = v == true
+    find_monitor()
     if open and not was then
-        fact.hl_mon = -2
-        find_monitor()
         poll()
     elseif not open and was then
         fact.hl_editing = false          -- (edit mode ends with the panel)
         fact.rz_i = -1
+        text.t_ed = T("ed_start")
     end
 end)
-
--- Monitors plugged in or out: which copy is on which is learnt again
-learn_copies(function() end)
-every(60000, function() learn_copies(function() end) end)
 
 -- config.json saved: read it again
 sys.watch("files:" .. CONFIG, function()

@@ -34,7 +34,7 @@ It needs a Vitreus with add-ons, and `curl`.
 
 ## Set it up
 
-The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it, and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
+The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor (`$VISUAL`, then `$EDITOR`, then `nvim`), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
 
 - `language`: `"en"` (English) or `"es"` (Spanish). Without it, the panel follows the system's language (`LANG`).
 - `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
@@ -80,6 +80,10 @@ hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --
 
 `ax_toggle` opens the first add-on that has a panel.
 
+## Translations
+
+Every word the panel shows is in one table, `STR` at the top of `homeassistant.luau`, with an `es` and an `en` block. To add a language, copy the `en` block under a new code (`fr = { ... }`), translate the values, and set `"language": "fr"`. A key the new block lacks is shown in English. Pull requests with new languages are welcome.
+
 ## Privacy
 
 The token is never put on curl's command line, where other programs could read it: the add-on writes it to `auth.curl` in its data folder and curl reads it from there with `-K`. Both that file and `config.json` hold the token, so keep them to yourself:
@@ -90,7 +94,7 @@ chmod 600 ~/.local/share/pleamar/homeassistant/config.json ~/.local/share/pleama
 
 ## Notes
 
-- With two monitors of the same size, the panel shows on the one where it was opened (it asks Hyprland which monitor has focus).
+- With two monitors of the same size, the panel shows on the one Vitreus opened it on (Vitreus tells the add-on the monitor's name; an older Vitreus that does not falls back to the monitor's size).
 - Up to 12 rooms and 32 tiles.
 
 ## License
