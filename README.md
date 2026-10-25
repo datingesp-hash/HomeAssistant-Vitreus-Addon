@@ -4,18 +4,19 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 
 *[Leer en español](README.es.md)*
 
-![The panel, by rooms](docs/panel.png)
+![The panel, by rooms, on the Island](docs/en/island.png)
 
 - **Rooms**, each with its name and, if you give it sensors, its temperature and humidity.
 - **A click** turns a tile on or off. **A right click** on a light opens a brightness slider (drag it, use the wheel, or pick off / 25 / 50 / 75 / 100 %).
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
 - **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them.
+- **English or Spanish**: `"language"` in its settings, or the system's language if it is not set.
 - Lights use `light.toggle` / `light.turn_on`; anything else (`input_boolean`, `switch`, `media_player`, scripts…) uses `homeassistant.toggle`.
 
-| Edit mode | Brightness | On the Island |
+| The panel | Edit mode | Brightness |
 | --- | --- | --- |
-| ![Edit mode](docs/edit-mode.png) | ![Brightness](docs/brightness.png) | ![On the Island](docs/island.png) |
+| ![The panel](docs/en/panel.png) | ![Edit mode](docs/en/edit-mode.png) | ![Brightness](docs/en/brightness.png) |
 
 ## Install
 
@@ -35,6 +36,7 @@ It needs a Vitreus with add-ons, and `curl`.
 
 The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it, and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
 
+- `language`: `"en"` (English) or `"es"` (Spanish). Without it, the panel follows the system's language (`LANG`).
 - `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
 - `token`: a long-lived access token. In Home Assistant: your profile > Security > Long-lived access tokens > Create token.
 - `insecure`: `true` only for https with a self-signed certificate.
@@ -52,9 +54,20 @@ A plain `items` list at the top level (without rooms) works too: it is shown fir
 
 ### The add-on's own icons
 
-For what Material Symbols has no good icon for. They are drawn on Material's grid and tinted the same way.
+For what Material Symbols has no good icon for. They are drawn on Material's grid and tinted the same way. Each has an English and a Spanish name, and either works in `icon`:
 
-![The add-on's icons](docs/icons.png)
+![The add-on's icons](docs/en/icons.png)
+
+| English | Spanish |
+| --- | --- |
+| `led-strip.svg` | `tira-led.svg` |
+| `wall-lantern.svg` | `farol-pared.svg` |
+| `pendant-lamp.svg` | `lampara-pergola.svg` |
+| `floor-lamp.svg` | `lampara-pie.svg` |
+| `3d-printer.svg` | `impresora-3d.svg` |
+| `tv-box.svg` | `reproductor.svg` |
+| `terrarium.svg` | `terrario.svg` |
+| `fan-heater.svg` | `calefactor.svg` |
 
 ### A key to open it
 
@@ -77,7 +90,6 @@ chmod 600 ~/.local/share/pleamar/homeassistant/config.json ~/.local/share/pleama
 
 ## Notes
 
-- The panel's texts are in Spanish for now.
 - With two monitors of the same size, the panel shows on the one where it was opened (it asks Hyprland which monitor has focus).
 - Up to 12 rooms and 32 tiles.
 

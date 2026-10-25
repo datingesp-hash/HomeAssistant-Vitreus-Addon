@@ -1,27 +1,29 @@
 {
-  "_ayuda": "Configuración del addon de Home Assistant para Vitreus. Al guardar este archivo el panel se actualiza solo.",
-  "_url": "La dirección de tu Home Assistant, con http:// o https:// y el puerto (normalmente 8123).",
+  "_help": "Home Assistant add-on for Vitreus. Save this file and the panel reloads by itself.",
+  "_language": "The panel's language: \"en\" (English) or \"es\" (Spanish). Leave it out to follow the system's.",
+  "language": "en",
+  "_url": "Your Home Assistant's address, with http:// or https:// and the port (usually 8123).",
   "url": "http://homeassistant.local:8123",
-  "_token": "Un token de larga duración: en Home Assistant, tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.",
-  "token": "PEGA_AQUI_TU_TOKEN",
-  "_insecure": "Ponlo a true solo si usas https con un certificado propio (autofirmado).",
+  "_token": "A long-lived access token: in Home Assistant, your profile > Security > Long-lived access tokens > Create token.",
+  "token": "PASTE_YOUR_TOKEN_HERE",
+  "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
-  "_rooms": "Las habitaciones, en este orden. name: su nombre. temperature y humidity (opcionales): un sensor de Home Assistant cuya lectura sale junto al nombre. items: sus fichas.",
-  "_items": "type: \"light\" (luz: clic enciende/apaga, clic derecho abre el brillo) o \"toggle\" (interruptor, input_boolean, enchufe...). icon: un nombre de Material Symbols (fonts.google.com/icons), por ejemplo lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage. on_text y off_text son opcionales. El tamaño de cada ficha se cambia en el panel, con el lápiz.",
+  "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
-      "name": "Salón",
-      "temperature": "sensor.salon_temperatura",
-      "humidity": "sensor.salon_humedad",
+      "name": "Living room",
+      "temperature": "sensor.living_room_temperature",
+      "humidity": "sensor.living_room_humidity",
       "items": [
-        { "type": "light",  "name": "Salón",      "icon": "lightbulb", "entity": "light.salon" },
-        { "type": "toggle", "name": "Modo noche", "icon": "bedtime",   "entity": "input_boolean.modo_noche", "on_text": "Activado", "off_text": "Desactivado" }
+        { "type": "light",  "name": "Lamp",       "icon": "floor-lamp.svg", "entity": "light.living_room" },
+        { "type": "toggle", "name": "Night mode", "icon": "bedtime",        "entity": "input_boolean.night_mode" }
       ]
     },
     {
-      "name": "Despacho",
+      "name": "Office",
       "items": [
-        { "type": "light",  "name": "Escritorio", "icon": "desk",      "entity": "light.escritorio" }
+        { "type": "light",  "name": "Desk",       "icon": "desk",           "entity": "light.desk" }
       ]
     }
   ]

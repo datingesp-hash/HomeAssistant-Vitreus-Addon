@@ -59,34 +59,92 @@ local ICONS = {
 }
 
 local EXAMPLE = [[{
-  "_ayuda": "Configuración del addon de Home Assistant para Vitreus. Al guardar este archivo el panel se actualiza solo.",
-  "_url": "La dirección de tu Home Assistant, con http:// o https:// y el puerto (normalmente 8123).",
+  "_help": "Home Assistant add-on for Vitreus. Save this file and the panel reloads by itself.",
+  "_language": "The panel's language: \"en\" (English) or \"es\" (Spanish). Leave it out to follow the system's.",
+  "language": "en",
+  "_url": "Your Home Assistant's address, with http:// or https:// and the port (usually 8123).",
   "url": "http://homeassistant.local:8123",
-  "_token": "Un token de larga duración: en Home Assistant, tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.",
-  "token": "PEGA_AQUI_TU_TOKEN",
-  "_insecure": "Ponlo a true solo si usas https con un certificado propio (autofirmado).",
+  "_token": "A long-lived access token: in Home Assistant, your profile > Security > Long-lived access tokens > Create token.",
+  "token": "PASTE_YOUR_TOKEN_HERE",
+  "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
-  "_rooms": "Las habitaciones, en este orden. name: su nombre. temperature y humidity (opcionales): un sensor de Home Assistant cuya lectura sale junto al nombre. items: sus fichas.",
-  "_items": "type: \"light\" (luz: clic enciende/apaga, clic derecho abre el brillo) o \"toggle\" (interruptor, input_boolean, enchufe...). icon: un nombre de Material Symbols (fonts.google.com/icons), por ejemplo lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage. on_text y off_text son opcionales. El tamaño de cada ficha se cambia en el panel, con el lápiz.",
+  "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
-      "name": "Salón",
-      "temperature": "sensor.salon_temperatura",
-      "humidity": "sensor.salon_humedad",
+      "name": "Living room",
+      "temperature": "sensor.living_room_temperature",
+      "humidity": "sensor.living_room_humidity",
       "items": [
-        { "type": "light",  "name": "Salón",      "icon": "lightbulb", "entity": "light.salon" },
-        { "type": "toggle", "name": "Modo noche", "icon": "bedtime",   "entity": "input_boolean.modo_noche", "on_text": "Activado", "off_text": "Desactivado" }
+        { "type": "light",  "name": "Lamp",       "icon": "floor-lamp.svg", "entity": "light.living_room" },
+        { "type": "toggle", "name": "Night mode", "icon": "bedtime",        "entity": "input_boolean.night_mode" }
       ]
     },
     {
-      "name": "Despacho",
+      "name": "Office",
       "items": [
-        { "type": "light",  "name": "Escritorio", "icon": "desk",      "entity": "light.escritorio" }
+        { "type": "light",  "name": "Desk",       "icon": "desk",           "entity": "light.desk" }
       ]
     }
   ]
 }
 ]]
+
+-- What the panel says, in Spanish and in English (config.json's "language"; without it, the system's: LANG and the like).
+local STR = {
+    es = {
+        connecting = "Conectando…", connected = "Conectado · %d de %d %s", tile = "ficha", tiles = "fichas", no_tiles = "Conectado · sin fichas",
+        offline = "Sin conexión", odd = "Respuesta extraña", odd_msg = "Home Assistant ha respondido algo que no se entiende",
+        not_set = "Sin configurar", unreadable = "config.json no se puede leer: %s",
+        need_url = "Pon la dirección de tu Home Assistant en \"url\" (por ejemplo http://192.168.1.10:8123).",
+        need_token = "Falta el token: créalo en tu perfil de Home Assistant (Seguridad > Tokens de acceso de larga duración) y pégalo en \"token\".",
+        no_auth = "No se puede escribir auth.curl en la carpeta del addon",
+        e6 = "No se encuentra la dirección %s", e7 = "No se puede conectar con %s", e28 = "Home Assistant tarda demasiado en responder",
+        e35 = "Fallo de https (¿certificado propio? prueba \"insecure\": true)", e60 = "Certificado https no válido (prueba \"insecure\": true)",
+        ecurl = "curl ha fallado (código %s)", e401 = "Token incorrecto o caducado (401): crea uno nuevo en tu perfil de Home Assistant",
+        e404 = "Home Assistant no reconoce la dirección (404): revisa la url", ehttp = "Home Assistant ha respondido con un error (%s)",
+        bad = "Entidad no válida: %s", unavailable = "No disponible", light_on = "Encendida", light_off = "Apagada", on = "Activado", off = "Desactivado",
+        room = "Habitación %d",
+    },
+    en = {
+        connecting = "Connecting…", connected = "Connected · %d of %d %s", tile = "tile", tiles = "tiles", no_tiles = "Connected · no tiles",
+        offline = "Can't connect", odd = "Odd answer", odd_msg = "Home Assistant answered something that can't be read",
+        not_set = "Not set up", unreadable = "config.json can't be read: %s",
+        need_url = "Put your Home Assistant's address in \"url\" (e.g. http://192.168.1.10:8123).",
+        need_token = "The token is missing: make one in your Home Assistant profile (Security > Long-lived access tokens) and paste it in \"token\".",
+        no_auth = "auth.curl can't be written in the add-on's folder",
+        e6 = "Address not found: %s", e7 = "Can't connect to %s", e28 = "Home Assistant takes too long to answer",
+        e35 = "https failed (a certificate of your own? try \"insecure\": true)", e60 = "Invalid https certificate (try \"insecure\": true)",
+        ecurl = "curl failed (code %s)", e401 = "Wrong or expired token (401): make a new one in your Home Assistant profile",
+        e404 = "Home Assistant doesn't know that address (404): check the url", ehttp = "Home Assistant answered with an error (%s)",
+        bad = "Invalid entity: %s", unavailable = "Unavailable", light_on = "On", light_off = "Off", on = "On", off = "Off",
+        room = "Room %d",
+    },
+}
+local lang = "en"
+local function T(key, ...)
+    local s = (STR[lang] or STR.en)[key] or STR.en[key] or key
+    if select("#", ...) > 0 then return string.format(s, ...) end
+    return s
+end
+-- The system's language: Spanish if the locale says so, English otherwise.
+local function system_lang()
+    for _, v in ipairs({ "LC_ALL", "LC_MESSAGES", "LANG" }) do
+        local ok, val = pcall(sys.ask, "env", v)
+        if ok and type(val) == "string" and val ~= "" and val ~= "C" and val ~= "POSIX" then
+            return val:lower():match("^es") and "es" or "en"
+        end
+    end
+    return "en"
+end
+
+-- English names for the add-on's own icons (the files keep their Spanish ones).
+local ALIAS = {
+    ["led-strip.svg"] = "tira-led.svg", ["wall-lantern.svg"] = "farol-pared.svg", ["pendant-lamp.svg"] = "lampara-pergola.svg",
+    ["floor-lamp.svg"] = "lampara-pie.svg", ["3d-printer.svg"] = "impresora-3d.svg", ["tv-box.svg"] = "reproductor.svg",
+    ["terrarium.svg"] = "terrario.svg", ["fan-heater.svg"] = "calefactor.svg",
+}
+
 
 local function set_state(n, status, msg)
     fact.hl_state = n
@@ -171,13 +229,13 @@ local function show()
             local p = place[i] or { col = 0, cs = 1, rs = 1, yu = 0 }
             local sub
             if it.bad then
-                sub = "Entidad no válida: " .. it.entity
+                sub = T("bad", it.entity)
             elseif not s.avail then
-                sub = s.known and "No disponible" or "…"
+                sub = s.known and T("unavailable") or "…"
             elseif it.kind == 0 then
-                sub = s.on and ((it.on_text or "Encendida") .. " · " .. math.floor(s.bri * 100 + 0.5) .. " %") or (it.off_text or "Apagada")
+                sub = s.on and ((it.on_text or T("light_on")) .. " · " .. math.floor(s.bri * 100 + 0.5) .. " %") or (it.off_text or T("light_off"))
             else
-                sub = s.on and (it.on_text or "Activado") or (it.off_text or "Desactivado")
+                sub = s.on and (it.on_text or T("on")) or (it.off_text or T("off"))
             end
             rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = it.file and 1 or 0, sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu }
@@ -218,16 +276,15 @@ local function call(path, body, done)
     run("curl", args, function(out, code)
         out = out or ""
         if code ~= 0 then
-            local why = ({ [6] = "No se encuentra la dirección " .. cfg.url, [7] = "No se puede conectar con " .. cfg.url, [28] = "Home Assistant tarda demasiado en responder",
-                [35] = "Fallo de https (¿certificado propio? prueba \"insecure\": true)", [60] = "Certificado https no válido (prueba \"insecure\": true)" })[code]
-            done(false, nil, why or ("curl ha fallado (código " .. tostring(code) .. ")"))
+            local why = ({ [6] = T("e6", cfg.url), [7] = T("e7", cfg.url), [28] = T("e28"), [35] = T("e35"), [60] = T("e60") })[code]
+            done(false, nil, why or T("ecurl", tostring(code)))
             return
         end
         local body_out, status = out:match("^(.*)\n(%d+)%s*$")
         status = tonumber(status) or 0
-        if status == 401 then done(false, nil, "Token incorrecto o caducado (401): crea uno nuevo en tu perfil de Home Assistant") return end
-        if status == 404 then done(false, nil, "Home Assistant no reconoce la dirección (404): revisa la url") return end
-        if status < 200 or status >= 300 then done(false, nil, "Home Assistant ha respondido con un error (" .. status .. ")") return end
+        if status == 401 then done(false, nil, T("e401")) return end
+        if status == 404 then done(false, nil, T("e404")) return end
+        if status < 200 or status >= 300 then done(false, nil, T("ehttp", tostring(status))) return end
         done(true, body_out or "", nil)
     end, opts)
 end
@@ -242,7 +299,7 @@ local function poll()
     for _, it in ipairs(cfg.items) do if not it.bad then want(it.entity) end end
     for _, room in ipairs(cfg.rooms) do want(room.temp); want(room.hum) end
     if #ids == 0 then
-        set_state(1, "Conectado · sin fichas")
+        set_state(1, T("no_tiles"))
         show()
         return
     end
@@ -254,13 +311,13 @@ local function poll()
     call("/api/template", json.encode({ template = tpl }), function(ok, out, err)
         busy = false
         if not ok then
-            set_state(2, "Sin conexión", err)
+            set_state(2, T("offline"), err)
             show()
             return
         end
         local okj, list = pcall(json.decode, out)
         if not okj or type(list) ~= "table" then
-            set_state(2, "Respuesta extraña", "Home Assistant ha respondido algo que no se entiende")
+            set_state(2, T("odd"), T("odd_msg"))
             return
         end
         for k, e in ipairs(ids) do
@@ -281,7 +338,7 @@ local function poll()
             end
             if state[i] and state[i].avail then count = count + 1 end
         end
-        set_state(1, "Conectado · " .. count .. " de " .. #cfg.items .. (#cfg.items == 1 and " ficha" or " fichas"))
+        set_state(1, T("connected", count, #cfg.items, #cfg.items == 1 and T("tile") or T("tiles")))
         show()
     end)
 end
@@ -303,24 +360,27 @@ local function load()
         end
     end
     local ok, c = pcall(sys.ask, "files.read", CONFIG, "json")
+    local want = ok and type(c) == "table" and type(c.language) == "string" and c.language:lower() or ""
+    lang = (want == "es" or want == "en") and want or system_lang()
+    fact.hl_en = lang == "en"
     cfg = nil
     state = {}
     est = {}
     last_sig = ""
     if not ok or type(c) ~= "table" then
-        set_state(3, "Sin configurar", "config.json no se puede leer: " .. tostring(c):gsub("^.-: ", ""))
+        set_state(3, T("not_set"), T("unreadable", (tostring(c):gsub("^.-: ", ""))))
         show()
         return
     end
     local url = type(c.url) == "string" and c.url:gsub("/+$", "") or ""
     local token = type(c.token) == "string" and c.token or ""
     if not url:match("^https?://.+") then
-        set_state(3, "Sin configurar", "Pon la dirección de tu Home Assistant en \"url\" (por ejemplo http://192.168.1.10:8123).")
+        set_state(3, T("not_set"), T("need_url"))
         show()
         return
     end
-    if token == "" or token == "PEGA_AQUI_TU_TOKEN" or not token:match("^[%w%._%-]+$") then
-        set_state(3, "Sin configurar", "Falta el token: créalo en tu perfil de Home Assistant (Seguridad > Tokens de acceso de larga duración) y pégalo en \"token\".")
+    if token == "" or token == "PEGA_AQUI_TU_TOKEN" or token == "PASTE_YOUR_TOKEN_HERE" or not token:match("^[%w%._%-]+$") then
+        set_state(3, T("not_set"), T("need_token"))
         show()
         return
     end
@@ -336,7 +396,7 @@ local function load()
                     name = type(it.name) == "string" and it.name or entity,
                     icon = type(it.icon) == "string" and it.icon ~= "" and it.icon or (kind == 0 and "lightbulb" or "toggle_on"),
                     -- an icon of its own: a file in the data folder (only a plain name: the folder is all a scene may read)
-                    file = type(it.icon) == "string" and it.icon:match("^[%w%._%-]+%.[sp][vn]g$") and it.icon or nil,
+                    file = type(it.icon) == "string" and it.icon:match("^[%w%._%-]+%.[sp][vn]g$") and (ALIAS[it.icon] or it.icon) or nil,
                     on_text = type(it.on_text) == "string" and it.on_text or nil,
                     off_text = type(it.off_text) == "string" and it.off_text or nil,
                     bad = not valid(entity),
@@ -354,7 +414,7 @@ local function load()
         if type(r) == "table" and #rooms < MAX_ROOMS then
             local k = #rooms + 1
             rooms[k] = {
-                name = type(r.name) == "string" and r.name or ("Habitación " .. k),
+                name = type(r.name) == "string" and r.name or T("room", k),
                 temp = valid(r.temperature) and r.temperature or nil,
                 hum = valid(r.humidity) and r.humidity or nil,
             }
@@ -364,10 +424,10 @@ local function load()
     cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items }
     local wrote = pcall(sys.call, "files.write", AUTH, 'header = "Authorization: Bearer ' .. token .. '"\n')
     if not wrote then
-        set_state(2, "Sin conexión", "No se puede escribir auth.curl en la carpeta del addon")
+        set_state(2, T("offline"), T("no_auth"))
         return
     end
-    set_state(0, "Conectando…")
+    set_state(0, T("connecting"))
     layout()
     show()
     poll()
@@ -385,7 +445,7 @@ on("hl_tap", function(k)
     show()
     local service = it.kind == 0 and "/api/services/light/toggle" or "/api/services/homeassistant/toggle"
     call(service, json.encode({ entity_id = it.entity }), function(ok, _, err)
-        if not ok then set_state(2, "Sin conexión", err) end
+        if not ok then set_state(2, T("offline"), err) end
         hold_until[i] = nil
         after(700, poll)
     end)
@@ -405,7 +465,7 @@ on("hl_bri", function(v)
     local service, body = "/api/services/light/turn_on", { entity_id = it.entity, brightness_pct = pct }
     if pct == 0 then service, body = "/api/services/light/turn_off", { entity_id = it.entity } end
     call(service, json.encode(body), function(ok, _, err)
-        if not ok then set_state(2, "Sin conexión", err) end
+        if not ok then set_state(2, T("offline"), err) end
         after(900, function() hold_until[i] = nil; poll() end)
     end)
 end)

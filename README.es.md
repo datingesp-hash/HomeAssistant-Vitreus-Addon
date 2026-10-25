@@ -4,17 +4,18 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 
 *[Read in English](README.md)*
 
-![El panel, por habitaciones](docs/panel.png)
+![El panel, por habitaciones, en la isla](docs/es/island.png)
 
 - **Habitaciones**, cada una con su nombre y, si le pones sensores, su temperatura y humedad.
 - **Clic** en una ficha: enciende o apaga. **Clic derecho** en una luz: abre el control de brillo (arrastra, usa la rueda o pulsa Apagar / 25 / 50 / 75 / 100 %).
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
 - **En la isla**: arrastra la pieza de add-ons a la barra (Ajustes > Bar > Island layout) y el panel se despliega desde la barra como los paneles de la shell.
 - **Estética de Vitreus**: toma la paleta y el tema de la shell, y cambia con ellos.
+- **En español o en inglés**: `"language"` en su configuración, o el idioma del sistema si no lo pones.
 
-| Modo edición | Brillo | En la isla |
+| El panel | Modo edición | Brillo |
 | --- | --- | --- |
-| ![Modo edición](docs/edit-mode.png) | ![Brillo](docs/brightness.png) | ![En la isla](docs/island.png) |
+| ![El panel](docs/es/panel.png) | ![Modo edición](docs/es/edit-mode.png) | ![Brillo](docs/es/brightness.png) |
 
 ## Instalar
 
@@ -34,6 +35,7 @@ Necesita un Vitreus con add-ons, y `curl`.
 
 La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre, y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
 
+- `language`: `"es"` (español) o `"en"` (inglés). Si no lo pones, el panel usa el idioma del sistema (`LANG`).
 - `url`: la dirección de tu Home Assistant, p. ej. `http://homeassistant.local:8123`.
 - `token`: un token de larga duración. En Home Assistant: tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.
 - `insecure`: `true` solo si usas https con un certificado propio.
@@ -51,9 +53,20 @@ Un `items` suelto fuera de `rooms` también vale: sale arriba, sin título.
 
 ### Los iconos propios del addon
 
-Para lo que Material Symbols no tiene un buen icono. Están dibujados sobre la cuadrícula de Material y se tiñen igual.
+Para lo que Material Symbols no tiene un buen icono. Están dibujados sobre la cuadrícula de Material y se tiñen igual. Cada uno tiene un nombre en español y otro en inglés, y los dos valen en `icon`:
 
-![Los iconos del addon](docs/icons.png)
+![Los iconos del addon](docs/es/icons.png)
+
+| Español | Inglés |
+| --- | --- |
+| `tira-led.svg` | `led-strip.svg` |
+| `farol-pared.svg` | `wall-lantern.svg` |
+| `lampara-pergola.svg` | `pendant-lamp.svg` |
+| `lampara-pie.svg` | `floor-lamp.svg` |
+| `impresora-3d.svg` | `3d-printer.svg` |
+| `reproductor.svg` | `tv-box.svg` |
+| `terrario.svg` | `terrarium.svg` |
+| `calefactor.svg` | `fan-heater.svg` |
 
 ### Un atajo para abrirlo
 
