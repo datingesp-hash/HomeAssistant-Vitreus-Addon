@@ -319,8 +319,13 @@ scene HomeAssistant {
                 let ty = ct + 98 * u
                 let kx = tl + 17 * u + (tw2 - 34 * u) * sl_vs
                 //  first the veil over the tiles, which shuts it (declared before the card, so the card's zones win over it)
-                box { from: 0, 0; size: W, H; color: deep; opacity: 45% }
-                zone box sl_scrim_z { from: 0, 0; size: W, H }
+                //  (over all of Vitreus's glass, not only the content: past it by the glass's margin at the sides and the foot (14) and the title bar on top (38),
+                //  both in Vitreus's `cu`, 1.5525, with the glass's own corner, `rc`: 26, or 7 with the square themes, Retro and Cyber, times its `u`, 1.35)
+                let sl_gm = 14 * 1.5525
+                let sl_gt = 38 * 1.5525
+                let sl_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
+                box { from: -sl_gm, -sl_gt; size: W + 2 * sl_gm, H + sl_gt + sl_gm; corner: sl_gr; color: deep; opacity: 45% }
+                zone box sl_scrim_z { from: -sl_gm, -sl_gt; size: W + 2 * sl_gm, H + sl_gt + sl_gm; corner: sl_gr }
                 on press sl_scrim_z { sl_open = false }
                 on press right sl_scrim_z { sl_open = false }
                 body {
