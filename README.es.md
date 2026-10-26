@@ -85,11 +85,15 @@ Todo lo que dice el panel está en una sola tabla, `STR`, al principio de `homea
 
 ## Privacidad
 
-El token nunca va en la línea de comandos de curl, donde otros programas podrían leerlo: el addon lo escribe en `auth.curl`, en su carpeta de datos, y curl lo lee de ahí con `-K`. Ese archivo y `config.json` guardan el token, así que ciérralos para otros usuarios:
+El token nunca va en la línea de comandos de curl, donde otros programas podrían leerlo: el addon lo escribe en `auth.curl`, en su carpeta de datos, y curl lo lee de ahí con `-K`.
+
+Esa carpeta (`~/.local/share/pleamar/homeassistant/`, donde están `config.json` y `auth.curl`, los dos con el token) es privada: pleamar, a partir de la versión siguiente a la 0.4.31, crea la carpeta de datos de cada escena con permisos 0700 y los archivos que escribe con 0600 ([pleamar#107](https://github.com/k4ditano/pleamar/issues/107)). Una carpeta creada antes también se cierra, porque el addon escribe `auth.curl` cada vez que arranca. Con pleamar 0.4.31 o anterior, hazlo a mano:
 
 ```sh
-chmod 600 ~/.local/share/pleamar/homeassistant/config.json ~/.local/share/pleamar/homeassistant/auth.curl
+chmod 700 ~/.local/share/pleamar/homeassistant
 ```
+
+En los dos casos esto protege el token de otros usuarios del equipo; los programas que se ejecutan con tu usuario pueden seguir leyéndolo.
 
 ## Notas
 

@@ -86,11 +86,15 @@ Every word the panel shows is in one table, `STR` at the top of `homeassistant.l
 
 ## Privacy
 
-The token is never put on curl's command line, where other programs could read it: the add-on writes it to `auth.curl` in its data folder and curl reads it from there with `-K`. Both that file and `config.json` hold the token, so keep them to yourself:
+The token is never put on curl's command line, where other programs could read it: the add-on writes it to `auth.curl` in its data folder and curl reads it from there with `-K`.
+
+That folder (`~/.local/share/pleamar/homeassistant/`, which holds `config.json` and `auth.curl`, both with the token) is private: pleamar after 0.4.31 keeps a scene's data folder 0700 and the files it writes 0600 ([pleamar#107](https://github.com/k4ditano/pleamar/issues/107)). A folder made before is tightened too, since the add-on writes `auth.curl` every time it starts. With pleamar 0.4.31 or older, do it by hand:
 
 ```sh
-chmod 600 ~/.local/share/pleamar/homeassistant/config.json ~/.local/share/pleamar/homeassistant/auth.curl
+chmod 700 ~/.local/share/pleamar/homeassistant
 ```
+
+Either way this keeps the token from other users of the machine; programs running as you can still read it.
 
 ## Notes
 
