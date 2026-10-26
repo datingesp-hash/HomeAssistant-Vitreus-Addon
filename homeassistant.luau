@@ -112,6 +112,11 @@ local STR = {
         title_setup = "Configura Home Assistant", empty = "Aún no hay nada aquí",
         empty_hint = "Añade luces e interruptores en config.json: el engranaje de arriba lo abre.", brightness = "Brillo", close = "Cerrar",
         off_btn = "Apagar", resize = "Cambiar el tamaño de",
+        -- the printer's card
+        pr_idle = "En espera", pr_running = "Imprimiendo", pr_paused = "En pausa", pr_finished = "Terminada", pr_failed = "Fallida",
+        pr_preparing = "Preparando", pr_offline = "Sin conexión", progress = "Progreso", pr_left = "Quedan %s", pr_started = "Empezó %s",
+        pr_ends = "Termina %s", pr_ended = "Terminó %s", pause = "Pausar", resume = "Continuar", stop = "Detener", stop_sure = "¿Detener?",
+        camera = "Cámara", live = "EN DIRECTO", open_cam = "Abrir la cámara",
     },
     en = {
         connecting = "Connecting…", connected = "Connected · %d of %d %s", tile = "tile", tiles = "tiles", no_tiles = "Connected · no tiles",
@@ -132,6 +137,11 @@ local STR = {
         title_setup = "Set up Home Assistant", empty = "Nothing here yet",
         empty_hint = "Add lights and switches in config.json: the gear above opens it.", brightness = "Brightness", close = "Close",
         off_btn = "Off", resize = "Resize",
+        -- the printer's card
+        pr_idle = "Idle", pr_running = "Printing", pr_paused = "Paused", pr_finished = "Finished", pr_failed = "Failed",
+        pr_preparing = "Preparing", pr_offline = "Offline", progress = "Progress", pr_left = "%s left", pr_started = "Started %s",
+        pr_ends = "Ends %s", pr_ended = "Ended %s", pause = "Pause", resume = "Resume", stop = "Stop", stop_sure = "Stop?",
+        camera = "Camera", live = "LIVE", open_cam = "Open the camera",
     },
 }
 local lang = "en"
@@ -179,6 +189,14 @@ local function scene_words()
     text.t_close = T("close")
     text.t_off = T("off_btn")
     text.t_resize = T("resize")
+    text.t_progress = T("progress")
+    text.t_pause = T("pause")
+    text.t_resume = T("resume")
+    text.t_stop = T("stop")
+    text.t_stop_sure = T("stop_sure")
+    text.t_camera = T("camera")
+    text.t_live = T("live")
+    text.t_open_cam = T("open_cam")
 end
 on("fact:hl_editing", function() text.t_ed = fact.hl_editing == true and T("ed_done") or T("ed_start") end)
 
@@ -251,6 +269,95 @@ local function layout()
     fact.hl_cols = cols
 end
 
+-- A printer (a tile with "printer" in config.json: the entities of its job, its state, its progress, its times, its cover, its camera and its buttons). What
+-- its sensors say is read once here, for the tile (its line and its bar while it prints) and for the card a right click opens.
+local PR_KEYS = { "task", "progress", "remaining", "status", "start", "end", "cover", "camera", "pause", "resume", "stop" }
+local PR_POLL = { "task", "progress", "remaining", "status", "start", "end", "cover", "camera" }      -- (the buttons have nothing to read)
+local PR_STATE = { running = 1, printing = 1, pause = 2, paused = 2, finish = 3, finished = 3, failed = 4, error = 4,
+    prepare = 5, preparing = 5, init = 5, slicing = 5, idle = 0, offline = 6, unavailable = 6, unknown = 6 }
+local PR_LABEL = { [0] = "pr_idle", "pr_running", "pr_paused", "pr_finished", "pr_failed", "pr_preparing", "pr_offline" }
+local function pr_read(it)
+    local P = it.printer
+    local function e(k) return P[k] and est[P[k]] or nil end
+    local s = e("status")
+    local code = s and (PR_STATE[(s.st or ""):lower()] or 0) or 0
+    local prog = e("progress") and tonumber(e("progress").st) or nil
+    local left
+    local re = e("remaining")
+    local v = re and tonumber(re.st)
+    if v then
+        local unit = (re.unit or ""):lower()
+        left = unit == "h" and v * 60 or (unit == "s" and v / 60 or (unit == "d" and v * 1440 or v))       -- in minutes (Bambu Lab's is in minutes or hours)
+    end
+    local task = e("task") and e("task").st or ""
+    if task == "unknown" or task == "unavailable" then task = "" end
+    return { code = code, has_status = s ~= nil, prog = prog, left = left, task = task,
+        start = e("start") and e("start").tm or "", ends = e("end") and e("end").tm or "" }
+end
+local function duration(mins)
+    mins = math.floor(mins + 0.5)
+    if mins < 1 then return "< 1 min" end
+    local h, m = math.floor(mins / 60), mins % 60
+    if h == 0 then return m .. " min" end
+    if m == 0 then return h .. " h" end
+    return h .. " h " .. m .. " min"
+end
+
+-- The card's picture: the model's cover, or a frame of the camera, fetched with curl into the data folder (two files in turn, so the one on screen is never
+-- half written) and shown with a version, so the same name is read again.
+local pr_pic_n, pr_shown, pr_busy = 0, "", false
+local function pr_item()
+    local it = cfg and cfg.items[(tonumber(fact.pr_i) or -1) + 1]
+    return it and it.printer and it or nil
+end
+local function pr_fetch(pic)
+    if pr_busy or not cfg or not pic or pic == "" then return end
+    pr_busy = true
+    pr_pic_n = pr_pic_n + 1
+    local n = pr_pic_n
+    local path = folder .. "/printer-" .. (n % 2) .. ".img"
+    local args = { "-s", "-f", "-K", folder .. "/" .. AUTH, "--max-time", "8", "-o", path }
+    if cfg.insecure then args[#args + 1] = "-k" end
+    args[#args + 1] = cfg.url .. pic
+    run("curl", args, function(_, code)
+        pr_busy = false
+        if code == 0 then
+            model.pr_pic = { { img = path .. "?" .. n } }
+            fact.pr_has_pic = true
+        end
+    end)
+end
+local function pr_fill()
+    local it = pr_item()
+    if not it or fact.pr_open ~= true then return end
+    local P = it.printer
+    local pr = pr_read(it)
+    text.pr_icon = it.file and "" or it.icon
+    fact.pr_custom = it.file ~= nil
+    text.pr_task = pr.task ~= "" and pr.task or it.name
+    fact.pr_st = pr.code
+    text.pr_status = pr.has_status and T(PR_LABEL[pr.code] or "pr_idle") or ""
+    fact.pr_prog = math.max(0, math.min(1, (pr.prog or 0) / 100))
+    text.pr_pct = pr.prog and (math.floor(pr.prog + 0.5) .. " %") or "—"
+    local running = pr.code == 1 or pr.code == 2 or pr.code == 5
+    text.pr_left = (running and pr.left) and T("pr_left", duration(pr.left)) or "—"
+    text.pr_start = pr.start ~= "" and T("pr_started", pr.start) or "—"
+    text.pr_end = pr.ends ~= "" and T(running and "pr_ends" or "pr_ended", pr.ends) or "—"
+    fact.pr_has_cam = P.camera ~= nil
+    fact.pr_has_btn = P.pause ~= nil or P.resume ~= nil or P.stop ~= nil
+    if fact.pr_cam ~= true then
+        -- the cover: fetched again only when it changes (its state is when it last did; its address carries a token that changes by itself)
+        local ce = P.cover and est[P.cover]
+        if ce and ce.pic ~= "" then
+            local key = ce.st .. (ce.pic:gsub("token=[^&]*", ""))
+            if key ~= pr_shown then pr_shown = key; pr_fetch(ce.pic) end
+        elseif pr_shown ~= "none" then
+            pr_shown = "none"
+            fact.pr_has_pic = false
+        end
+    end
+end
+
 local function show()
     local rows, heads = {}, {}
     if cfg then
@@ -267,8 +374,16 @@ local function show()
             else
                 sub = s.on and (it.on_text or T("on")) or (it.off_text or T("off"))
             end
+            local pp = -1
+            if it.printer then
+                local pr = pr_read(it)
+                if pr.code == 1 or pr.code == 2 or pr.code == 5 then       -- printing, paused or getting ready: that, and how far, instead of the light's line
+                    sub = T(PR_LABEL[pr.code]) .. (pr.prog and (" · " .. math.floor(pr.prog + 0.5) .. " %") or "")
+                    pp = pr.prog and math.max(0, math.min(1, pr.prog / 100)) or -1
+                end
+            end
             rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = it.file and 1 or 0, sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
-                avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu }
+                avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp }
         end
         for k, room in ipairs(cfg.rooms) do
             if room.name ~= "" then
@@ -283,6 +398,7 @@ local function show()
             end
         end
     end
+    pr_fill()
     -- (only what changed: the poll answers every few seconds, mostly with the same)
     local sig = json.encode({ rows, heads, content })
     if sig == last_sig then return end
@@ -328,6 +444,9 @@ local function poll()
     end
     for _, it in ipairs(cfg.items) do if not it.bad then want(it.entity) end end
     for _, room in ipairs(cfg.rooms) do want(room.temp); want(room.hum) end
+    for _, it in ipairs(cfg.items) do
+        if it.printer then for _, k in ipairs(PR_POLL) do want(it.printer[k]) end end
+    end
     if #ids == 0 then
         set_state(1, T("no_tiles"))
         show()
@@ -336,7 +455,9 @@ local function poll()
     local quoted = {}
     for k, e in ipairs(ids) do quoted[k] = '"' .. e .. '"' end
     -- The state, the brightness (0 to 255) and the unit of each entity, as a JSON list, in the order of `ids`.
-    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}[{{ states(e) | tojson }},{{ (state_attr(e, 'brightness') or 0) | int }},{{ (state_attr(e, 'unit_of_measurement') or '') | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
+    -- The state, the brightness (0 to 255), the unit, the picture's address (an image's or a camera's) and, for a time, when it is (HH:MM, or dd/mm HH:MM
+    -- another day, in Home Assistant's time zone) of each entity, as a JSON list, in the order of `ids`.
+    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set ts = as_timestamp(states(e), none) %}[{{ states(e) | tojson }},{{ (state_attr(e, 'brightness') or 0) | int }},{{ (state_attr(e, 'unit_of_measurement') or '') | tojson }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{% if ts is not none %}{{ (ts | timestamp_custom('%H:%M') if (ts | timestamp_custom('%Y%m%d')) == now().strftime('%Y%m%d') else ts | timestamp_custom('%d/%m %H:%M')) | tojson }}{% else %}\"\"{% endif %}]{{ ',' if not loop.last }}{% endfor %}]"
     busy = true
     call("/api/template", json.encode({ template = tpl }), function(ok, out, err)
         busy = false
@@ -352,7 +473,7 @@ local function poll()
         end
         for k, e in ipairs(ids) do
             local row = list[k]
-            if type(row) == "table" then est[e] = { st = tostring(row[1] or "unknown"), bri = tonumber(row[2]) or 0, unit = tostring(row[3] or "") } end
+            if type(row) == "table" then est[e] = { st = tostring(row[1] or "unknown"), bri = tonumber(row[2]) or 0, unit = tostring(row[3] or ""), pic = tostring(row[4] or ""), tm = tostring(row[5] or "") } end
         end
         local count = 0
         for i, it in ipairs(cfg.items) do
@@ -371,6 +492,16 @@ local function poll()
         set_state(1, T("connected", count, #cfg.items, #cfg.items == 1 and T("tile") or T("tiles")))
         show()
     end)
+end
+
+-- A tile's "printer": the entities it names (any of PR_KEYS), the ones that are valid ids. None: no printer.
+local function parse_printer(p)
+    if type(p) ~= "table" then return nil end
+    local out, any = {}, false
+    for _, k in ipairs(PR_KEYS) do
+        if valid(p[k]) then out[k] = p[k]; any = true end
+    end
+    return any and out or nil
 end
 
 local function load()
@@ -430,6 +561,7 @@ local function load()
                     on_text = type(it.on_text) == "string" and it.on_text or nil,
                     off_text = type(it.off_text) == "string" and it.off_text or nil,
                     bad = not valid(entity),
+                    printer = parse_printer(it.printer),
                     room = k,
                 }
             end
@@ -522,6 +654,44 @@ on("hl_resize", function(k)
 end)
 
 -- The slider asks which light it is on: its name and icon
+-- The printer's card: opened (or on another printer), the camera switched, a button pressed
+local function pr_reset()
+    pr_shown = ""
+    fact.pr_has_pic = false
+    model.pr_pic = {}
+    pr_fill()
+end
+on("fact:pr_open", function(v) if v == true then pr_reset(); poll() end end)
+on("fact:pr_i", function() if fact.pr_open == true then pr_reset() end end)
+on("fact:pr_cam", function(v)
+    local it = pr_item()
+    if not it then return end
+    if v == true then
+        local ce = it.printer.camera and est[it.printer.camera]
+        if ce then pr_fetch(ce.pic) end
+    else
+        pr_shown = ""          -- (back to the cover)
+        pr_fill()
+    end
+end)
+on("pr_act", function(a)
+    a = tonumber(a) or -1
+    local it = pr_item()
+    if not it then return end
+    local P = it.printer
+    if a == 4 then            -- the camera, full size: its stream, in the browser (the address carries the camera's own short-lived token)
+        local ce = P.camera and est[P.camera]
+        if ce and ce.pic ~= "" then run("xdg-open", { cfg.url .. (ce.pic:gsub("/api/camera_proxy/", "/api/camera_proxy_stream/")) }, function() end) end
+        return
+    end
+    local target = ({ [0] = P.pause, [1] = P.resume, [2] = P.stop })[a]
+    if not target then return end
+    call("/api/services/button/press", json.encode({ entity_id = target }), function(ok, _, err)
+        if not ok then set_state(2, T("offline"), err) end
+        after(1500, poll)
+    end)
+end)
+
 on("fact:sl_i", function(v)
     local it = cfg and cfg.items[(tonumber(v) or -1) + 1]
     if it then
@@ -601,6 +771,11 @@ every(1000, function()
     if fact.hl_state == 2 then period = 10 end
     if fact.hl_state == 3 then return end
     if tick % period == 0 then poll() end
+    if open and fact.pr_open == true and fact.pr_cam == true and tick % 2 == 0 then
+        local it = pr_item()
+        local ce = it and it.printer.camera and est[it.printer.camera]
+        if ce then pr_fetch(ce.pic) end
+    end
 end)
 
 load()

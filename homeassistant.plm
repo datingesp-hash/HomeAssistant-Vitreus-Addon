@@ -84,7 +84,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number }      // kind 0 a light, 1 a switch · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number }      // kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -113,6 +113,42 @@ scene HomeAssistant {
     text sl_name = ""
     text sl_icon = "lightbulb"
     fact sl_custom = false                            // the light's icon is an svg of its own (drawn from its record, below)
+
+    //  The printer's card: a tile with "printer" in config.json opens it with a right click (a click still toggles the tile). The logic fills it from the printer's
+    //  sensors: the job, its state, its progress, the time left, when it started and ends, the model's cover or the camera, and its buttons.
+    fact pr_open = false
+    fact pr_i = -1
+    prop pr_k = 0 ~240ms
+    follow pr_k = if(pr_open, 1, 0)
+    fact pr_st = 0                                    // 0 waiting · 1 printing · 2 paused · 3 finished · 4 failed · 5 preparing · 6 offline
+    fact pr_prog = 0
+    prop pr_progs = 0 ~calm
+    follow pr_progs = pr_prog
+    text pr_icon = "print"
+    fact pr_custom = false
+    text pr_task = ""
+    text pr_status = ""
+    text pr_pct = ""
+    text pr_left = ""
+    text pr_start = ""
+    text pr_end = ""
+    fact pr_has_pic = false                           // a picture to show: the model's cover, or the camera
+    fact pr_has_cam = false
+    fact pr_has_btn = false                           // pause, resume and stop are configured
+    fact pr_cam = false                               // the camera instead of the cover
+    fact pr_arm = false                               // stop pressed once: a second press within three seconds stops the print
+    model pr_pic max 1 { img: image 512, 512 }
+    event pr_act ->                                   // 0 pause · 1 resume · 2 stop · 4 the camera, full size, in the browser
+    on change pr_open while not pr_open { pr_cam = false; pr_arm = false }
+    on still pr_arm for 3000ms while pr_arm { pr_arm = false }
+    text t_progress = ""
+    text t_pause = ""
+    text t_resume = ""
+    text t_stop = ""
+    text t_stop_sure = ""
+    text t_camera = ""
+    text t_live = ""
+    text t_open_cam = ""
     prop sl_k = 0 ~240ms
     follow sl_k = if(sl_open, 1, 0)
     prop sl_vs = 0 ~quick                             // the fill, a hair behind the finger
@@ -221,7 +257,8 @@ scene HomeAssistant {
                         opacity: if(r.avail > 0.5, 100%, 45%)
                         zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { emit hl_tap(r.index) }
-                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 { sl_i = r.index; sl_v = r.bri; sl_dirty = false; sl_open = true }
+                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_v = r.bri; sl_dirty = false; sl_open = true }
+                        on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_open = true }
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 13% * lit }
@@ -246,6 +283,14 @@ scene HomeAssistant {
                             let bw = mix(tww - 76 * u, tww - 36 * u, tall)
                             box { from: bx, cy0 + thh - 13 * u; size: bw, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
                             box { from: bx, cy0 + thh - 13 * u; size: max(3 * u, bw * bv), 3 * u; corner: 1.5 * u; color: mint }
+                        }
+                        //  a printer: the print's progress along the bottom, while one runs
+                        group {
+                            show: r.prn > 0.5 and r.pp >= 0 and not (r.kind == 0 and lit > 0.5)
+                            let px0 = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
+                            let pw0 = mix(tww - if(r.kind == 1, 116, 76) * u, tww - 36 * u, tall)
+                            box { from: px0, cy0 + thh - 13 * u; size: pw0, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
+                            box { from: px0, cy0 + thh - 13 * u; size: max(3 * u, pw0 * r.pp), 3 * u; corner: 1.5 * u; color: mint }
                         }
                         //  a switch: the shell's pill, the knob sliding to the lit side (top right in a tall tile)
                         group {
@@ -387,6 +432,125 @@ scene HomeAssistant {
                     text t_off { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i == 0; family: "Space Grotesk" }
                     text pick(i, "", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i > 0; family: "Space Grotesk" }
                 }
+            }
+
+            //  ── the printer's card: over the panel like the slider's, shut by a click outside it, its X or a right click ──
+            group {
+                opacity: pr_k
+                show: pr_k > 0.01
+                let pcw = min(W - 28 * u, 460 * u)
+                let pch = 320 * u
+                let pcl = (W - pcw) / 2
+                let pct = (H - pch) / 2 + 10 * u * (1 - pr_k)
+                let plit = if(pr_st == 1, 1, 0)
+                //  the veil, as the slider's (over all of Vitreus's glass)
+                let pr_gm = 14 * 1.5525
+                let pr_gt = 38 * 1.5525
+                let pr_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
+                box { from: -pr_gm, -pr_gt; size: W + 2 * pr_gm, H + pr_gt + pr_gm; corner: pr_gr; color: deep; opacity: 45% }
+                zone box pr_scrim_z { from: -pr_gm, -pr_gt; size: W + 2 * pr_gm, H + pr_gt + pr_gm; corner: pr_gr }
+                on press pr_scrim_z { pr_open = false }
+                on press right pr_scrim_z { pr_open = false }
+                body {
+                    color: card
+                    shadow: 0, 10 * u, 30 * u, 45%, deep
+                    rim: 10%
+                    box { from: pcl, pct; size: pcw, pch; corner: 20 * u }
+                }
+                zone box pr_card_z { from: pcl, pct; size: pcw, pch; corner: 20 * u }
+                on press right pr_card_z { pr_open = false }
+                //  the head: the printer's disc (lit while it prints), the job and its state, and the X
+                body {
+                    color: mix(off, mint, plit)
+                    shadow: 0, 0, 10 * u * plit, 45%, mint
+                    rim: 16%
+                    ellipse { at: pcl + 42 * u, pct + 42 * u; radius: 20 * u }
+                }
+                text pr_icon { at: pcl + 42 * u, pct + 42 * u; anchor: center; size: 22; color: mix(ink, onmint, plit); show: not pr_custom; family: "Material Symbols Outlined" }
+                for r in hl_items {
+                    image r.img { at: pcl + 31 * u, pct + 31 * u; size: 22 * u, 22 * u; tint: mix(ink, onmint, plit); show: pr_custom and r.index == pr_i }
+                }
+                text pr_task { at: pcl + 72 * u, pct + 33 * u; anchor: left center; size: 15; weight: 700; width: pcw - 130 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                row {
+                    at: pcl + 72 * u, pct + 46 * u
+                    gap: 6 * u
+                    align: center
+                    ellipse { radius: 3.5 * u; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert) }
+                    text pr_status { size: 11.5; weight: 600; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert); family: "Space Grotesk" }
+                }
+                ellipse { at: pcl + pcw - 30 * u, pct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * pr_x_z.hover }
+                text "close" { at: pcl + pcw - 30 * u, pct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, pr_x_z.hover); family: "Material Symbols Outlined" }
+                zone box pr_x_z { at: pcl + pcw - 30 * u, pct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
+                on press pr_x_z { pr_open = false }
+                //  the picture: the model's cover, or the camera (live, a frame every two seconds; a click on it opens it full size in the browser)
+                let pis = 140 * u
+                let pix = pcl + 20 * u
+                let piy = pct + 84 * u
+                box { from: pix, piy; size: pis, pis; corner: 14 * u; color: ink; opacity: 6% }
+                text "deployed_code" { at: pix + pis / 2, piy + pis / 2; anchor: center; size: 40; color: faint; opacity: if(pr_has_pic, 0%, 60%); family: "Material Symbols Outlined" }
+                group {
+                    clip box { from: pix, piy; size: pis, pis; corner: 14 * u }
+                    for p in pr_pic { image p.img { at: pix, piy; size: pis, pis; fit: cover; show: pr_has_pic } }
+                }
+                group {
+                    show: pr_cam and pr_has_pic
+                    box { from: pix + 8 * u, piy + pis - 30 * u; size: 70 * u, 22 * u; corner: 11 * u; color: deep; opacity: 75% }
+                    ellipse { at: pix + 20 * u, piy + pis - 19 * u; radius: 3.5 * u; color: alert }
+                    text t_live { at: pix + 29 * u, piy + pis - 19 * u; anchor: left center; size: 10; weight: 700; color: ink; family: "Space Grotesk" }
+                    ellipse { at: pix + pis - 19 * u, piy + 19 * u; radius: 12 * u; color: deep; opacity: 60% + 20% * pr_pic_z.hover }
+                    text "open_in_new" { at: pix + pis - 19 * u, piy + 19 * u; anchor: center; size: 14; color: ink; family: "Material Symbols Outlined" }
+                }
+                zone box pr_pic_z { from: pix, piy; size: pis, pis; corner: 14 * u; cursor: pointer; active: pr_cam and pr_has_pic; label: t_open_cam }
+                on press pr_pic_z { emit pr_act(4) }
+                //  beside it: the progress, its bar, the time left, when it started and when it ends
+                let prx = pix + pis + 18 * u
+                let prw = pcl + pcw - 20 * u - prx
+                text t_progress { at: prx, piy + 8 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                text pr_pct { at: prx, piy + 34 * u; anchor: left center; size: 30; weight: 700; color: ink; family: "Space Grotesk" }
+                box { from: prx, piy + 58 * u; size: prw, 6 * u; corner: 3 * u; color: ink; opacity: 10% }
+                body {
+                    gradient: prx, piy to prx + prw, piy, mintlo, minthi
+                    shadow: 0, 0, 8 * u * plit, 30%, mint
+                    box { from: prx, piy + 58 * u; size: max(6 * u, prw * pr_progs), 6 * u; corner: 3 * u }
+                }
+                text "schedule" { at: prx + 8 * u, piy + 90 * u; anchor: center; size: 16; color: faint; family: "Material Symbols Outlined" }
+                text pr_left { at: prx + 24 * u, piy + 90 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                text "play_circle" { at: prx + 8 * u, piy + 114 * u; anchor: center; size: 16; color: faint; family: "Material Symbols Outlined" }
+                text pr_start { at: prx + 24 * u, piy + 114 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                text "flag" { at: prx + 8 * u, piy + 138 * u; anchor: center; size: 16; color: faint; family: "Material Symbols Outlined" }
+                text pr_end { at: prx + 24 * u, piy + 138 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                //  the buttons: pause or resume, stop (pressed twice: the first asks), and the camera
+                let pbw = (pcw - 40 * u - 2 * 8 * u) / 3
+                let pby = pct + pch - 54 * u
+                let pb0 = pr_has_btn and (pr_st == 1 or pr_st == 2)
+                let pb1 = pr_has_btn and (pr_st == 1 or pr_st == 2 or pr_st == 5)
+                repeat i in 0..3 {
+                    let bx = pcl + 20 * u + i * (pbw + 8 * u)
+                    let on = pick(i, if(pb0, 1, 0), if(pb1, 1, 0), if(pr_has_cam, 1, 0))
+                    let hot = pick(i, 0, if(pr_arm, 1, 0), if(pr_cam, 1, 0))      // filled: stop armed (red), the camera on (the accent)
+                    group {
+                        opacity: if(on > 0.5, 100%, 35%)
+                        box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: ink; opacity: (8% + 8% * pr_b_z.$i.hover) * (1 - hot) }
+                        box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: if(i == 1, alert, mint); opacity: 90% * hot }
+                        row {
+                            at: bx + pbw / 2, pby + 13 * u      // (a little above the middle: the icon font's line is taller than what it draws)
+                            anchor: center
+                            gap: 6 * u
+                            align: center
+                            text pick(i + 3 * if(pr_st == 2, 1, 0), "pause", "stop", "videocam", "play_arrow", "stop", "videocam") { size: 17; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); family: "Material Symbols Outlined" }
+                            text t_pause { size: 12.5; weight: 700; color: ink; show: i == 0 and pr_st != 2; family: "Space Grotesk" }
+                            text t_resume { size: 12.5; weight: 700; color: ink; show: i == 0 and pr_st == 2; family: "Space Grotesk" }
+                            text t_stop { size: 12.5; weight: 700; color: alert; show: i == 1 and not pr_arm; family: "Space Grotesk" }
+                            text t_stop_sure { size: 12.5; weight: 700; color: onmint; show: i == 1 and pr_arm; family: "Space Grotesk" }
+                            text t_camera { size: 12.5; weight: 700; color: if(pr_cam, onmint, ink); show: i == 2; family: "Space Grotesk" }
+                        }
+                        zone box pr_b_z.$i { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; cursor: pointer; active: on > 0.5; label: pick(i, "{t_pause} / {t_resume}", "{t_stop}", "{t_camera}") }
+                    }
+                }
+                on press pr_b_z.0 { emit pr_act(if(pr_st == 2, 1, 0)) }
+                on press pr_b_z.1 while pr_arm { emit pr_act(2); pr_arm = false }
+                on press pr_b_z.1 while not pr_arm { pr_arm = true }
+                on press pr_b_z.2 { toggle pr_cam }
             }
         }
     }

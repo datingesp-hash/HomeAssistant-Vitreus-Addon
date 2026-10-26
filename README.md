@@ -8,6 +8,7 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 
 - **Rooms**, each with its name and, if you give it sensors, its temperature and humidity.
 - **A click** turns a tile on or off. **A right click** on a light opens a brightness slider (drag it, use the wheel, or pick off / 25 / 50 / 75 / 100 %).
+- **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
 - **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them.
@@ -51,6 +52,31 @@ The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.js
     - `on_text`, `off_text` (optional): the line under the name when it is on or off.
 
 A plain `items` list at the top level (without rooms) works too: it is shown first, with no title.
+
+### A 3D printer's card
+
+Give a tile a `"printer"` block and a right click on it opens a card with the print: the model's cover (or the printer's camera), the job, its state, its progress, the time left, when it started and when it ends, and Pause / Resume / Stop (Stop asks again). A click on the tile still toggles its own entity (the printer's light, say), and while it prints the tile shows *Printing · 62 %* with a bar. Every entity is optional; leave out the ones your printer does not have.
+
+```json
+{ "type": "toggle", "name": "Printer", "icon": "3d-printer.svg", "entity": "light.p1p_chamber_light",
+  "printer": {
+    "task":      "sensor.p1p_task_name",
+    "progress":  "sensor.p1p_print_progress",
+    "remaining": "sensor.p1p_remaining_time",
+    "status":    "sensor.p1p_print_status",
+    "start":     "sensor.p1p_start_time",
+    "end":       "sensor.p1p_end_time",
+    "cover":     "image.p1p_cover_image",
+    "camera":    "camera.p1p_camera",
+    "pause":     "button.p1p_pause_printing",
+    "resume":    "button.p1p_resume_printing",
+    "stop":      "button.p1p_stop_printing"
+  } }
+```
+
+![The printer's card](docs/en/printer.png)
+
+These are the [Bambu Lab integration](https://github.com/greghesp/ha-bambulab)'s entities for a printer called P1P (their names follow Home Assistant's language and your printer's name: check yours in Settings > Devices & services > Entities). `status` understands `running`, `pause`, `finish`, `failed`, `prepare`, `idle` and `offline`; `remaining` is read in its own unit (minutes, hours or seconds). The camera shows a frame every two seconds inside the card; a click on it opens the live stream in your browser.
 
 ### The add-on's own icons
 

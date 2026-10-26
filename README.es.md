@@ -8,6 +8,7 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 
 - **Habitaciones**, cada una con su nombre y, si le pones sensores, su temperatura y humedad.
 - **Clic** en una ficha: enciende o apaga. **Clic derecho** en una luz: abre el control de brillo (arrastra, usa la rueda o pulsa Apagar / 25 / 50 / 75 / 100 %).
+- **Impresoras 3D**: un clic derecho en la ficha de una impresora abre una tarjeta con la portada o la cámara, el progreso, los tiempos y sus botones.
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
 - **En la isla**: arrastra la pieza de add-ons a la barra (Ajustes > Bar > Island layout) y el panel se despliega desde la barra como los paneles de la shell.
 - **Estética de Vitreus**: toma la paleta y el tema de la shell, y cambia con ellos.
@@ -50,6 +51,31 @@ La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ej
     - `on_text`, `off_text` (opcionales): el texto de debajo cuando está encendido o apagado.
 
 Un `items` suelto fuera de `rooms` también vale: sale arriba, sin título.
+
+### La tarjeta de una impresora 3D
+
+Ponle a una ficha un bloque `"printer"` y un clic derecho sobre ella abre una tarjeta con la impresión: la portada del modelo (o la cámara de la impresora), el trabajo, su estado, el progreso, el tiempo restante, cuándo empezó y cuándo termina, y Pausar / Continuar / Detener (Detener pide confirmación). El clic normal sigue encendiendo y apagando la entidad de la ficha (la luz de la impresora, por ejemplo), y mientras imprime la ficha muestra *Imprimiendo · 62 %* con una barra. Todas las entidades son opcionales: quita las que tu impresora no tenga.
+
+```json
+{ "type": "toggle", "name": "Impresora", "icon": "impresora-3d.svg", "entity": "light.p1p_luz_de_la_carcasa",
+  "printer": {
+    "task":      "sensor.p1p_nombre_de_la_tarea",
+    "progress":  "sensor.p1p_progreso_de_la_impresion",
+    "remaining": "sensor.p1p_tiempo_restante",
+    "status":    "sensor.p1p_estado_de_la_impresion",
+    "start":     "sensor.p1p_tiempo_de_inicio",
+    "end":       "sensor.p1p_tiempo_de_finalizacion",
+    "cover":     "image.p1p_imagen_de_portada",
+    "camera":    "camera.p1p_camara",
+    "pause":     "button.p1p_pausar_la_impresion",
+    "resume":    "button.p1p_continuar_la_impresion",
+    "stop":      "button.p1p_detener_la_impresion"
+  } }
+```
+
+![La tarjeta de la impresora](docs/es/printer.png)
+
+Son las entidades de la [integración de Bambu Lab](https://github.com/greghesp/ha-bambulab) para una impresora llamada P1P, con Home Assistant en español (los nombres dependen del idioma y del nombre de tu impresora: míralos en Ajustes > Dispositivos y servicios > Entidades). `status` entiende `running`, `pause`, `finish`, `failed`, `prepare`, `idle` y `offline`; `remaining` se lee en su propia unidad (minutos, horas o segundos). La cámara muestra un fotograma cada dos segundos dentro de la tarjeta; un clic sobre ella la abre en directo en el navegador.
 
 ### Los iconos propios del addon
 
