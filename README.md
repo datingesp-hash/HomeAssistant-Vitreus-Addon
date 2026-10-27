@@ -43,7 +43,7 @@ The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.js
 - `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
 - `token`: a long-lived access token. In Home Assistant: your profile > Security > Long-lived access tokens > Create token.
 - `insecure`: `true` only for https with a self-signed certificate.
-- `artwork_search` (optional): `false` to not look up artwork in Apple's catalogue for an Apple TV (see its card, below).
+- `artwork_search` (optional): `false` to not look up artwork online for an Apple TV (see its card, below).
 - `rooms`: the rooms, in order. Each has:
   - `name`: shown as its title.
   - `temperature`, `humidity` (optional): a sensor entity; its reading is shown beside the name.
@@ -84,7 +84,17 @@ Give an Apple TV's tile an `"apple_tv"` block with its remote entity, and a righ
 
 These are the [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/)'s entities: it makes a `media_player.` and a `remote.` with the same name for each Apple TV (check yours in Settings > Devices & services > Apple TV). The remote's buttons go to `remote.send_command`, the rest to the media player (mute sets its volume to nothing and back, when it reports one). The card shrinks a little when the panel is not tall enough for it. If the tile's entity is not the media player, add `"media_player": "media_player.…"` to the block. Without `remote` the card has no remote tab, so it works for any other media player too. While it plays, the tile says so: *Playing · La casa de papel*.
 
-**Artwork.** Home Assistant often has none: many apps (Crunchyroll and most that are not Apple's) give the Apple TV no artwork. Then the add-on looks it up in Apple's public iTunes catalogue: the series' poster when the player names a series and a season of it is found under that name, the film's when the title is exactly a film's, and otherwise the app's own icon with its name. Only the series, the title and the app's name are sent to Apple; each is asked once and kept. `"artwork_search": false` turns it off.
+**Artwork.** Home Assistant often has none: many apps (Crunchyroll and most that are not Apple's) give the Apple TV no artwork. Then the add-on looks it up in the free public catalogue that knows that kind of thing best (none needs an account or a key), chosen by the app and by what it plays:
+
+| What plays | Where |
+| --- | --- |
+| Music (Spotify, Music…) with its artist | [Deezer](https://developers.deezer.com/api), the album's cover; then Apple's iTunes |
+| A series, in an anime app (Crunchyroll…) | [AniList](https://anilist.co), its cover |
+| A series, in any other app | [TVmaze](https://www.tvmaze.com/api), its poster; then iTunes |
+| Only a title | iTunes, a film with exactly that title; then TVmaze, a series with exactly that name |
+| None of that found | the app's own icon (iTunes), over its name |
+
+A match must carry the name it was asked for, so a near miss shows the app's icon rather than somebody else's poster. What the Apple TV sends decides how far it gets: Crunchyroll, for one, sends only the episode's title (no series), so it shows its icon. Only the series, the title, the artist and the app's name are sent; each is asked once and kept. `"artwork_search": false` turns it off.
 
 ### A 3D printer's card
 
@@ -155,7 +165,7 @@ chmod 700 ~/.local/share/pleamar/homeassistant
 
 Either way this keeps the token from other users of the machine; programs running as you can still read it.
 
-An Apple TV's artwork lookup (above) asks `itunes.apple.com` with what is playing (series, title, app); turn it off with `"artwork_search": false`.
+An Apple TV's artwork lookup (above) asks public catalogues (Deezer, AniList, TVmaze, iTunes) with what is playing (series, title, artist, app); turn it off with `"artwork_search": false`.
 
 ## Notes
 

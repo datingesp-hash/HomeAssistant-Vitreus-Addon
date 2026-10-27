@@ -425,12 +425,23 @@ local function tv_fetch(pic)
         end
     end)
 end
--- Artwork where Home Assistant has none (many apps give the Apple TV none): looked up in Apple's public iTunes catalogue (itunes.apple.com/search, no
--- account, no key), by what plays. The series' poster when the player names a series and a season of it is found under that name; the film's when the title
--- is exactly a film's; and otherwise the app's own icon. Only the series, the title and the app's name are sent, never anything of Home Assistant's, and
--- `"artwork_search": false` in config.json turns it off. What is found is kept (in memory, and its picture in the data folder), so each thing is asked once.
+-- Artwork where Home Assistant has none (many apps give the Apple TV none): looked up by what plays, in the free public catalogue that knows that kind of thing
+-- best (none needs an account or a key), chosen by the app and by what it says it plays:
+--   music (Spotify, Music…, or a song with its artist)  Deezer, by artist and title: the album's cover; then Apple's iTunes catalogue
+--   a series, from an anime app (Crunchyroll…)          AniList, by the series' name: its cover
+--   a series, from any other app                        TVmaze, by the series' name: its poster; then iTunes
+--   only a title                                        iTunes, a film with exactly that title; then TVmaze, a series with exactly that name
+--   none of that found                                  the app's own icon (iTunes), over its name
+-- A match must carry the name it was asked for, so a near miss shows the app's icon rather than somebody else's poster. Only the series, the title, the artist
+-- and the app's name are sent, never anything of Home Assistant's; `"artwork_search": false` in config.json turns it off. What is found is kept (in memory,
+-- and its picture in the data folder), so each thing is asked once.
 local ITUNES = "https://itunes.apple.com/search"
-local art = {}               -- by what plays ("app|series|title") and by app ("app:Netflix"): { kind = 1 artwork · 2 an app's icon, path }, or false: none
+local DEEZER = "https://api.deezer.com/search"
+local TVMAZE = "https://api.tvmaze.com/singlesearch/shows"
+local ANILIST = "https://graphql.anilist.co"
+local MUSIC_APPS = { spotify = true, ["música"] = true, music = true, applemusic = true, deezer = true, tidal = true, amazonmusic = true, youtubemusic = true }
+local ANIME_APPS = { crunchyroll = true, hidive = true, animelab = true, funimation = true, adn = true }
+local art = {}               -- by what plays ("app|series|artist|title") and by app ("app:Netflix"): { kind = 1 artwork · 2 an app's icon, path }, or false: none
 local art_busy = {}
 local function urlenc(x) return (x:gsub("[^%w%-_%.~]", function(c) return string.format("%%%02X", string.byte(c)) end)) end
 local function norm(x) return (tostring(x or ""):lower():gsub("[^%w]", "")) end
@@ -439,18 +450,87 @@ local function hash(x)
     for i = 1, #x do h = (h * 33 + x:byte(i)) % 4294967296 end
     return string.format("%08x", h)
 end
-local function itunes(media, entity, term, choose, done)
-    local q = ITUNES .. "?media=" .. media .. "&entity=" .. entity .. "&limit=8&country=" .. (lang == "es" and "es" or "us") .. "&term=" .. urlenc(term)
-    run("curl", { "-s", "-f", "-L", "--max-time", "10", q }, function(out, code)
+local function same(a, b) a, b = norm(a), norm(b) return #b >= 2 and a == b end
+local function starts(a, b) a, b = norm(a), norm(b) return #b >= 3 and a:sub(1, #b) == b end
+-- a JSON answer from a public catalogue (`body`: POSTed as JSON). `done(table or nil)`.
+local function web(url, body, done)
+    local args = { "-s", "-f", "-L", "--max-time", "10" }
+    local opts = nil
+    if body then
+        for _, x in ipairs({ "-X", "POST", "-H", "Content-Type: application/json", "-H", "Accept: application/json", "--data-binary", "@-" }) do args[#args + 1] = x end
+        opts = { input = body }
+    end
+    args[#args + 1] = url
+    run("curl", args, function(out, code)
         local ok, j = pcall(json.decode, code == 0 and out or "")
-        if ok and type(j) == "table" and type(j.results) == "table" then
-            for _, r in ipairs(j.results) do
-                local u = type(r) == "table" and choose(r)
-                if type(u) == "string" and u:match("^https://") then done(u) return end
+        done(ok and type(j) == "table" and j or nil)
+    end, opts)
+end
+local function https(u) return type(u) == "string" and u:match("^https://") and u or nil end
+local function big(u, size) return (tostring(u or ""):gsub("%d+x%d+bb", size .. "x" .. size .. "bb")) end
+local function itunes(media, entity, term, choose, done)
+    web(ITUNES .. "?media=" .. media .. "&entity=" .. entity .. "&limit=8&country=" .. (lang == "es" and "es" or "us") .. "&term=" .. urlenc(term), nil, function(j)
+        for _, r in ipairs(j and type(j.results) == "table" and j.results or {}) do
+            local u = type(r) == "table" and https(choose(r))
+            if u then done(u) return end
+        end
+        done(nil)
+    end)
+end
+-- the sources, each `done(url or nil)`
+local function from_deezer(artist, title, done)
+    web(DEEZER .. "?limit=8&q=" .. urlenc('artist:"' .. artist .. '" track:"' .. title .. '"'), nil, function(j)
+        for _, r in ipairs(j and type(j.data) == "table" and j.data or {}) do
+            if type(r) == "table" and type(r.artist) == "table" and type(r.album) == "table" and (same(r.artist.name, artist) or starts(artist, r.artist.name)) then
+                local u = https(r.album.cover_xl or r.album.cover_big)
+                if u then done(u) return end
             end
         end
         done(nil)
     end)
+end
+local function from_itunes_song(artist, title, done)
+    itunes("music", "song", artist .. " " .. title, function(r)
+        return (same(r.artistName, artist) or starts(r.artistName, artist)) and starts(r.trackName, title) and big(r.artworkUrl100, 600) or nil
+    end, done)
+end
+local function from_anilist(series, done)
+    local q = 'query ($s: String) { Page(perPage: 5) { media(search: $s, type: ANIME) { title { romaji english native } synonyms coverImage { extraLarge large } } } }'
+    web(ANILIST, json.encode({ query = q, variables = { s = series } }), function(j)
+        local list = j and type(j.data) == "table" and type(j.data.Page) == "table" and j.data.Page.media or {}
+        for _, m in ipairs(type(list) == "table" and list or {}) do
+            local t = type(m) == "table" and m.title or {}
+            local hit = same(t.romaji, series) or same(t.english, series) or same(t.native, series) or starts(t.english, series) or starts(t.romaji, series)
+            for _, syn in ipairs(type(m.synonyms) == "table" and m.synonyms or {}) do hit = hit or same(syn, series) end
+            if hit and type(m.coverImage) == "table" then
+                local u = https(m.coverImage.extraLarge or m.coverImage.large)
+                if u then done(u) return end
+            end
+        end
+        done(nil)
+    end)
+end
+local function from_tvmaze(name, exact, done)
+    web(TVMAZE .. "?q=" .. urlenc(name), nil, function(j)
+        local ok = j and (same(j.name, name) or (not exact and starts(j.name, name)))
+        done(ok and type(j.image) == "table" and https(j.image.original or j.image.medium) or nil)
+    end)
+end
+local function from_itunes_season(name, done)
+    itunes("tvShow", "tvSeason", name, function(r) return starts(r.collectionName, name) and big(r.artworkUrl100, 600) or nil end, done)
+end
+local function from_itunes_movie(title, done)
+    itunes("movie", "movie", title, function(r) return same(r.trackName, title) and #norm(title) >= 3 and big(r.artworkUrl100, 600) or nil end, done)
+end
+-- tries each source in turn until one finds it
+local function first(tries, done)
+    local k = 0
+    local function step(u)
+        if u then done(u) return end
+        k = k + 1
+        if tries[k] then tries[k](step) else done(nil) end
+    end
+    step(nil)
 end
 local function art_get(url, kind, done)
     local path = folder .. "/art-" .. hash(url) .. ".img"
@@ -465,34 +545,36 @@ local function art_app(app, done)
     if art[key] ~= nil then done(art[key]) return end
     itunes("software", "software", app, function(r)
         local n = norm(r.trackName)
-        return (n:find(norm(app), 1, true) or norm(app):find(n, 1, true)) and big(r.artworkUrl512 or r.artworkUrl100, 512) or nil
+        return #n > 0 and #norm(app) > 0 and (n:find(norm(app), 1, true) or norm(app):find(n, 1, true)) and big(r.artworkUrl512 or r.artworkUrl100, 512) or nil
     end, function(u)
         if not u then art[key] = false; done(false) return end
         art_get(u, 2, function(a) art[key] = a; done(a) end)
     end)
 end
 local function art_find(t, done)
-    local series, title, app = t.series or "", t.title or "", t.app or ""
-    local function by_app() if app ~= "" then art_app(app, done) else done(false) end end
-    local function got(u) if u then art_get(u, 1, function(a) if a then done(a) else by_app() end end) else by_app() end end
-    local function season_of(name)            -- a season whose name begins with the series' ("Arcane", "Arcane: Season 2")
-        local n = norm(name)
-        return function(r)
-            local c = norm(r.collectionName)
-            return #n >= 3 and c:sub(1, #n) == n and big(r.artworkUrl100, 600) or nil
-        end
+    local series, title, artist, app = t.series or "", t.title or "", t.artist or "", t.app or ""
+    local music = MUSIC_APPS[norm(app)] or MUSIC_APPS[(app:lower():gsub("%s", ""))] or t.ctype == "music"
+    local anime = ANIME_APPS[norm(app)]
+    local tries = {}
+    local function add(f) tries[#tries + 1] = f end
+    if music and artist ~= "" and title ~= "" then
+        add(function(k) from_deezer(artist, title, k) end)
+        add(function(k) from_itunes_song(artist, title, k) end)
+    elseif series ~= "" then
+        if anime then add(function(k) from_anilist(series, k) end) end
+        add(function(k) from_tvmaze(series, false, k) end)
+        if not anime then add(function(k) from_anilist(series, k) end) end
+        add(function(k) from_itunes_season(series, k) end)
+    elseif title ~= "" and not music then
+        if anime then add(function(k) from_anilist(title, k) end) end
+        add(function(k) from_itunes_movie(title, k) end)
+        add(function(k) from_tvmaze(title, true, k) end)
     end
-    if series ~= "" then
-        itunes("tvShow", "tvSeason", series, season_of(series), got)
-    elseif title ~= "" then
-        itunes("movie", "movie", title, function(r)
-            return norm(r.trackName) == norm(title) and #norm(title) >= 3 and big(r.artworkUrl100, 600) or nil
-        end, function(u)
-            if u then got(u) else itunes("tvShow", "tvSeason", title, season_of(title), got) end       -- some apps put the series in the title
-        end)
-    else
-        by_app()
-    end
+    first(tries, function(u)
+        local function by_app() if app ~= "" then art_app(app, done) else done(false) end end
+        if not u then by_app() return end
+        art_get(u, 1, function(a) if a then done(a) else by_app() end end)
+    end)
 end
 local art_shown = ""
 local function art_show(a)
@@ -551,7 +633,7 @@ local function tv_fill()
     end
     -- none from Home Assistant: the one looked up (or being looked up) for what plays
     if code == 0 or not cfg.art_search or (title == "" and app == "") then art_show(false) return end
-    local key = app .. "|" .. (t.series or "") .. "|" .. title
+    local key = app .. "|" .. (t.series or "") .. "|" .. (t.artist or "") .. "|" .. title
     if art[key] ~= nil then art_show(art[key]) return end
     if art_busy[key] then return end
     art_busy[key] = true
@@ -571,8 +653,9 @@ local function tv_poll()
     if #ids == 0 then return end
     local quoted = {}
     for k, e in ipairs(ids) do quoted[k] = '"' .. e .. '"' end
-    -- the state, the title, the artist, the series, the app, the length, the position and how long ago it was told (seconds), the artwork and the volume
-    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set u = state_attr(e, 'media_position_updated_at') %}[{{ states(e) | tojson }},{{ (state_attr(e, 'media_title') or '') | tojson }},{{ (state_attr(e, 'media_artist') or state_attr(e, 'media_album_artist') or '') | tojson }},{{ (state_attr(e, 'media_series_title') or '') | tojson }},{{ (state_attr(e, 'app_name') or state_attr(e, 'source') or '') | tojson }},{{ state_attr(e, 'media_duration') | float(0) }},{{ state_attr(e, 'media_position') | float(-1) }},{{ ((as_timestamp(now()) - as_timestamp(u, as_timestamp(now()))) | round(1)) if u else 0 }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{{ state_attr(e, 'volume_level') | float(-1) }}]{{ ',' if not loop.last }}{% endfor %}]"
+    -- the state, the title, the artist, the series, the app, the length, the position and how long ago it was told (seconds), the artwork, the volume and
+    -- what kind of thing it is (music, video…)
+    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set u = state_attr(e, 'media_position_updated_at') %}[{{ states(e) | tojson }},{{ (state_attr(e, 'media_title') or '') | tojson }},{{ (state_attr(e, 'media_artist') or state_attr(e, 'media_album_artist') or '') | tojson }},{{ (state_attr(e, 'media_series_title') or '') | tojson }},{{ (state_attr(e, 'app_name') or state_attr(e, 'source') or '') | tojson }},{{ state_attr(e, 'media_duration') | float(0) }},{{ state_attr(e, 'media_position') | float(-1) }},{{ ((as_timestamp(now()) - as_timestamp(u, as_timestamp(now()))) | round(1)) if u else 0 }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{{ state_attr(e, 'volume_level') | float(-1) }},{{ (state_attr(e, 'media_content_type') or '') | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
     tv_busy = true
     call("/api/template", json.encode({ template = tpl }), function(ok, out)
         tv_busy = false
@@ -583,7 +666,7 @@ local function tv_poll()
             local r = list[k]
             if type(r) == "table" then
                 tvs[e] = { st = tostring(r[1] or "unknown"), title = tostring(r[2] or ""), artist = tostring(r[3] or ""), series = tostring(r[4] or ""),
-                    app = tostring(r[5] or ""), dur = tonumber(r[6]) or 0, pos = tonumber(r[7]) or -1, el = tonumber(r[8]) or 0, pic = tostring(r[9] or ""), vol = tonumber(r[10]) or -1, at = tick,
+                    app = tostring(r[5] or ""), dur = tonumber(r[6]) or 0, pos = tonumber(r[7]) or -1, el = tonumber(r[8]) or 0, pic = tostring(r[9] or ""), vol = tonumber(r[10]) or -1, ctype = tostring(r[11] or ""), at = tick,
                     unmute = tvs[e] and tvs[e].unmute or nil }
             end
         end
