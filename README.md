@@ -14,7 +14,7 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
 - **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them.
-- **English or Spanish**: `"language"` in its settings, or the system's language if it is not set.
+- **Any language**: English by default, Spanish included, and any other from a JSON file you add (French.json, say): `"language"` in its settings picks it.
 - Lights use `light.toggle` / `light.turn_on`; anything else (`input_boolean`, `switch`, `media_player`, scripts…) uses `homeassistant.toggle`.
 
 | The panel | Edit mode | Brightness |
@@ -39,7 +39,7 @@ It needs a Vitreus with add-ons, and `curl`.
 
 The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor (`$VISUAL`, then `$EDITOR`, then `nvim`), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
 
-- `language`: `"en"` (English) or `"es"` (Spanish). Without it, the panel follows the system's language (`LANG`).
+- `language`: the language file to use, by its name: `"English"` (the default, also when it is left out), `"Spanish"`, or one you add (`"French"` for `French.json`). See [Translations](#translations).
 - `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
 - `token`: a long-lived access token. In Home Assistant: your profile > Security > Long-lived access tokens > Create token.
 - `insecure`: `true` only for https with a self-signed certificate.
@@ -151,7 +151,14 @@ hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --
 
 ## Translations
 
-Every word the panel shows is in one table, `STR` at the top of `homeassistant.luau`, with an `es` and an `en` block. To add a language, copy the `en` block under a new code (`fr = { ... }`), translate the values, and set `"language": "fr"`. A key the new block lacks is shown in English. Pull requests with new languages are welcome.
+Every word the panel shows is in a JSON file in its data folder, `~/.local/share/pleamar/homeassistant/`: `English.json` and `Spanish.json` are written there the first time it runs, one text a line, and can be edited (a newer version of the add-on adds the texts it brings and keeps your edits). To add a language:
+
+1. Copy `English.json` as, say, `French.json`, in the same folder.
+2. Translate the texts on the right of each line. Keep the names on the left as they are, and keep `%s` and `%d` where they are (a name or a number goes there).
+3. Set `"_code"` to the language's two letters (`"fr"`): it is the country whose catalogue the Apple TV's artwork is looked up in.
+4. Put `"language": "French"` in `config.json`. The panel changes as soon as either file is saved.
+
+A text the file lacks is said in English, so a translation can be done a bit at a time. To share one, open an issue or a pull request with the file, and it will come with the add-on.
 
 ## Privacy
 

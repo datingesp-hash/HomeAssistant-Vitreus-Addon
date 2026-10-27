@@ -14,7 +14,7 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
 - **En la isla**: arrastra la pieza de add-ons a la barra (Ajustes > Bar > Island layout) y el panel se despliega desde la barra como los paneles de la shell.
 - **Estética de Vitreus**: toma la paleta y el tema de la shell, y cambia con ellos.
-- **En español o en inglés**: `"language"` en su configuración, o el idioma del sistema si no lo pones.
+- **En cualquier idioma**: inglés por defecto, español incluido, y cualquier otro con un archivo JSON que añadas (French.json, por ejemplo): `"language"` en su configuración lo elige.
 
 | El panel | Modo edición | Brillo |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ Necesita un Vitreus con add-ons, y `curl`.
 
 La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre en tu editor (`$VISUAL`, si no `$EDITOR`, si no `nvim`), y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
 
-- `language`: `"es"` (español) o `"en"` (inglés). Si no lo pones, el panel usa el idioma del sistema (`LANG`).
+- `language`: el archivo de idioma que usar, por su nombre: `"English"` (por defecto, también si no lo pones), `"Spanish"`, o uno que añadas (`"French"` para `French.json`). Ver [Traducciones](#traducciones).
 - `url`: la dirección de tu Home Assistant, p. ej. `http://homeassistant.local:8123`.
 - `token`: un token de larga duración. En Home Assistant: tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.
 - `insecure`: `true` solo si usas https con un certificado propio.
@@ -150,7 +150,14 @@ hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --
 
 ## Traducciones
 
-Todo lo que dice el panel está en una sola tabla, `STR`, al principio de `homeassistant.luau`, con un bloque `es` y otro `en`. Para añadir un idioma, copia el bloque `en` con un código nuevo (`fr = { ... }`), traduce los textos y pon `"language": "fr"`. Lo que falte en el bloque nuevo sale en inglés. Los pull requests con idiomas nuevos son bienvenidos.
+Todo lo que dice el panel está en un archivo JSON en su carpeta de datos, `~/.local/share/pleamar/homeassistant/`: `English.json` y `Spanish.json` se crean ahí la primera vez que arranca, un texto por línea, y se pueden editar (una versión nueva del addon añade los textos nuevos y respeta lo que hayas cambiado). Para añadir un idioma:
+
+1. Copia `English.json` como, por ejemplo, `French.json`, en la misma carpeta.
+2. Traduce los textos de la derecha de cada línea. Deja los nombres de la izquierda como están, y deja `%s` y `%d` donde están (ahí va un nombre o un número).
+3. Pon en `"_code"` las dos letras del idioma (`"fr"`): es el país en cuyo catálogo se buscan las carátulas del Apple TV.
+4. Pon `"language": "French"` en `config.json`. El panel cambia en cuanto guardas cualquiera de los dos archivos.
+
+Lo que le falte al archivo sale en inglés, así que se puede traducir poco a poco. Para compartir uno, abre una issue o un pull request con el archivo, y vendrá con el addon.
 
 ## Privacidad
 

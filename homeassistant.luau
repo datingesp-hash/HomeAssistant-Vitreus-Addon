@@ -60,8 +60,8 @@ local ICONS = {
 
 local EXAMPLE = [[{
   "_help": "Home Assistant add-on for Vitreus. Save this file and the panel reloads by itself.",
-  "_language": "The panel's language: \"en\" (English) or \"es\" (Spanish). Leave it out to follow the system's.",
-  "language": "en",
+  "_language": "The panel's language: the name of a language file in this folder (English, Spanish, or one you add, such as French for French.json). English if left out.",
+  "language": "English",
   "_url": "Your Home Assistant's address, with http:// or https:// and the port (usually 8123).",
   "url": "http://homeassistant.local:8123",
   "_token": "A long-lived access token: in Home Assistant, your profile > Security > Long-lived access tokens > Create token.",
@@ -92,8 +92,9 @@ local EXAMPLE = [[{
 }
 ]]
 
--- What the panel says, in Spanish and in English (config.json's "language"; without it, the system's: LANG and the like). Every word the panel shows is
--- here, the scene's too: another language is another block with the same keys (and its code accepted in `load`, below); a key it lacks is said in English.
+-- What the panel says. Every word it shows is here, the scene's too, in English and in Spanish, the two that come with it. Each is also written into the
+-- data folder as a JSON file (English.json, Spanish.json), where it can be edited; and any other file there with the same keys is another language
+-- (French.json, say): config.json's "language" names the file to use, English if it names none. A key a file lacks is said in English.
 local STR = {
     es = {
         connecting = "Conectando…", connected = "Conectado · %d de %d %s", tile = "ficha", tiles = "fichas", no_tiles = "Conectado · sin fichas",
@@ -156,21 +157,160 @@ local STR = {
         home = "TV (home)", playpause = "Play or pause", volup = "Volume up", voldown = "Volume down", mute = "Mute", prev = "Previous", next = "Next",
     },
 }
-local lang = "en"
+local WORDS = {
+    "connecting",
+    "connected",
+    "tile",
+    "tiles",
+    "no_tiles",
+    "offline",
+    "odd",
+    "odd_msg",
+    "not_set",
+    "unreadable",
+    "need_url",
+    "need_token",
+    "no_auth",
+    "e6",
+    "e7",
+    "e28",
+    "e35",
+    "e60",
+    "ecurl",
+    "e401",
+    "e404",
+    "ehttp",
+    "bad",
+    "unavailable",
+    "light_on",
+    "light_off",
+    "on",
+    "off",
+    "room",
+    "hint",
+    "ed_start",
+    "ed_done",
+    "refresh",
+    "edit_cfg",
+    "connecting_ha",
+    "title_offline",
+    "title_setup",
+    "empty",
+    "empty_hint",
+    "brightness",
+    "close",
+    "off_btn",
+    "resize",
+    "color",
+    "pr_idle",
+    "pr_running",
+    "pr_paused",
+    "pr_finished",
+    "pr_failed",
+    "pr_preparing",
+    "pr_offline",
+    "progress",
+    "pr_left",
+    "pr_started",
+    "pr_ends",
+    "pr_ended",
+    "pause",
+    "resume",
+    "stop",
+    "stop_sure",
+    "camera",
+    "live",
+    "open_cam",
+    "tv_off",
+    "tv_on",
+    "tv_playing",
+    "tv_paused",
+    "tv_nothing",
+    "tab_media",
+    "tab_remote",
+    "kb_hint",
+    "power",
+    "up",
+    "down",
+    "left",
+    "right",
+    "select",
+    "back",
+    "home",
+    "playpause",
+    "volup",
+    "voldown",
+    "mute",
+    "prev",
+    "next",
+}
+local LANGS = { English = STR.en, Spanish = STR.es }          -- the ones that come with it, by their file's name
+local lang = "en"            -- the language's code (its file's "_code"): which country's catalogue the Apple TV's artwork is looked up in
+local words = STR.en         -- the words in use
 local function T(key, ...)
-    local s = (STR[lang] or STR.en)[key] or STR.en[key] or key
-    if select("#", ...) > 0 then return string.format(s, ...) end
+    local s = words[key]
+    if type(s) ~= "string" then s = STR.en[key] or key end
+    if select("#", ...) > 0 then
+        local ok, out = pcall(string.format, s, ...)      -- (a translation that lost a %s or a %d is said in English rather than not at all)
+        if ok then return out end
+        return string.format(STR.en[key] or key, ...)
+    end
     return s
 end
--- The system's language: Spanish if the locale says so, English otherwise.
-local function system_lang()
-    for _, v in ipairs({ "LC_ALL", "LC_MESSAGES", "LANG" }) do
-        local ok, val = pcall(sys.ask, "env", v)
-        if ok and type(val) == "string" and val ~= "" and val ~= "C" and val ~= "POSIX" then
-            return val:lower():match("^es") and "es" or "en"
+-- A language as the JSON file it is kept in: the keys in WORDS' order, one a line, with a note on top, so it reads (and translates) top to bottom.
+local function lang_json(name, code, t)
+    local lines = { "{",
+        '  "_about": ' .. json.encode("The Home Assistant add-on's words in " .. name .. ". Edit the texts on the right, keeping %s and %d where they are (a number or a name goes there). To add a language, copy this file as French.json (say), translate it, change _code to the language's two letters, and put \"language\": \"French\" in config.json. A text it lacks is said in English.") .. ",",
+        '  "_code": ' .. json.encode(code) .. "," }
+    for k, key in ipairs(WORDS) do
+        lines[#lines + 1] = "  " .. json.encode(key) .. ": " .. json.encode(t[key] or STR.en[key] or "") .. (k < #WORDS and "," or "")
+    end
+    lines[#lines + 1] = "}"
+    return table.concat(lines, "\n") .. "\n"
+end
+-- English.json and Spanish.json in the data folder: written when they are not there, and given any text a newer version of the add-on added (what was
+-- edited in them is kept).
+local function lang_files()
+    for name, t in pairs(LANGS) do
+        local file = name .. ".json"
+        local ok, have = pcall(sys.ask, "files.read", file, "json")
+        if not ok or type(have) ~= "table" then
+            pcall(sys.call, "files.write", file, lang_json(name, t == STR.es and "es" or "en", t))
+        else
+            local missing = false
+            for _, key in ipairs(WORDS) do if have[key] == nil then missing = true; break end end
+            if missing then
+                local merged = {}
+                for _, key in ipairs(WORDS) do merged[key] = have[key] ~= nil and have[key] or t[key] end
+                pcall(sys.call, "files.write", file, lang_json(name, type(have._code) == "string" and have._code or (t == STR.es and "es" or "en"), merged))
+            end
         end
     end
-    return "en"
+end
+-- config.json's "language": a file's name ("French" or "French.json"), or the old codes and names of the two that come with it. English when it names none
+-- or the file cannot be read.
+local OLD = { en = "English", es = "Spanish", english = "English", spanish = "Spanish", ["inglés"] = "English", ingles = "English", ["español"] = "Spanish", espanol = "Spanish" }
+local lang_watched, lang_reload = {}, nil
+local function use_lang(want)
+    want = type(want) == "string" and want:gsub("%.json$", ""):gsub("^%s+", ""):gsub("%s+$", "") or ""
+    local name = OLD[want:lower()] or want
+    if name == "" or not name:match("^[%w _%-%(%)]+$") then name = "English" end
+    local file = name .. ".json"
+    local ok, t = pcall(sys.ask, "files.read", file, "json")
+    if not ok or type(t) ~= "table" then
+        local other = name:sub(1, 1):upper() .. name:sub(2):lower() .. ".json"
+        local ok2, t2 = pcall(sys.ask, "files.read", other, "json")
+        if ok2 and type(t2) == "table" then ok, t, file = ok2, t2, other end
+    end
+    if not ok or type(t) ~= "table" then t = LANGS[name] or STR.en end
+    -- the file in use, saved: read again (each is watched once; an edit to it shows at once)
+    if not lang_watched[file] then
+        lang_watched[file] = true
+        sys.watch("files:" .. file, function() after(150, function() if lang_reload then lang_reload() end end) end)
+    end
+    words = t
+    local code = type(t._code) == "string" and t._code:lower() or (t == STR.es and "es" or "en")
+    lang = code:match("^%a%a$") and code or "en"
 end
 
 -- English names for the add-on's own icons (the files keep their Spanish ones).
@@ -469,7 +609,7 @@ end
 local function https(u) return type(u) == "string" and u:match("^https://") and u or nil end
 local function big(u, size) return (tostring(u or ""):gsub("%d+x%d+bb", size .. "x" .. size .. "bb")) end
 local function itunes(media, entity, term, choose, done)
-    web(ITUNES .. "?media=" .. media .. "&entity=" .. entity .. "&limit=8&country=" .. (lang == "es" and "es" or "us") .. "&term=" .. urlenc(term), nil, function(j)
+    web(ITUNES .. "?media=" .. media .. "&entity=" .. entity .. "&limit=8&country=" .. (lang == "en" and "us" or lang) .. "&term=" .. urlenc(term), nil, function(j)
         for _, r in ipairs(j and type(j.results) == "table" and j.results or {}) do
             local u = type(r) == "table" and https(choose(r))
             if u then done(u) return end
@@ -862,8 +1002,8 @@ local function load()
         end
     end
     local ok, c = pcall(sys.ask, "files.read", CONFIG, "json")
-    local want = ok and type(c) == "table" and type(c.language) == "string" and c.language:lower() or ""
-    lang = STR[want] and want or system_lang()
+    lang_files()
+    use_lang(ok and type(c) == "table" and c.language or nil)
     scene_words()
     cfg = nil
     state = {}
@@ -1185,6 +1325,7 @@ on("fact:slot_open", function(v)
 end)
 
 -- config.json saved: read it again
+lang_reload = function() load() end
 sys.watch("files:" .. CONFIG, function()
     after(150, load)
 end)

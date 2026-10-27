@@ -1,7 +1,7 @@
 {
   "_help": "Home Assistant add-on for Vitreus. Save this file and the panel reloads by itself.",
-  "_language": "The panel's language: \"en\" (English) or \"es\" (Spanish). Leave it out to follow the system's.",
-  "language": "en",
+  "_language": "The panel's language: the name of a language file in this folder (English, Spanish, or one you add, such as French for French.json). English if left out.",
+  "language": "English",
   "_url": "Your Home Assistant's address, with http:// or https:// and the port (usually 8123).",
   "url": "http://homeassistant.local:8123",
   "_token": "A long-lived access token: in Home Assistant, your profile > Security > Long-lived access tokens > Create token.",
