@@ -69,7 +69,7 @@ local EXAMPLE = [[{
   "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
-  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
       "name": "Living room",
@@ -77,7 +77,8 @@ local EXAMPLE = [[{
       "humidity": "sensor.living_room_humidity",
       "items": [
         { "type": "light",  "name": "Lamp",       "icon": "floor-lamp.svg", "entity": "light.living_room" },
-        { "type": "toggle", "name": "Night mode", "icon": "bedtime",        "entity": "input_boolean.night_mode" }
+        { "type": "toggle", "name": "Night mode", "icon": "bedtime",        "entity": "input_boolean.night_mode" },
+        { "type": "toggle", "name": "Apple TV",   "icon": "tv-box.svg",     "entity": "media_player.living_room", "apple_tv": { "remote": "remote.living_room" } }
       ]
     },
     {
@@ -118,6 +119,11 @@ local STR = {
         pr_preparing = "Preparando", pr_offline = "Sin conexión", progress = "Progreso", pr_left = "Quedan %s", pr_started = "Empezó %s",
         pr_ends = "Termina %s", pr_ended = "Terminó %s", pause = "Pausar", resume = "Continuar", stop = "Detener", stop_sure = "¿Detener?",
         camera = "Cámara", live = "EN DIRECTO", open_cam = "Abrir la cámara",
+        -- an Apple TV's card
+        tv_off = "Apagado", tv_on = "Encendido", tv_playing = "Reproduciendo", tv_paused = "En pausa", tv_nothing = "No se está reproduciendo nada",
+        tab_media = "Reproducción", tab_remote = "Mando", kb_hint = "Teclado: flechas, Intro, Retroceso (atrás) y Espacio (reproducir/pausa)",
+        power = "Encender o apagar", up = "Arriba", down = "Abajo", left = "Izquierda", right = "Derecha", select = "Seleccionar", back = "Atrás",
+        home = "TV (inicio)", playpause = "Reproducir o pausar", volup = "Subir el volumen", voldown = "Bajar el volumen", prev = "Anterior", next = "Siguiente",
     },
     en = {
         connecting = "Connecting…", connected = "Connected · %d of %d %s", tile = "tile", tiles = "tiles", no_tiles = "Connected · no tiles",
@@ -143,6 +149,11 @@ local STR = {
         pr_preparing = "Preparing", pr_offline = "Offline", progress = "Progress", pr_left = "%s left", pr_started = "Started %s",
         pr_ends = "Ends %s", pr_ended = "Ended %s", pause = "Pause", resume = "Resume", stop = "Stop", stop_sure = "Stop?",
         camera = "Camera", live = "LIVE", open_cam = "Open the camera",
+        -- an Apple TV's card
+        tv_off = "Off", tv_on = "On", tv_playing = "Playing", tv_paused = "Paused", tv_nothing = "Nothing playing",
+        tab_media = "Now playing", tab_remote = "Remote", kb_hint = "Keyboard: arrows, Return, BackSpace (back) and Space (play/pause)",
+        power = "Power", up = "Up", down = "Down", left = "Left", right = "Right", select = "Select", back = "Back",
+        home = "TV (home)", playpause = "Play or pause", volup = "Volume up", voldown = "Volume down", prev = "Previous", next = "Next",
     },
 }
 local lang = "en"
@@ -201,6 +212,13 @@ local function scene_words()
     text.t_open_cam = T("open_cam")
     text.t_b1 = fact.pr_arm == true and T("stop_sure") or T("stop")
     text.t_b2 = T("camera")
+    text.t_tab0 = T("tab_media")
+    text.t_tab1 = T("tab_remote")
+    text.t_kb = T("kb_hint")
+    text.t_power = T("power")
+    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "prev", "next" }) do
+        text["t_" .. k] = T(k)
+    end
 end
 on("fact:hl_editing", function() text.t_ed = fact.hl_editing == true and T("ed_done") or T("ed_start") end)
 
@@ -363,7 +381,112 @@ local function pr_fill()
     end
 end
 
-local function show()
+local show, call          -- (both further down; the Apple TV's poll, here, uses them)
+-- An Apple TV (or any media player given "apple_tv"): what it plays, asked in a template of its own (a few more attributes than the tiles' one), when it is
+-- polled. Its position is counted on here between answers (`at`: the tick it came at), so the bar moves every second without asking.
+local tvs = {}              -- by media player: { st, title, artist, series, app, dur, pos, el, pic, at }
+local TV_CODE = { off = 0, standby = 0, unavailable = 0, unknown = 0, idle = 1, on = 1, playing = 2, buffering = 2, paused = 3 }
+local TV_LABEL = { [0] = "tv_off", "tv_on", "tv_playing", "tv_paused" }
+local tv_busy, tv_pic_n, tv_shown, tv_pbusy = false, 0, "", false
+local function tv_code(t) return t and (TV_CODE[t.st] or 1) or 0 end
+local function tv_now(t)                -- where it is now, in seconds (-1: it does not say)
+    if not t or t.dur <= 0 or t.pos < 0 then return -1 end
+    local p = t.pos
+    if tv_code(t) == 2 then p = p + t.el + (tick - t.at) end
+    return math.max(0, math.min(t.dur, p))
+end
+local function clock(sec)
+    sec = math.floor(sec + 0.5)
+    local h, m, x = math.floor(sec / 3600), math.floor(sec / 60) % 60, sec % 60
+    if h > 0 then return string.format("%d:%02d:%02d", h, m, x) end
+    return string.format("%d:%02d", m, x)
+end
+local function tv_item()
+    local it = cfg and cfg.items[(tonumber(fact.tv_i) or -1) + 1]
+    return it and it.tv and it or nil
+end
+local function tv_fetch(pic)
+    if tv_pbusy or not cfg or not pic or pic == "" then return end
+    tv_pbusy = true
+    tv_pic_n = tv_pic_n + 1
+    local n = tv_pic_n
+    local path = folder .. "/tv-" .. (n % 2) .. ".img"
+    local args = { "-s", "-f", "-K", folder .. "/" .. AUTH, "--max-time", "8", "-o", path }
+    if cfg.insecure then args[#args + 1] = "-k" end
+    args[#args + 1] = cfg.url .. pic
+    run("curl", args, function(_, code)
+        tv_pbusy = false
+        if code == 0 then
+            model.tv_pic = { { img = path .. "?" .. n } }
+            fact.tv_has_pic = true
+        else
+            tv_shown = ""
+        end
+    end)
+end
+local function tv_fill()
+    local it = tv_item()
+    if not it or fact.tv_open ~= true then return end
+    local t = it.tv.media and tvs[it.tv.media]
+    local code = tv_code(t)
+    text.tv_name = it.name
+    text.tv_icon = it.file and "" or it.icon
+    fact.tv_custom = it.file ~= nil
+    fact.tv_has_rm = it.tv.remote ~= nil
+    fact.tv_st = code
+    local app = t and t.app or ""
+    text.tv_status = T(TV_LABEL[code]) .. ((code > 0 and app ~= "") and (" · " .. app) or "")
+    local title = t and t.title or ""
+    text.tv_title = title ~= "" and title or (code > 0 and app ~= "" and app or T("tv_nothing"))
+    local sub = title ~= "" and ((t.series ~= "" and t.series) or t.artist or "") or ""
+    text.tv_sub = sub ~= title and sub or ""
+    local p = tv_now(t)
+    fact.tv_has_prog = p >= 0 and code >= 2
+    if p >= 0 then
+        fact.tv_prog = p / t.dur
+        text.tv_pos = clock(p)
+        text.tv_rem = "-" .. clock(t.dur - p)
+    end
+    -- the artwork: fetched again when it changes (its address carries a token that changes by itself)
+    local pic = (t and code > 0) and t.pic or ""
+    if pic ~= "" then
+        local key = (pic:gsub("token=[^&]*", ""))
+        if key ~= tv_shown then tv_shown = key; tv_fetch(pic) end
+    elseif tv_shown ~= "none" then
+        tv_shown = "none"
+        fact.tv_has_pic = false
+    end
+end
+local function tv_poll()
+    if tv_busy or not cfg then return end
+    local ids, seen = {}, {}
+    for _, it in ipairs(cfg.items) do
+        local m = it.tv and it.tv.media
+        if m and not seen[m] then seen[m] = true; ids[#ids + 1] = m end
+    end
+    if #ids == 0 then return end
+    local quoted = {}
+    for k, e in ipairs(ids) do quoted[k] = '"' .. e .. '"' end
+    -- the state, the title, the artist, the series, the app, the length, the position and how long ago it was told (seconds), and the artwork
+    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set u = state_attr(e, 'media_position_updated_at') %}[{{ states(e) | tojson }},{{ (state_attr(e, 'media_title') or '') | tojson }},{{ (state_attr(e, 'media_artist') or state_attr(e, 'media_album_artist') or '') | tojson }},{{ (state_attr(e, 'media_series_title') or '') | tojson }},{{ (state_attr(e, 'app_name') or state_attr(e, 'source') or '') | tojson }},{{ state_attr(e, 'media_duration') | float(0) }},{{ state_attr(e, 'media_position') | float(-1) }},{{ ((as_timestamp(now()) - as_timestamp(u, as_timestamp(now()))) | round(1)) if u else 0 }},{{ (state_attr(e, 'entity_picture') or '') | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
+    tv_busy = true
+    call("/api/template", json.encode({ template = tpl }), function(ok, out)
+        tv_busy = false
+        if not ok then return end
+        local okj, list = pcall(json.decode, out)
+        if not okj or type(list) ~= "table" then return end
+        for k, e in ipairs(ids) do
+            local r = list[k]
+            if type(r) == "table" then
+                tvs[e] = { st = tostring(r[1] or "unknown"), title = tostring(r[2] or ""), artist = tostring(r[3] or ""), series = tostring(r[4] or ""),
+                    app = tostring(r[5] or ""), dur = tonumber(r[6]) or 0, pos = tonumber(r[7]) or -1, el = tonumber(r[8]) or 0, pic = tostring(r[9] or ""), at = tick }
+            end
+        end
+        show()
+    end)
+end
+
+show = function()
     local rows, heads = {}, {}
     if cfg then
         for i, it in ipairs(cfg.items) do
@@ -387,9 +510,18 @@ local function show()
                     pp = pr.prog and math.max(0, math.min(1, pr.prog / 100)) or -1
                 end
             end
+            if it.tv and it.tv.media and not it.bad then
+                local t = tvs[it.tv.media]
+                local code = tv_code(t)
+                if code >= 2 then          -- playing or paused: that, and what (or in which app), instead of the tile's line
+                    local what = (t.title ~= "" and t.title) or t.app
+                    sub = T(TV_LABEL[code]) .. (what ~= "" and (" · " .. what) or "")
+                end
+            end
             rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = it.file and 1 or 0, sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
-                cc = it.color and 1 or 0, hk = (it.color and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0 }
+                cc = it.color and 1 or 0, hk = (it.color and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
+                tvr = it.tv and 1 or 0 }
         end
         for k, room in ipairs(cfg.rooms) do
             if room.name ~= "" then
@@ -405,6 +537,7 @@ local function show()
         end
     end
     pr_fill()
+    tv_fill()
     -- (only what changed: the poll answers every few seconds, mostly with the same)
     local sig = json.encode({ rows, heads, content })
     if sig == last_sig then return end
@@ -415,7 +548,7 @@ local function show()
 end
 
 -- curl, with the token from auth.curl. `body`: a JSON text to POST (on curl's input), or nil for a GET. `done(ok, out, err)`.
-local function call(path, body, done)
+call = function(path, body, done)
     if not cfg then return end
     local args = { "-s", "-K", folder .. "/" .. AUTH, "--max-time", "6", "-w", "\n%{http_code}" }
     if cfg.insecure then args[#args + 1] = "-k" end
@@ -453,6 +586,7 @@ local function poll()
     for _, it in ipairs(cfg.items) do
         if it.printer then for _, k in ipairs(PR_POLL) do want(it.printer[k]) end end
     end
+    tv_poll()
     if #ids == 0 then
         set_state(1, T("no_tiles"))
         show()
@@ -514,6 +648,15 @@ local function parse_printer(p)
     return any and out or nil
 end
 
+-- A tile's "apple_tv": its media player (the tile's own entity if it is one) and, for the remote, its remote entity. Neither: no card.
+local function parse_tv(t, entity)
+    if type(t) ~= "table" then return nil end
+    local media = valid(t.media_player) and t.media_player or (valid(entity) and entity:match("^media_player%.") and entity or nil)
+    local remote = valid(t.remote) and t.remote:match("^remote%.") and t.remote or nil
+    if not media and not remote then return nil end
+    return { media = media, remote = remote }
+end
+
 local function load()
     folder = sys.ask("files.folder") or ""
     for name, svg in pairs(ICONS) do
@@ -537,6 +680,7 @@ local function load()
     cfg = nil
     state = {}
     est = {}
+    tvs = {}
     last_sig = ""
     if not ok or type(c) ~= "table" then
         set_state(3, T("not_set"), T("unreadable", (tostring(c):gsub("^.-: ", ""))))
@@ -573,6 +717,7 @@ local function load()
                     bad = not valid(entity),
                     printer = parse_printer(it.printer),
                     color = kind == 0 and it.color == true,          -- its colour is chosen in the card too
+                    tv = parse_tv(it.apple_tv, entity),
                     room = k,
                 }
             end
@@ -726,6 +871,51 @@ on("pr_act", function(a)
 end)
 
 -- The slider asks which light it is on: its name and icon
+-- The Apple TV's card: opened, and its buttons. The remote's go to the remote entity (remote.send_command, as the Apple TV integration takes them); the
+-- transport and the power to the media player.
+local TV_REMOTE = { [0] = "up", "down", "left", "right", "select", "menu", "home", "play_pause", "volume_up", "volume_down" }
+on("fact:tv_open", function(v) if v == true then tv_shown = ""; fact.tv_has_pic = false; model.tv_pic = {}; tv_fill(); tv_poll() end end)
+on("fact:tv_i", function() if fact.tv_open == true then tv_shown = ""; tv_fill() end end)
+on("tv_cmd", function(c)
+    c = tonumber(c) or -1
+    local it = tv_item()
+    if not it then return end
+    local media, remote = it.tv.media, it.tv.remote
+    local t = media and tvs[media]
+    local svc, body
+    if c == 10 then                                       -- power: on if it is off, off if not
+        local was = tv_code(t)
+        if media then
+            svc, body = "/api/services/media_player/" .. (was == 0 and "turn_on" or "turn_off"), { entity_id = media }
+        elseif remote then
+            svc, body = "/api/services/remote/" .. (was == 0 and "turn_on" or "turn_off"), { entity_id = remote }
+        end
+        if t then t.st = was == 0 and "idle" or "off" end
+    elseif (c == 11 or c == 12) and media then             -- previous, next
+        svc, body = "/api/services/media_player/" .. (c == 11 and "media_previous_track" or "media_next_track"), { entity_id = media }
+    elseif c == 15 and remote then                        -- the middle held: a long press
+        svc, body = "/api/services/remote/send_command", { entity_id = remote, command = "select", hold_secs = 1 }
+    elseif c == 16 and remote then                        -- TV held: the control centre
+        svc, body = "/api/services/remote/send_command", { entity_id = remote, command = "home_hold" }
+    elseif TV_REMOTE[c] and remote then
+        svc, body = "/api/services/remote/send_command", { entity_id = remote, command = TV_REMOTE[c] }
+    elseif media and (c == 7 or c == 8 or c == 9) then     -- no remote: the media player's own
+        svc = "/api/services/media_player/" .. ({ [7] = "media_play_pause", [8] = "volume_up", [9] = "volume_down" })[c]
+        body = { entity_id = media }
+    end
+    if not svc then return end
+    if c == 7 and t then                                  -- play/pause: at once on the card, Home Assistant confirms it
+        local code = tv_code(t)
+        if code == 2 then t.pos = tv_now(t); t.el = 0; t.at = tick; t.st = "paused"
+        elseif code == 3 then t.st = "playing"; t.at = tick; t.el = 0 end
+    end
+    tv_fill()
+    call(svc, json.encode(body), function(ok, _, err)
+        if not ok then set_state(2, T("offline"), err) end
+        after(c <= 6 and 1500 or 800, tv_poll)
+    end)
+end)
+
 on("fact:sl_i", function(v)
     local it = cfg and cfg.items[(tonumber(v) or -1) + 1]
     if it then
@@ -805,6 +995,7 @@ every(1000, function()
     if fact.hl_state == 2 then period = 10 end
     if fact.hl_state == 3 then return end
     if tick % period == 0 then poll() end
+    if open and fact.tv_open == true then tv_fill() end
     if open and fact.pr_open == true and fact.pr_cam == true and tick % 2 == 0 then
         local it = pr_item()
         local ce = it and it.printer.camera and est[it.printer.camera]

@@ -9,6 +9,7 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 - **Habitaciones**, cada una con su nombre y, si le pones sensores, su temperatura y humedad.
 - **Clic** en una ficha: enciende o apaga. **Clic derecho** en una luz: abre el control de brillo (arrastra, usa la rueda o pulsa Apagar / 25 / 50 / 75 / 100 %).
 - **Colores**: una luz con `"color": true` tiene además en ese control un arcoíris y una fila de colores hechos, y su ficha brilla del color que tiene.
+- **Apple TV**: un clic derecho en su ficha abre una tarjeta con lo que se está reproduciendo (carátula, título, progreso, controles y volumen) y un mando como el Siri Remote, que también se maneja con el teclado.
 - **Impresoras 3D**: un clic derecho en la ficha de una impresora abre una tarjeta con la portada o la cámara, el progreso, los tiempos y sus botones.
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
 - **En la isla**: arrastra la pieza de add-ons a la barra (Ajustes > Bar > Island layout) y el panel se despliega desde la barra como los paneles de la shell.
@@ -49,6 +50,7 @@ La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ej
     - `name`: el nombre de la ficha.
     - `icon`: un nombre de [Material Symbols](https://fonts.google.com/icons) (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…), uno de los iconos propios del addon (abajo), o cualquier `.svg` blanco que pongas en `~/.local/share/pleamar/homeassistant/`.
     - `entity`: la entidad, p. ej. `light.salon`.
+    - `apple_tv` (opcional): `{ "remote": "remote.salon" }` en la ficha de un Apple TV le da su tarjeta y su mando (abajo).
     - `color` (opcional, solo luces): `true` en una luz que cambia de color (una bombilla RGB, una tira LED). Su control del clic derecho muestra también los colores.
     - `on_text`, `off_text` (opcionales): el texto de debajo cuando está encendido o apagado.
 
@@ -63,6 +65,22 @@ Ponle `"color": true` a una luz y su control del clic derecho muestra, debajo de
 ```
 
 ![Los colores](docs/es/color.png)
+
+### La tarjeta y el mando de un Apple TV
+
+Ponle a la ficha de un Apple TV un bloque `"apple_tv"` con su entidad de mando, y un clic derecho sobre ella abre una tarjeta con dos pestañas (el clic normal lo sigue encendiendo y apagando):
+
+- **Reproducción**: la carátula, el título y la serie o el artista, la app, por dónde va (avanza cada segundo), y bajar volumen, anterior, reproducir/pausa, siguiente y subir volumen. El botón de encendido está en la cabecera.
+- **Mando**: el clickpad (sus cuatro bordes mueven, el centro selecciona, y mantenido es una pulsación larga; la rueda del ratón encima sube y baja), atrás, TV (mantenido: el centro de control), reproducir/pausa y el volumen. Mientras esta pestaña está a la vista se maneja con el teclado: las flechas, Intro para seleccionar, Retroceso para atrás, Espacio para reproducir/pausa, y Escape cierra la tarjeta (la tarjeta toma el teclado mientras muestra el mando, y lo suelta al cerrarse o al volver a la otra pestaña).
+
+```json
+{ "type": "toggle", "name": "Apple TV", "icon": "reproductor.svg", "entity": "media_player.salon",
+  "apple_tv": { "remote": "remote.salon" } }
+```
+
+![La tarjeta del Apple TV y su mando](docs/es/apple-tv.png)
+
+Son las entidades de la [integración de Apple TV](https://www.home-assistant.io/integrations/apple_tv/): crea un `media_player.` y un `remote.` con el mismo nombre para cada Apple TV (míralos en Ajustes > Dispositivos y servicios > Apple TV). Los botones del mando van a `remote.send_command` y el resto al reproductor. Si la entidad de la ficha no es el reproductor, añade `"media_player": "media_player.…"` al bloque. Sin `remote` la tarjeta no tiene la pestaña del mando, así que también sirve para cualquier otro reproductor. Mientras reproduce, la ficha lo dice: *Reproduciendo · La casa de papel*.
 
 ### La tarjeta de una impresora 3D
 

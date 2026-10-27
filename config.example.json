@@ -9,7 +9,7 @@
   "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
-  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
       "name": "Living room",
@@ -17,7 +17,8 @@
       "humidity": "sensor.living_room_humidity",
       "items": [
         { "type": "light",  "name": "Lamp",       "icon": "floor-lamp.svg", "entity": "light.living_room" },
-        { "type": "toggle", "name": "Night mode", "icon": "bedtime",        "entity": "input_boolean.night_mode" }
+        { "type": "toggle", "name": "Night mode", "icon": "bedtime",        "entity": "input_boolean.night_mode" },
+        { "type": "toggle", "name": "Apple TV",   "icon": "tv-box.svg",     "entity": "media_player.living_room", "apple_tv": { "remote": "remote.living_room" } }
       ]
     },
     {

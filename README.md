@@ -9,6 +9,7 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 - **Rooms**, each with its name and, if you give it sensors, its temperature and humidity.
 - **A click** turns a tile on or off. **A right click** on a light opens a brightness slider (drag it, use the wheel, or pick off / 25 / 50 / 75 / 100 %).
 - **Colours**: a light with `"color": true` also gets a rainbow and a row of ready colours in that card, and its tile glows in the colour it has.
+- **Apple TV**: a right click on its tile opens a card with what is playing (artwork, title, progress, transport and volume) and a remote like the Siri Remote's, which the keyboard drives too.
 - **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
@@ -50,6 +51,7 @@ The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.js
     - `name`: what the tile says.
     - `icon`: a [Material Symbols](https://fonts.google.com/icons) name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
     - `entity`: the entity id, e.g. `light.living_room`.
+    - `apple_tv` (optional): `{ "remote": "remote.living_room" }` on an Apple TV's tile gives it its card and remote (below).
     - `color` (optional, lights only): `true` for a light whose colour can change (an RGB bulb, an LED strip). Its right click card then shows the colours too.
     - `on_text`, `off_text` (optional): the line under the name when it is on or off.
 
@@ -64,6 +66,22 @@ Give a light `"color": true` and its right click card shows, below the brightnes
 ```
 
 ![The colours](docs/en/color.png)
+
+### An Apple TV's card and remote
+
+Give an Apple TV's tile an `"apple_tv"` block with its remote entity, and a right click on it opens a card with two tabs (a click still turns it on and off):
+
+- **Now playing**: the artwork, the title and the series or artist, the app, how far it has got (it moves every second), and volume down, previous, play/pause, next and volume up. The power button is in the head.
+- **Remote**: the clickpad (its four edges move, its middle selects, held it is a long press; the wheel over it moves up and down), back, TV (held: the control centre), play/pause and the volume. While this tab is showing the keyboard drives it: the arrows, Return to select, BackSpace for back, Space for play/pause, and Escape shuts the card (the card takes the keyboard while it shows the remote, and gives it back when it shuts or goes back to the other tab).
+
+```json
+{ "type": "toggle", "name": "Apple TV", "icon": "tv-box.svg", "entity": "media_player.living_room",
+  "apple_tv": { "remote": "remote.living_room" } }
+```
+
+![The Apple TV's card and its remote](docs/en/apple-tv.png)
+
+These are the [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/)'s entities: it makes a `media_player.` and a `remote.` with the same name for each Apple TV (check yours in Settings > Devices & services > Apple TV). The remote's buttons go to `remote.send_command`, the rest to the media player. If the tile's entity is not the media player, add `"media_player": "media_player.…"` to the block. Without `remote` the card has no remote tab, so it works for any other media player too. While it plays, the tile says so: *Playing · La casa de papel*.
 
 ### A 3D printer's card
 
