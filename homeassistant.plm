@@ -149,6 +149,12 @@ scene HomeAssistant {
     text t_camera = ""
     text t_live = ""
     text t_open_cam = ""
+    text t_b0 = ""                                    // the card's buttons' words, now (the logic: pause or resume, stop or "stop?", camera), and how wide each is
+    text t_b1 = ""
+    text t_b2 = ""
+    measure pbm.0
+    measure pbm.1
+    measure pbm.2
     prop sl_k = 0 ~240ms
     follow sl_k = if(sl_open, 1, 0)
     prop sl_vs = 0 ~quick                             // the fill, a hair behind the finger
@@ -532,18 +538,12 @@ scene HomeAssistant {
                         opacity: if(on > 0.5, 100%, 35%)
                         box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: ink; opacity: (8% + 8% * pr_b_z.$i.hover) * (1 - hot) }
                         box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: if(i == 1, alert, mint); opacity: 90% * hot }
-                        row {
-                            at: bx + pbw / 2, pby + 13 * u      // (a little above the middle: the icon font's line is taller than what it draws)
-                            anchor: center
-                            gap: 6 * u
-                            align: center
-                            text pick(i + 3 * if(pr_st == 2, 1, 0), "pause", "stop", "videocam", "play_arrow", "stop", "videocam") { size: 17; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); family: "Material Symbols Outlined" }
-                            text t_pause { size: 12.5; weight: 700; color: ink; show: i == 0 and pr_st != 2; family: "Space Grotesk" }
-                            text t_resume { size: 12.5; weight: 700; color: ink; show: i == 0 and pr_st == 2; family: "Space Grotesk" }
-                            text t_stop { size: 12.5; weight: 700; color: alert; show: i == 1 and not pr_arm; family: "Space Grotesk" }
-                            text t_stop_sure { size: 12.5; weight: 700; color: onmint; show: i == 1 and pr_arm; family: "Space Grotesk" }
-                            text t_camera { size: 12.5; weight: 700; color: if(pr_cam, onmint, ink); show: i == 2; family: "Space Grotesk" }
-                        }
+                        //  the icon and the word, each centred on the button's middle line by itself (a row would centre the icon font's tall line box, not its
+                        //  glyph, and the pair came out low), and side by side centred as one: the word's width is measured
+                        let lw = pbm.$i.width
+                        let gx0 = bx + pbw / 2 - (lw + 23 * u) / 2
+                        text pick(i + 3 * if(pr_st == 2, 1, 0), "pause", "stop", "videocam", "play_arrow", "stop", "videocam") { at: gx0 + 8.5 * u, pby + 18 * u; anchor: center; size: 17; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); family: "Material Symbols Outlined" }
+                        text pick(i, t_b0, t_b1, t_b2) { at: gx0 + 23 * u, pby + 18 * u; anchor: left center; size: 12.5; weight: 700; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); measure: pbm.$i; family: "Space Grotesk" }
                         zone box pr_b_z.$i { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; cursor: pointer; active: on > 0.5; label: pick(i, "{t_pause} / {t_resume}", "{t_stop}", "{t_camera}") }
                     }
                 }

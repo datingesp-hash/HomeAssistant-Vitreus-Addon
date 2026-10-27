@@ -197,6 +197,8 @@ local function scene_words()
     text.t_camera = T("camera")
     text.t_live = T("live")
     text.t_open_cam = T("open_cam")
+    text.t_b1 = fact.pr_arm == true and T("stop_sure") or T("stop")
+    text.t_b2 = T("camera")
 end
 on("fact:hl_editing", function() text.t_ed = fact.hl_editing == true and T("ed_done") or T("ed_start") end)
 
@@ -336,6 +338,7 @@ local function pr_fill()
     fact.pr_custom = it.file ~= nil
     text.pr_task = pr.task ~= "" and pr.task or it.name
     fact.pr_st = pr.code
+    text.t_b0 = pr.code == 2 and T("resume") or T("pause")
     text.pr_status = pr.has_status and T(PR_LABEL[pr.code] or "pr_idle") or ""
     fact.pr_prog = math.max(0, math.min(1, (pr.prog or 0) / 100))
     text.pr_pct = pr.prog and (math.floor(pr.prog + 0.5) .. " %") or "—"
@@ -661,6 +664,7 @@ local function pr_reset()
     model.pr_pic = {}
     pr_fill()
 end
+on("fact:pr_arm", function(v) text.t_b1 = v == true and T("stop_sure") or T("stop") end)       -- (Stop pressed once asks; the scene disarms it)
 on("fact:pr_open", function(v) if v == true then pr_reset(); poll() end end)
 on("fact:pr_i", function() if fact.pr_open == true then pr_reset() end end)
 on("fact:pr_cam", function(v)
