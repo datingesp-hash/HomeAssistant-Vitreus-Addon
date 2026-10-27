@@ -197,7 +197,7 @@ scene HomeAssistant {
     text tv_rem = ""
     model tv_pic max 1 { img: image 512, 512 }
     //  what a button asks for: 0 up · 1 down · 2 left · 3 right · 4 select · 5 back · 6 TV (home) · 7 play/pause · 8 volume up · 9 volume down · 10 power
-    //  · 11 previous · 12 next · 15 select held · 16 TV held
+    //  · 11 previous · 12 next · 15 select held · 16 TV held · 17 mute
     event tv_cmd ->
     fact tv_fl = -1                                   // the button just pressed, lit for a moment (a key presses it too)
     on still tv_fl for 180ms while tv_fl >= 0 { tv_fl = -1 }
@@ -217,6 +217,7 @@ scene HomeAssistant {
     text t_playpause = ""
     text t_volup = ""
     text t_voldown = ""
+    text t_mute = ""
     text t_prev = ""
     text t_next = ""
     prop sl_k = 0 ~240ms
@@ -676,10 +677,13 @@ scene HomeAssistant {
             group {
                 opacity: tv_k
                 show: tv_k > 0.01
-                let tcw = min(W - 28 * u, 460 * u)
-                let tch = min((mix(324, 398, tv_tk) - if(tv_has_rm, 0, 38)) * u, H - 16 * u)
+                //  all of it a little smaller when the panel is not tall enough for it (`v` is its `u`)
+                let tsc = min(1, (H - 16 * u) / ((mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)) * u))
+                let v = u * tsc
+                let tcw = min(W - 28 * u, 460 * v)
+                let tch = (mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)) * v
                 let tcl = (W - tcw) / 2
-                let tct = (H - tch) / 2 + 10 * u * (1 - tv_k)
+                let tct = (H - tch) / 2 + 10 * v * (1 - tv_k)
                 let tlit = if(tv_st == 2, 1, 0)
                 let tv_gm = 14 * 1.5525
                 let tv_gt = 38 * 1.5525
@@ -690,120 +694,122 @@ scene HomeAssistant {
                 on press right tv_scrim_z { tv_open = false }
                 body {
                     color: card
-                    shadow: 0, 10 * u, 30 * u, 45%, deep
+                    shadow: 0, 10 * v, 30 * v, 45%, deep
                     rim: 10%
-                    box { from: tcl, tct; size: tcw, tch; corner: 20 * u }
+                    box { from: tcl, tct; size: tcw, tch; corner: 20 * v }
                 }
-                zone box tv_card_z { from: tcl, tct; size: tcw, tch; corner: 20 * u }
+                zone box tv_card_z { from: tcl, tct; size: tcw, tch; corner: 20 * v }
                 on press right tv_card_z { tv_open = false }
                 //  the head: its disc (lit while it plays), its name, how it is and in which app, the power and the X
                 body {
                     color: mix(off, mint, tlit)
-                    shadow: 0, 0, 10 * u * tlit, 45%, mint
+                    shadow: 0, 0, 10 * v * tlit, 45%, mint
                     rim: 16%
-                    ellipse { at: tcl + 42 * u, tct + 42 * u; radius: 20 * u }
+                    ellipse { at: tcl + 42 * v, tct + 42 * v; radius: 20 * v }
                 }
-                text tv_icon { at: tcl + 42 * u, tct + 42 * u; anchor: center; size: 22; color: mix(ink, onmint, tlit); show: not tv_custom; family: "Material Symbols Outlined" }
+                text tv_icon { at: tcl + 42 * v, tct + 42 * v; anchor: center; size: 22 * tsc; color: mix(ink, onmint, tlit); show: not tv_custom; family: "Material Symbols Outlined" }
                 for r in hl_items {
-                    image r.img { at: tcl + 31 * u, tct + 31 * u; size: 22 * u, 22 * u; tint: mix(ink, onmint, tlit); show: tv_custom and r.index == tv_i }
+                    image r.img { at: tcl + 31 * v, tct + 31 * v; size: 22 * v, 22 * v; tint: mix(ink, onmint, tlit); show: tv_custom and r.index == tv_i }
                 }
-                text tv_name { at: tcl + 72 * u, tct + 33 * u; anchor: left center; size: 15; weight: 700; width: tcw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                text tv_name { at: tcl + 72 * v, tct + 33 * v; anchor: left center; size: 15 * tsc; weight: 700; width: tcw - 170 * v; lines: 1; color: ink; family: "Space Grotesk" }
                 row {
-                    at: tcl + 72 * u, tct + 46 * u
-                    gap: 6 * u
+                    at: tcl + 72 * v, tct + 46 * v
+                    gap: 6 * v
                     align: center
-                    ellipse { radius: 3.5 * u; color: pick(tv_st, faint, ink, mint, ink) }
-                    text tv_status { size: 11.5; weight: 600; width: tcw - 170 * u; lines: 1; color: pick(tv_st, faint, ink, mint, ink); family: "Space Grotesk" }
+                    ellipse { radius: 3.5 * v; color: pick(tv_st, faint, ink, mint, ink) }
+                    text tv_status { size: 11.5 * tsc; weight: 600; width: tcw - 170 * v; lines: 1; color: pick(tv_st, faint, ink, mint, ink); family: "Space Grotesk" }
                 }
                 body {
                     color: mix(ink, mint, if(tv_st > 0, 1, 0))
                     opacity: if(tv_st > 0, 90%, 8% + 10% * tv_pw_z.hover)
-                    ellipse { at: tcl + tcw - 64 * u, tct + 28 * u; radius: 13 * u }
+                    ellipse { at: tcl + tcw - 64 * v, tct + 28 * v; radius: 13 * v }
                 }
-                text "power_settings_new" { at: tcl + tcw - 64 * u, tct + 28 * u; anchor: center; size: 16; color: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)); family: "Material Symbols Outlined" }
-                zone box tv_pw_z { at: tcl + tcw - 64 * u, tct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
+                text "power_settings_new" { at: tcl + tcw - 64 * v, tct + 28 * v; anchor: center; size: 16 * tsc; color: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)); family: "Material Symbols Outlined" }
+                zone box tv_pw_z { at: tcl + tcw - 64 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
                 on press tv_pw_z { emit tv_cmd(10) }
-                ellipse { at: tcl + tcw - 30 * u, tct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * tv_x_z.hover }
-                text "close" { at: tcl + tcw - 30 * u, tct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, tv_x_z.hover); family: "Material Symbols Outlined" }
-                zone box tv_x_z { at: tcl + tcw - 30 * u, tct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
+                ellipse { at: tcl + tcw - 30 * v, tct + 28 * v; radius: 13 * v; color: ink; opacity: 8% + 10% * tv_x_z.hover }
+                text "close" { at: tcl + tcw - 30 * v, tct + 28 * v; anchor: center; size: 17 * tsc; color: mix(faint, ink, tv_x_z.hover); family: "Material Symbols Outlined" }
+                zone box tv_x_z { at: tcl + tcw - 30 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_close }
                 on press tv_x_z { tv_open = false }
                 on key Escape while tv_open { tv_open = false }
                 //  the tabs: what is playing, and the remote (only with a remote entity)
-                let tbw = (tcw - 40 * u) / 2
+                let tbw = (tcw - 40 * v) / 2
                 group {
                     show: tv_has_rm
-                    box { from: tcl + 20 * u, tct + 78 * u; size: tcw - 40 * u, 32 * u; corner: 16 * u; color: ink; opacity: 7% }
+                    box { from: tcl + 20 * v, tct + 78 * v; size: tcw - 40 * v, 32 * v; corner: 16 * v; color: ink; opacity: 7% }
                     body {
                         color: ink
                         opacity: 14%
-                        box { from: tcl + 23 * u + tv_tk * tbw, tct + 81 * u; size: tbw - 6 * u, 26 * u; corner: 13 * u }
+                        box { from: tcl + 23 * v + tv_tk * tbw, tct + 81 * v; size: tbw - 6 * v, 26 * v; corner: 13 * v }
                     }
                     repeat i in 0..2 {
-                        text pick(i, "play_circle", "settings_remote") { at: tcl + 20 * u + i * tbw + tbw / 2 - tbm.$i.width / 2 - 2 * u, tct + 94 * u; anchor: center; size: 16; color: if(tv_tab == i, ink, faint); family: "Material Symbols Outlined" }
-                        text pick(i, t_tab0, t_tab1) { at: tcl + 20 * u + i * tbw + tbw / 2 - tbm.$i.width / 2 + 10 * u, tct + 94 * u; anchor: left center; size: 12.5; weight: 700; color: if(tv_tab == i, ink, faint); measure: tbm.$i; family: "Space Grotesk" }
-                        zone box tv_tab_z.$i { from: tcl + 20 * u + i * tbw, tct + 78 * u; size: tbw, 32 * u; corner: 16 * u; cursor: pointer; label: pick(i, t_tab0, t_tab1); role: tab; selected: tv_tab == i }
+                        text pick(i, "play_circle", "settings_remote") { at: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 - 2 * v, tct + 94 * v; anchor: center; size: 16 * tsc; color: if(tv_tab == i, ink, faint); family: "Material Symbols Outlined" }
+                        text pick(i, t_tab0, t_tab1) { at: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 + 10 * v, tct + 94 * v; anchor: left center; size: 12.5 * tsc; weight: 700; color: if(tv_tab == i, ink, faint); measure: tbm.$i; family: "Space Grotesk" }
+                        zone box tv_tab_z.$i { from: tcl + 20 * v + i * tbw, tct + 78 * v; size: tbw, 32 * v; corner: 16 * v; cursor: pointer; label: pick(i, t_tab0, t_tab1); role: tab; selected: tv_tab == i }
                     }
                     on press tv_tab_z.0 { tv_tab = 0 }
                     on press tv_tab_z.1 { tv_tab = 1 }
                 }
-                let cy0 = tct + if(tv_has_rm, 124, 80) * u
+                let cy0 = tct + if(tv_has_rm, 124, 80) * v
                 //  ── what is playing ──
                 group {
                     opacity: 1 - tv_tk
                     show: tv_tk < 0.99
-                    let as = 116 * u
-                    let ax = tcl + 20 * u
-                    box { from: ax, cy0; size: as, as; corner: 14 * u; color: ink; opacity: 6% }
-                    text "live_tv" { at: ax + as / 2, cy0 + as / 2; anchor: center; size: 38; color: faint; opacity: if(tv_has_pic, 0%, 60%); family: "Material Symbols Outlined" }
+                    let as = 116 * v
+                    let ax = tcl + 20 * v
+                    box { from: ax, cy0; size: as, as; corner: 14 * v; color: ink; opacity: 6% }
+                    text "live_tv" { at: ax + as / 2, cy0 + as / 2; anchor: center; size: 38 * tsc; color: faint; opacity: if(tv_has_pic, 0%, 60%); family: "Material Symbols Outlined" }
                     group {
-                        clip box { from: ax, cy0; size: as, as; corner: 14 * u }
+                        clip box { from: ax, cy0; size: as, as; corner: 14 * v }
                         for p in tv_pic { image p.img { at: ax, cy0; size: as, as; fit: cover; show: tv_has_pic } }
                     }
-                    let mx = ax + as + 18 * u
-                    let mw = tcl + tcw - 20 * u - mx
-                    text tv_title { at: mx, cy0 + 4 * u; anchor: left top; size: 16; weight: 700; width: mw; lines: 2; color: ink; family: "Space Grotesk" }
-                    text tv_sub { at: mx, cy0 + 62 * u; anchor: left center; size: 12.5; weight: 600; width: mw; lines: 1; color: faint; family: "Space Grotesk" }
+                    let mx = ax + as + 18 * v
+                    let mw = tcl + tcw - 20 * v - mx
+                    text tv_title { at: mx, cy0 + 4 * v; anchor: left top; size: 16 * tsc; weight: 700; width: mw; lines: 2; color: ink; family: "Space Grotesk" }
+                    text tv_sub { at: mx, cy0 + 62 * v; anchor: left center; size: 12.5 * tsc; weight: 600; width: mw; lines: 1; color: faint; family: "Space Grotesk" }
                     group {
                         show: tv_has_prog
-                        box { from: mx, cy0 + as - 28 * u; size: mw, 5 * u; corner: 2.5 * u; color: ink; opacity: 10% }
+                        box { from: mx, cy0 + as - 28 * v; size: mw, 5 * v; corner: 2.5 * v; color: ink; opacity: 10% }
                         body {
                             gradient: mx, cy0 to mx + mw, cy0, mintlo, minthi
-                            shadow: 0, 0, 8 * u * tlit, 30%, mint
-                            box { from: mx, cy0 + as - 28 * u; size: max(5 * u, mw * tv_progs), 5 * u; corner: 2.5 * u }
+                            shadow: 0, 0, 8 * v * tlit, 30%, mint
+                            box { from: mx, cy0 + as - 28 * v; size: max(5 * v, mw * tv_progs), 5 * v; corner: 2.5 * v }
                         }
-                        text tv_pos { at: mx, cy0 + as - 8 * u; anchor: left center; size: 11; weight: 600; color: faint; family: "Space Grotesk" }
-                        text tv_rem { at: mx + mw, cy0 + as - 8 * u; anchor: right center; size: 11; weight: 600; color: faint; family: "Space Grotesk" }
+                        text tv_pos { at: mx, cy0 + as - 8 * v; anchor: left center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
+                        text tv_rem { at: mx + mw, cy0 + as - 8 * v; anchor: right center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
                     }
                     //  the transport: volume down, previous, play/pause (lit), next, volume up
-                    let ty0 = cy0 + as + 44 * u
+                    let ty0 = cy0 + as + 44 * v
                     repeat i in 0..5 {
-                        let bx = tcl + tcw / 2 + (i - 2) * 70 * u
+                        let bx = tcl + tcw / 2 + (i - 2) * 70 * v
                         let code = pick(i, 9, 11, 7, 12, 8)
                         let big = if(i == 2, 1, 0)
                         let live = if(i == 0 or i == 4 or tv_st > 0, 1, 0)
                         group {
                             opacity: if(live > 0.5, 100%, 35%)
-                            ellipse { at: bx, ty0; radius: 21 * u; color: ink; opacity: if(tv_fl == code, 24%, 8% + 8% * tv_m_z.$i.hover) * (1 - big) }
+                            ellipse { at: bx, ty0; radius: 21 * v; color: ink; opacity: if(tv_fl == code, 24%, 8% + 8% * tv_m_z.$i.hover) * (1 - big) }
                             body {
                                 color: mint
-                                shadow: 0, 0, 12 * u, 35% + 15% * tv_m_z.$i.hover, mint
+                                shadow: 0, 0, 12 * v, 35% + 15% * tv_m_z.$i.hover, mint
                                 rim: 16%
                                 opacity: big
-                                ellipse { at: bx, ty0; radius: (27 + if(tv_fl == 7, -2, 1) * tv_m_z.$i.hover) * u }
+                                ellipse { at: bx, ty0; radius: (27 + if(tv_fl == 7, -2, 1) * tv_m_z.$i.hover) * v }
                             }
-                            text pick(i + if(i == 2 and tv_st == 2, 3, 0), "volume_down", "skip_previous", "play_arrow", "skip_next", "volume_up", "pause") { at: bx, ty0; anchor: center; size: 22 + 8 * big; color: if(big > 0.5, onmint, ink); family: "Material Symbols Outlined" }
-                            zone box tv_m_z.$i { at: bx, ty0; size: (44 + 12 * big) * u, (44 + 12 * big) * u; corner: (22 + 6 * big) * u; cursor: pointer; active: live > 0.5 and tv_tk < 0.5; label: pick(i, t_voldown, t_prev, t_playpause, t_next, t_volup) }
+                            text pick(i + if(i == 2 and tv_st == 2, 3, 0), "volume_down", "skip_previous", "play_arrow", "skip_next", "volume_up", "pause") { at: bx, ty0; anchor: center; size: (22 + 8 * big) * tsc; color: if(big > 0.5, onmint, ink); family: "Material Symbols Outlined" }
+                            zone box tv_m_z.$i { at: bx, ty0; size: (44 + 12 * big) * v, (44 + 12 * big) * v; corner: (22 + 6 * big) * v; cursor: pointer; active: live > 0.5 and tv_tk < 0.5; label: pick(i, t_voldown, t_prev, t_playpause, t_next, t_volup) }
                         }
                         on press tv_m_z.$i { emit tv_cmd(code); tv_fl = code }
                     }
                 }
-                //  ── the remote ──
+                //  ── the remote: laid out as the Siri Remote, on its side: the clickpad, and beside it its buttons in two columns (back and TV, play/pause and
+                //  the volume's rocker, mute under them) ──
                 group {
                     opacity: tv_tk
                     show: tv_tk > 0.01 and tv_has_rm
-                    let qx = tcl + tcw / 2
-                    let qr = 88 * u
-                    let qy = cy0 + qr + 4 * u
+                    let qr = 80 * v
+                    let rl = tcl + tcw / 2 - 149 * v
+                    let qx = rl + qr
+                    let qy = cy0 + qr + 2 * v
                     //  the clickpad: a dark round pad, its four edges and its middle; the wheel over it moves up and down
                     zone box tv_pad_z { at: qx, qy; size: 2 * qr, 2 * qr; corner: qr }
                     body {
@@ -816,9 +822,9 @@ scene HomeAssistant {
                         let ddx = pick(k, 0, 0, -1, 1)
                         let ddy = pick(k, -1, 1, 0, 0)
                         //  the edge, lit under the pointer and when pressed
-                        arc { at: qx, qy; radius: 61 * u; span: 48deg; width: 44 * u; rotate: pick(k, 0, 180, 270, 90) * 1deg; color: ink; opacity: if(tv_fl == k, 22%, 9% * tv_d_z.$k.hover) }
-                        ellipse { at: qx + ddx * 70 * u, qy + ddy * 70 * u; radius: 3 * u; color: ink; opacity: if(tv_fl == k, 100%, 40% + 40% * tv_d_z.$k.hover) }
-                        zone box tv_d_z.$k { from: pick(k, qx - 60 * u, qx - 60 * u, qx - qr, qx + 34 * u), pick(k, qy - qr, qy + 34 * u, qy - 50 * u, qy - 50 * u); size: pick(k, 120 * u, 120 * u, qr - 34 * u, qr - 34 * u), pick(k, qr - 34 * u, qr - 34 * u, 100 * u, 100 * u); cursor: pointer; active: tv_tk > 0.5; label: pick(k, t_up, t_down, t_left, t_right) }
+                        arc { at: qx, qy; radius: 56 * v; span: 48deg; width: 40 * v; rotate: pick(k, 0, 180, 270, 90) * 1deg; color: ink; opacity: if(tv_fl == k, 22%, 9% * tv_d_z.$k.hover) }
+                        ellipse { at: qx + ddx * 64 * v, qy + ddy * 64 * v; radius: 3 * v; color: ink; opacity: if(tv_fl == k, 100%, 40% + 40% * tv_d_z.$k.hover) }
+                        zone box tv_d_z.$k { from: pick(k, qx - 55 * v, qx - 55 * v, qx - qr, qx + 30 * v), pick(k, qy - qr, qy + 30 * v, qy - 45 * v, qy - 45 * v); size: pick(k, 110 * v, 110 * v, qr - 30 * v, qr - 30 * v), pick(k, qr - 30 * v, qr - 30 * v, 90 * v, 90 * v); cursor: pointer; active: tv_tk > 0.5; label: pick(k, t_up, t_down, t_left, t_right) }
                     }
                     repeat k in 0..4 {
                         on press tv_d_z.$k { emit tv_cmd(k); tv_fl = k }
@@ -830,37 +836,40 @@ scene HomeAssistant {
                         color: ink
                         opacity: if(tv_fl == 4 or tv_fl == 15, 26%, 10% + 6% * tv_ok_z.hover)
                         rim: 10%
-                        ellipse { at: qx, qy; radius: 32 * u }
+                        ellipse { at: qx, qy; radius: 29 * v }
                     }
-                    zone box tv_ok_z { at: qx, qy; size: 64 * u, 64 * u; corner: 32 * u; cursor: pointer; label: t_select }
+                    zone box tv_ok_z { at: qx, qy; size: 58 * v, 58 * v; corner: 29 * v; cursor: pointer; label: t_select }
                     on press tv_ok_z { tv_hd = false; tv_fl = 4 }
                     on hold tv_ok_z for 600ms { tv_hd = true; tv_fl = 15; emit tv_cmd(15) }
                     on release tv_ok_z while not tv_hd { emit tv_cmd(4) }
                     on scroll tv_ok_z { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
-                    //  under it: back, TV (held: the control centre), play/pause, and the volume
-                    let ry = qy + qr + 36 * u
-                    repeat i in 0..3 {
-                        let bx = qx - 118 * u + i * 60 * u
-                        let code = pick(i, 5, 6, 7)
-                        ellipse { at: bx, ry; radius: 22 * u; color: ink; opacity: if(tv_fl == code or (i == 1 and tv_fl == 16), 26%, 10% + 8% * tv_r_z.$i.hover) }
-                        text pick(i, "chevron_left", "tv", "play_pause") { at: bx, ry; anchor: center; size: 22; color: ink; family: "Material Symbols Outlined" }
-                        zone box tv_r_z.$i { at: bx, ry; size: 44 * u, 44 * u; corner: 22 * u; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_back, t_home, t_playpause) }
+                    //  the buttons: first column back, play/pause, mute; second TV (held: the control centre) and the volume's rocker, + over −
+                    let ca = rl + 2 * qr + 36 * v + 22 * v
+                    let cb = ca + 58 * v
+                    repeat i in 0..4 {
+                        let bx = if(i == 1, cb, ca)
+                        let by = qy + pick(i, -54, -54, 0, 54) * v
+                        let code = pick(i, 5, 6, 7, 17)
+                        ellipse { at: bx, by; radius: 22 * v; color: ink; opacity: if(tv_fl == code or (i == 1 and tv_fl == 16), 26%, 10% + 8% * tv_r_z.$i.hover) }
+                        text pick(i, "chevron_left", "tv", "play_pause", "volume_off") { at: bx, by; anchor: center; size: 22 * tsc; color: ink; family: "Material Symbols Outlined" }
+                        zone box tv_r_z.$i { at: bx, by; size: 44 * v, 44 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_back, t_home, t_playpause, t_mute) }
                     }
                     on press tv_r_z.0 { emit tv_cmd(5); tv_fl = 5 }
                     on press tv_r_z.1 { tv_hd = false; tv_fl = 6 }
                     on hold tv_r_z.1 for 600ms { tv_hd = true; tv_fl = 16; emit tv_cmd(16) }
                     on release tv_r_z.1 while not tv_hd { emit tv_cmd(6) }
                     on press tv_r_z.2 { emit tv_cmd(7); tv_fl = 7 }
-                    box { from: qx + 40 * u, ry - 22 * u; size: 100 * u, 44 * u; corner: 22 * u; color: ink; opacity: 10% }
+                    on press tv_r_z.3 { emit tv_cmd(17); tv_fl = 17 }
+                    box { from: cb - 22 * v, qy - 22 * v; size: 44 * v, 98 * v; corner: 22 * v; color: ink; opacity: 10% }
                     repeat i in 0..2 {
-                        let code = pick(i, 9, 8)
-                        box { from: qx + 40 * u + i * 50 * u, ry - 22 * u; size: 50 * u, 44 * u; corner: 22 * u; color: ink; opacity: if(tv_fl == code, 18%, 8% * tv_v_z.$i.hover) }
-                        text pick(i, "remove", "add") { at: qx + 65 * u + i * 50 * u, ry; anchor: center; size: 20; color: ink; family: "Material Symbols Outlined" }
-                        zone box tv_v_z.$i { from: qx + 40 * u + i * 50 * u, ry - 22 * u; size: 50 * u, 44 * u; corner: 22 * u; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_voldown, t_volup) }
+                        let code = pick(i, 8, 9)
+                        box { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; color: ink; opacity: if(tv_fl == code, 18%, 8% * tv_v_z.$i.hover) }
+                        text pick(i, "add", "remove") { at: cb, qy + i * 54 * v; anchor: center; size: 20 * tsc; color: ink; family: "Material Symbols Outlined" }
+                        zone box tv_v_z.$i { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_volup, t_voldown) }
                         on press tv_v_z.$i { emit tv_cmd(code); tv_fl = code }
                     }
-                    box { from: qx + 89.25 * u, ry - 12 * u; size: 1.5 * u, 24 * u; color: ink; opacity: 14% }
-                    text t_kb { at: qx, ry + 42 * u; anchor: center; size: 11; weight: 600; width: tcw - 40 * u; lines: 1; align: center; color: faint; family: "Space Grotesk" }
+                    box { at: cb, qy + 27 * v; size: 22 * v, 1.5 * v; color: ink; opacity: 14% }
+                    text t_kb { at: tcl + tcw / 2, cy0 + 186 * v; anchor: center; size: 11 * tsc; weight: 600; width: tcw - 40 * v; lines: 1; align: center; color: faint; family: "Space Grotesk" }
                 }
                 //  the keyboard, while the remote is showing (the card has it then)
                 on key Up while tv_open and tv_tab == 1 { emit tv_cmd(0); tv_fl = 0 }

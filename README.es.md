@@ -71,7 +71,7 @@ Ponle `"color": true` a una luz y su control del clic derecho muestra, debajo de
 Ponle a la ficha de un Apple TV un bloque `"apple_tv"` con su entidad de mando, y un clic derecho sobre ella abre una tarjeta con dos pestañas (el clic normal lo sigue encendiendo y apagando):
 
 - **Reproducción**: la carátula, el título y la serie o el artista, la app, por dónde va (avanza cada segundo), y bajar volumen, anterior, reproducir/pausa, siguiente y subir volumen. El botón de encendido está en la cabecera.
-- **Mando**: el clickpad (sus cuatro bordes mueven, el centro selecciona, y mantenido es una pulsación larga; la rueda del ratón encima sube y baja), atrás, TV (mantenido: el centro de control), reproducir/pausa y el volumen. Mientras esta pestaña está a la vista se maneja con el teclado: las flechas, Intro para seleccionar, Retroceso para atrás, Espacio para reproducir/pausa, y Escape cierra la tarjeta (la tarjeta toma el teclado mientras muestra el mando, y lo suelta al cerrarse o al volver a la otra pestaña).
+- **Mando**: con la disposición del Siri Remote: el clickpad (sus cuatro bordes mueven, el centro selecciona, y mantenido es una pulsación larga; la rueda del ratón encima sube y baja), y a su lado atrás y TV (mantenido: el centro de control), reproducir/pausa y el balancín del volumen, y silenciar. Mientras esta pestaña está a la vista se maneja con el teclado: las flechas, Intro para seleccionar, Retroceso para atrás, Espacio para reproducir/pausa, y Escape cierra la tarjeta (la tarjeta toma el teclado mientras muestra el mando, y lo suelta al cerrarse o al volver a la otra pestaña).
 
 ```json
 { "type": "toggle", "name": "Apple TV", "icon": "reproductor.svg", "entity": "media_player.salon",
@@ -80,7 +80,7 @@ Ponle a la ficha de un Apple TV un bloque `"apple_tv"` con su entidad de mando, 
 
 ![La tarjeta del Apple TV y su mando](docs/es/apple-tv.png)
 
-Son las entidades de la [integración de Apple TV](https://www.home-assistant.io/integrations/apple_tv/): crea un `media_player.` y un `remote.` con el mismo nombre para cada Apple TV (míralos en Ajustes > Dispositivos y servicios > Apple TV). Los botones del mando van a `remote.send_command` y el resto al reproductor. Si la entidad de la ficha no es el reproductor, añade `"media_player": "media_player.…"` al bloque. Sin `remote` la tarjeta no tiene la pestaña del mando, así que también sirve para cualquier otro reproductor. Mientras reproduce, la ficha lo dice: *Reproduciendo · La casa de papel*.
+Son las entidades de la [integración de Apple TV](https://www.home-assistant.io/integrations/apple_tv/): crea un `media_player.` y un `remote.` con el mismo nombre para cada Apple TV (míralos en Ajustes > Dispositivos y servicios > Apple TV). Los botones del mando van a `remote.send_command` y el resto al reproductor (silenciar baja su volumen a cero y lo devuelve, si lo informa). La tarjeta se encoge un poco si el panel no es lo bastante alto. Si la entidad de la ficha no es el reproductor, añade `"media_player": "media_player.…"` al bloque. Sin `remote` la tarjeta no tiene la pestaña del mando, así que también sirve para cualquier otro reproductor. Mientras reproduce, la ficha lo dice: *Reproduciendo · La casa de papel*.
 
 ### La tarjeta de una impresora 3D
 

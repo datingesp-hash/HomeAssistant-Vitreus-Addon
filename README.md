@@ -72,7 +72,7 @@ Give a light `"color": true` and its right click card shows, below the brightnes
 Give an Apple TV's tile an `"apple_tv"` block with its remote entity, and a right click on it opens a card with two tabs (a click still turns it on and off):
 
 - **Now playing**: the artwork, the title and the series or artist, the app, how far it has got (it moves every second), and volume down, previous, play/pause, next and volume up. The power button is in the head.
-- **Remote**: the clickpad (its four edges move, its middle selects, held it is a long press; the wheel over it moves up and down), back, TV (held: the control centre), play/pause and the volume. While this tab is showing the keyboard drives it: the arrows, Return to select, BackSpace for back, Space for play/pause, and Escape shuts the card (the card takes the keyboard while it shows the remote, and gives it back when it shuts or goes back to the other tab).
+- **Remote**: laid out as the Siri Remote: the clickpad (its four edges move, its middle selects, held it is a long press; the wheel over it moves up and down), and beside it back and TV (held: the control centre), play/pause and the volume rocker, and mute. While this tab is showing the keyboard drives it: the arrows, Return to select, BackSpace for back, Space for play/pause, and Escape shuts the card (the card takes the keyboard while it shows the remote, and gives it back when it shuts or goes back to the other tab).
 
 ```json
 { "type": "toggle", "name": "Apple TV", "icon": "tv-box.svg", "entity": "media_player.living_room",
@@ -81,7 +81,7 @@ Give an Apple TV's tile an `"apple_tv"` block with its remote entity, and a righ
 
 ![The Apple TV's card and its remote](docs/en/apple-tv.png)
 
-These are the [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/)'s entities: it makes a `media_player.` and a `remote.` with the same name for each Apple TV (check yours in Settings > Devices & services > Apple TV). The remote's buttons go to `remote.send_command`, the rest to the media player. If the tile's entity is not the media player, add `"media_player": "media_player.…"` to the block. Without `remote` the card has no remote tab, so it works for any other media player too. While it plays, the tile says so: *Playing · La casa de papel*.
+These are the [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/)'s entities: it makes a `media_player.` and a `remote.` with the same name for each Apple TV (check yours in Settings > Devices & services > Apple TV). The remote's buttons go to `remote.send_command`, the rest to the media player (mute sets its volume to nothing and back, when it reports one). The card shrinks a little when the panel is not tall enough for it. If the tile's entity is not the media player, add `"media_player": "media_player.…"` to the block. Without `remote` the card has no remote tab, so it works for any other media player too. While it plays, the tile says so: *Playing · La casa de papel*.
 
 ### A 3D printer's card
 

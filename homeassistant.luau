@@ -123,7 +123,7 @@ local STR = {
         tv_off = "Apagado", tv_on = "Encendido", tv_playing = "Reproduciendo", tv_paused = "En pausa", tv_nothing = "No se está reproduciendo nada",
         tab_media = "Reproducción", tab_remote = "Mando", kb_hint = "Teclado: flechas, Intro, Retroceso (atrás) y Espacio (reproducir/pausa)",
         power = "Encender o apagar", up = "Arriba", down = "Abajo", left = "Izquierda", right = "Derecha", select = "Seleccionar", back = "Atrás",
-        home = "TV (inicio)", playpause = "Reproducir o pausar", volup = "Subir el volumen", voldown = "Bajar el volumen", prev = "Anterior", next = "Siguiente",
+        home = "TV (inicio)", playpause = "Reproducir o pausar", volup = "Subir el volumen", voldown = "Bajar el volumen", mute = "Silenciar", prev = "Anterior", next = "Siguiente",
     },
     en = {
         connecting = "Connecting…", connected = "Connected · %d of %d %s", tile = "tile", tiles = "tiles", no_tiles = "Connected · no tiles",
@@ -153,7 +153,7 @@ local STR = {
         tv_off = "Off", tv_on = "On", tv_playing = "Playing", tv_paused = "Paused", tv_nothing = "Nothing playing",
         tab_media = "Now playing", tab_remote = "Remote", kb_hint = "Keyboard: arrows, Return, BackSpace (back) and Space (play/pause)",
         power = "Power", up = "Up", down = "Down", left = "Left", right = "Right", select = "Select", back = "Back",
-        home = "TV (home)", playpause = "Play or pause", volup = "Volume up", voldown = "Volume down", prev = "Previous", next = "Next",
+        home = "TV (home)", playpause = "Play or pause", volup = "Volume up", voldown = "Volume down", mute = "Mute", prev = "Previous", next = "Next",
     },
 }
 local lang = "en"
@@ -216,7 +216,7 @@ local function scene_words()
     text.t_tab1 = T("tab_remote")
     text.t_kb = T("kb_hint")
     text.t_power = T("power")
-    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "prev", "next" }) do
+    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next" }) do
         text["t_" .. k] = T(k)
     end
 end
@@ -387,7 +387,7 @@ local show, call          -- (both further down; the Apple TV's poll, here, uses
 local tvs = {}              -- by media player: { st, title, artist, series, app, dur, pos, el, pic, at }
 local TV_CODE = { off = 0, standby = 0, unavailable = 0, unknown = 0, idle = 1, on = 1, playing = 2, buffering = 2, paused = 3 }
 local TV_LABEL = { [0] = "tv_off", "tv_on", "tv_playing", "tv_paused" }
-local tv_busy, tv_pic_n, tv_shown, tv_pbusy = false, 0, "", false
+local tv_busy, tv_pic_n, tv_shown, tv_pbusy, tv_retry = false, 0, "", false, nil
 local function tv_code(t) return t and (TV_CODE[t.st] or 1) or 0 end
 local function tv_now(t)                -- where it is now, in seconds (-1: it does not say)
     if not t or t.dur <= 0 or t.pos < 0 then return -1 end
@@ -411,7 +411,7 @@ local function tv_fetch(pic)
     tv_pic_n = tv_pic_n + 1
     local n = tv_pic_n
     local path = folder .. "/tv-" .. (n % 2) .. ".img"
-    local args = { "-s", "-f", "-K", folder .. "/" .. AUTH, "--max-time", "8", "-o", path }
+    local args = { "-s", "-f", "-K", folder .. "/" .. AUTH, "--max-time", "20", "-o", path }
     if cfg.insecure then args[#args + 1] = "-k" end
     args[#args + 1] = cfg.url .. pic
     run("curl", args, function(_, code)
@@ -420,7 +420,7 @@ local function tv_fetch(pic)
             model.tv_pic = { { img = path .. "?" .. n } }
             fact.tv_has_pic = true
         else
-            tv_shown = ""
+            tv_retry = tick + 15          -- (asked again a little later, not every second)
         end
     end)
 end
@@ -451,7 +451,7 @@ local function tv_fill()
     local pic = (t and code > 0) and t.pic or ""
     if pic ~= "" then
         local key = (pic:gsub("token=[^&]*", ""))
-        if key ~= tv_shown then tv_shown = key; tv_fetch(pic) end
+        if key ~= tv_shown or (tv_retry and tick >= tv_retry) then tv_shown = key; tv_retry = nil; tv_fetch(pic) end
     elseif tv_shown ~= "none" then
         tv_shown = "none"
         fact.tv_has_pic = false
@@ -467,8 +467,8 @@ local function tv_poll()
     if #ids == 0 then return end
     local quoted = {}
     for k, e in ipairs(ids) do quoted[k] = '"' .. e .. '"' end
-    -- the state, the title, the artist, the series, the app, the length, the position and how long ago it was told (seconds), and the artwork
-    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set u = state_attr(e, 'media_position_updated_at') %}[{{ states(e) | tojson }},{{ (state_attr(e, 'media_title') or '') | tojson }},{{ (state_attr(e, 'media_artist') or state_attr(e, 'media_album_artist') or '') | tojson }},{{ (state_attr(e, 'media_series_title') or '') | tojson }},{{ (state_attr(e, 'app_name') or state_attr(e, 'source') or '') | tojson }},{{ state_attr(e, 'media_duration') | float(0) }},{{ state_attr(e, 'media_position') | float(-1) }},{{ ((as_timestamp(now()) - as_timestamp(u, as_timestamp(now()))) | round(1)) if u else 0 }},{{ (state_attr(e, 'entity_picture') or '') | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
+    -- the state, the title, the artist, the series, the app, the length, the position and how long ago it was told (seconds), the artwork and the volume
+    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set u = state_attr(e, 'media_position_updated_at') %}[{{ states(e) | tojson }},{{ (state_attr(e, 'media_title') or '') | tojson }},{{ (state_attr(e, 'media_artist') or state_attr(e, 'media_album_artist') or '') | tojson }},{{ (state_attr(e, 'media_series_title') or '') | tojson }},{{ (state_attr(e, 'app_name') or state_attr(e, 'source') or '') | tojson }},{{ state_attr(e, 'media_duration') | float(0) }},{{ state_attr(e, 'media_position') | float(-1) }},{{ ((as_timestamp(now()) - as_timestamp(u, as_timestamp(now()))) | round(1)) if u else 0 }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{{ state_attr(e, 'volume_level') | float(-1) }}]{{ ',' if not loop.last }}{% endfor %}]"
     tv_busy = true
     call("/api/template", json.encode({ template = tpl }), function(ok, out)
         tv_busy = false
@@ -479,7 +479,8 @@ local function tv_poll()
             local r = list[k]
             if type(r) == "table" then
                 tvs[e] = { st = tostring(r[1] or "unknown"), title = tostring(r[2] or ""), artist = tostring(r[3] or ""), series = tostring(r[4] or ""),
-                    app = tostring(r[5] or ""), dur = tonumber(r[6]) or 0, pos = tonumber(r[7]) or -1, el = tonumber(r[8]) or 0, pic = tostring(r[9] or ""), at = tick }
+                    app = tostring(r[5] or ""), dur = tonumber(r[6]) or 0, pos = tonumber(r[7]) or -1, el = tonumber(r[8]) or 0, pic = tostring(r[9] or ""), vol = tonumber(r[10]) or -1, at = tick,
+                    unmute = tvs[e] and tvs[e].unmute or nil }
             end
         end
         show()
@@ -873,6 +874,7 @@ end)
 -- The slider asks which light it is on: its name and icon
 -- The Apple TV's card: opened, and its buttons. The remote's go to the remote entity (remote.send_command, as the Apple TV integration takes them); the
 -- transport and the power to the media player.
+local tv_muted = false
 local TV_REMOTE = { [0] = "up", "down", "left", "right", "select", "menu", "home", "play_pause", "volume_up", "volume_down" }
 on("fact:tv_open", function(v) if v == true then tv_shown = ""; fact.tv_has_pic = false; model.tv_pic = {}; tv_fill(); tv_poll() end end)
 on("fact:tv_i", function() if fact.tv_open == true then tv_shown = ""; tv_fill() end end)
@@ -891,6 +893,17 @@ on("tv_cmd", function(c)
             svc, body = "/api/services/remote/" .. (was == 0 and "turn_on" or "turn_off"), { entity_id = remote }
         end
         if t then t.st = was == 0 and "idle" or "off" end
+    elseif c == 17 and media then                         -- mute: to nothing and back by its volume when it says one, else the player's own mute
+        if t and t.vol >= 0 then
+            local back = t.vol > 0.001
+            if back then t.unmute = t.vol end
+            local to = back and 0 or (t.unmute or 0.3)
+            svc, body = "/api/services/media_player/volume_set", { entity_id = media, volume_level = to }
+            t.vol = to
+        else
+            tv_muted = not tv_muted
+            svc, body = "/api/services/media_player/volume_mute", { entity_id = media, is_volume_muted = tv_muted }
+        end
     elseif (c == 11 or c == 12) and media then             -- previous, next
         svc, body = "/api/services/media_player/" .. (c == 11 and "media_previous_track" or "media_next_track"), { entity_id = media }
     elseif c == 15 and remote then                        -- the middle held: a long press
