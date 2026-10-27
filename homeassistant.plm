@@ -4,7 +4,7 @@ import "addon-palette.plm"
 //  Home Assistant, as a Vitreus add-on with a panel: the rooms listed in config.json (the scene's data folder, ~/.local/share/pleamar/homeassistant/),
 //  each with its name, its temperature and humidity if it has sensors for them, and a tile for each of its lights and switches, drawn in the shell's own
 //  manner (the control centre's tiles: a veil, a lit disc, Space Grotesk). A click toggles a tile; a right click on a light opens its brightness slider
-//  over the panel. The pencil puts the tiles in edit mode: each gets a handle in its corner that pulls it wider or taller, cell by cell.
+//  over the panel (and its colour, for a light with "color": true in config.json). The pencil puts the tiles in edit mode: each gets a handle in its corner that pulls it wider or taller, cell by cell.
 //  homeassistant.luau talks to Home Assistant's REST API with curl (the token goes in a file curl reads, never in its arguments), lays the tiles out
 //  (`col`, `cs`, `rs`, `yu`: where each goes and how big, in cells and unscaled pixels) and fills `hl_items` and `hl_rooms`.
 //  Icons are Material Symbols names ("lightbulb", "tv", "bedtime"…): the font is the one the lock screen uses.
@@ -84,7 +84,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number }      // kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number }      // `cc` 1: a light whose colour is chosen here · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -113,6 +113,18 @@ scene HomeAssistant {
     text sl_name = ""
     text sl_icon = "lightbulb"
     fact sl_custom = false                            // the light's icon is an svg of its own (drawn from its record, below)
+    //  its colour, for a light that has one: a hue and a saturation, 0 to 1 (Home Assistant's hs_color), chosen on a rainbow or among a few made ones
+    fact sl_col = 0                                   // 1: this light's colour is chosen here
+    fact sl_ck = 0                                    // 1: its colour is known (until then the card and the tile keep the accent)
+    fact sl_h = 0
+    fact sl_s = 0
+    fact sl_cdirty = false
+    prop sl_hs = 0 ~quick
+    follow sl_hs = sl_h
+    prop sl_ss = 0 ~quick
+    follow sl_ss = sl_s
+    event hl_color ->                                 // a colour chosen: its hue in degrees times 1000, plus its saturation in percent (`sl_i` says which light)
+    text t_color = ""
 
     //  The printer's card: a tile with "printer" in config.json opens it with a right click (a click still toggles the tile). The logic fills it from the printer's
     //  sensors: the job, its state, its progress, the time left, when it started and ends, the model's cover or the camera, and its buttons.
@@ -253,6 +265,13 @@ scene HomeAssistant {
                     let seen = cy0 - hl_sc > -thh and cy0 - hl_sc < vh
                     //  a light shows the slider's value while the slider is on it
                     let bv = if(sl_open and sl_i == r.index, sl_vs, r.bri)
+                    //  a light with a colour of its own is lit in it instead of the accent (the card's, while it is chosen there)
+                    let live = if(sl_open and sl_i == r.index and sl_ck > 0.5, 1, 0)
+                    let kh = if(live > 0.5, sl_hs, r.hu)
+                    let ks = if(live > 0.5, sl_ss, r.sa)
+                    let kk = if(r.cc > 0.5 and (r.hk > 0.5 or live > 0.5), 1, 0)
+                    //  (the colours are drawn a little softer than the light's, as the shell's accents are; a dark one takes a light icon)
+                    let kdark = if(kk > 0.5 and 0.3 * (1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))) < 0.6, 1, 0)
                     let lit = r.on * r.avail
                     let dx = cx0 + mix(33, 36, tall) * u          // the disc's middle
                     let dy = mix(cy0 + thh / 2, cy0 + 36 * u, tall)
@@ -263,32 +282,32 @@ scene HomeAssistant {
                         opacity: if(r.avail > 0.5, 100%, 45%)
                         zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { emit hl_tap(r.index) }
-                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_v = r.bri; sl_dirty = false; sl_open = true }
+                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
                         on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_open = true }
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 13% * lit }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held, mint, ink); opacity: hl_ed * if(held, 90%, 22%) }
                         //  the disc: hollow when off, lit and glowing when on (a little larger in a tall tile)
                         body {
-                            color: mix(off, mint, lit)
-                            shadow: 0, 0, 10 * u * lit, 45% * lit, mint
+                            color: mix(off, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), lit)
+                            shadow: 0, 0, 10 * u * lit, 45% * lit, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk)
                             rim: 16% * lit
                             ellipse { at: dx, dy; radius: mix(19, 22, tall) * u }
                         }
-                        text r.icon { at: dx, dy; anchor: center; size: 22 + 4 * tall; color: mix(ink, onmint, lit); show: r.custom < 0.5; family: "Material Symbols Outlined" }
+                        text r.icon { at: dx, dy; anchor: center; size: 22 + 4 * tall; color: mix(ink, if(kdark > 0.5, ink, onmint), lit); show: r.custom < 0.5; family: "Material Symbols Outlined" }
                         //  an icon of its own: a white svg, tinted as the Material ones are
-                        image r.img { at: dx - (11 + 2 * tall) * u, dy - (11 + 2 * tall) * u; size: (22 + 4 * tall) * u, (22 + 4 * tall) * u; tint: mix(ink, onmint, lit); show: r.custom > 0.5 }
+                        image r.img { at: dx - (11 + 2 * tall) * u, dy - (11 + 2 * tall) * u; size: (22 + 4 * tall) * u, (22 + 4 * tall) * u; tint: mix(ink, if(kdark > 0.5, ink, onmint), lit); show: r.custom > 0.5 }
                         //  the name and how it is
                         text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; family: "Space Grotesk" }
-                        text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; color: if(lit > 0.5, mint, faint); family: "Space Grotesk" }
+                        text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; color: if(lit > 0.5, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), faint); family: "Space Grotesk" }
                         //  a light: how bright, along the bottom
                         group {
                             show: r.kind == 0 and lit > 0.5
                             let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
                             let bw = mix(tww - 76 * u, tww - 36 * u, tall)
                             box { from: bx, cy0 + thh - 13 * u; size: bw, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
-                            box { from: bx, cy0 + thh - 13 * u; size: max(3 * u, bw * bv), 3 * u; corner: 1.5 * u; color: mint }
+                            box { from: bx, cy0 + thh - 13 * u; size: max(3 * u, bw * bv), 3 * u; corner: 1.5 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk) }
                         }
                         //  a printer: the print's progress along the bottom, while one runs
                         group {
@@ -362,13 +381,15 @@ scene HomeAssistant {
             group {
                 opacity: sl_k
                 let cw = min(W - 40 * u, 400 * u)
-                let ch = 186 * u
+                let ch = if(sl_col > 0.5, 298, 186) * u          // (taller with the colours)
                 let cl = (W - cw) / 2
                 let ct = (H - ch) / 2 + 10 * u * (1 - sl_k)
                 let tl = cl + 22 * u
                 let tw2 = cw - 44 * u
                 let ty = ct + 98 * u
                 let kx = tl + 17 * u + (tw2 - 34 * u) * sl_vs
+                let lk = if(sl_col > 0.5 and sl_ck > 0.5, 1, 0)       // the light's own colour, known: the disc and the track take it
+                let ldark = if(lk > 0.5 and 0.3 * (1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))) < 0.6, 1, 0)
                 //  first the veil over the tiles, which shuts it (declared before the card, so the card's zones win over it)
                 //  (over all of Vitreus's glass, not only the content: past it by the glass's margin at the sides and the foot (14) and the title bar on top (38),
                 //  both in Vitreus's `cu`, 1.5525, with the glass's own corner, `rc`: 26, or 7 with the square themes, Retro and Cyber, times its `u`, 1.35)
@@ -389,14 +410,14 @@ scene HomeAssistant {
                 on press right sl_card_z { sl_open = false }
                 //  the light: its disc, its name, the value
                 body {
-                    color: mix(off, mint, if(sl_vs > 0.004, 1, 0))
-                    shadow: 0, 0, 10 * u * if(sl_vs > 0.004, 1, 0), 45%, mint
+                    color: mix(off, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), if(sl_vs > 0.004, 1, 0))
+                    shadow: 0, 0, 10 * u * if(sl_vs > 0.004, 1, 0), 45%, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk)
                     rim: 16%
                     ellipse { at: cl + 42 * u, ct + 42 * u; radius: 20 * u }
                 }
-                text sl_icon { at: cl + 42 * u, ct + 42 * u; anchor: center; size: 22; color: if(sl_vs > 0.004, onmint, ink); show: not sl_custom; family: "Material Symbols Outlined" }
+                text sl_icon { at: cl + 42 * u, ct + 42 * u; anchor: center; size: 22; color: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink); show: not sl_custom; family: "Material Symbols Outlined" }
                 for r in hl_items {
-                    image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004, onmint, ink); show: sl_custom and r.index == sl_i }
+                    image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink); show: sl_custom and r.index == sl_i }
                 }
                 text sl_name { at: cl + 72 * u, ct + 34 * u; anchor: left center; size: 15; weight: 700; width: cw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
                 text t_brightness { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
@@ -408,8 +429,8 @@ scene HomeAssistant {
                 //  the track: hollow, filled with the accent up to the knob
                 box { from: tl, ty - 17 * u; size: tw2, 34 * u; corner: 17 * u; color: ink; opacity: 9% }
                 body {
-                    gradient: tl, ty to tl + tw2, ty, mintlo, minthi
-                    shadow: 0, 0, 10 * u, 30%, mint
+                    gradient: tl, ty to tl + tw2, ty, mix(mintlo, mix(mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), deep, 0.3), lk), mix(minthi, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), lk)
+                    shadow: 0, 0, 10 * u, 30%, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk)
                     rim: 16%
                     box { from: tl, ty - 17 * u; size: max(34 * u, kx - tl + 17 * u), 34 * u; corner: 17 * u }
                 }
@@ -431,12 +452,57 @@ scene HomeAssistant {
                     let px = tl + i * (pw + 8 * u)
                     let pv = i * 0.25
                     let here = abs(sl_v - pv) < 0.01
-                    zone box sl_p_z.$i { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: "{t_brightness}: {i * 25} %" }
+                    zone box sl_p_z.$i { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: "{t_brightness}: {i * 25} %" }
                     on press sl_p_z.$i { sl_v = pv; emit hl_bri(pv); sl_dirty = false }
-                    box { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; color: mint; opacity: if(here, 100%, 0%) }
-                    box { from: px, ct + ch - 50 * u; size: pw, 30 * u; corner: 15 * u; color: ink; opacity: if(here, 0%, 8% + 8% * sl_p_z.$i.hover) }
-                    text t_off { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i == 0; family: "Space Grotesk" }
-                    text pick(i, "", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + ch - 35 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i > 0; family: "Space Grotesk" }
+                    box { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; color: mint; opacity: if(here, 100%, 0%) }
+                    box { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; color: ink; opacity: if(here, 0%, 8% + 8% * sl_p_z.$i.hover) }
+                    text t_off { at: px + pw / 2, ct + 151 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i == 0; family: "Space Grotesk" }
+                    text pick(i, "", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + 151 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i > 0; family: "Space Grotesk" }
+                }
+                //  the colour, for a light that has one: a rainbow to drag along, and a row of made ones (two whites, then around the wheel). Choosing one on a
+                //  light that is off turns it on, at full brightness.
+                group {
+                    show: sl_col > 0.5
+                    box { from: tl, ct + 184 * u; size: tw2, 1.5; color: ink; opacity: 10% }
+                    text t_color { at: tl, ct + 204 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                    let hy = ct + 230 * u
+                    let hx = tl + 11 * u + (tw2 - 22 * u) * sl_hs
+                    body {
+                        gradient: tl, hy to tl + tw2, hy, #ff2626, #ffff26, #26ff26, #26ffff, #2626ff, #ff26ff, #ff2626
+                        rim: 16%
+                        box { from: tl, hy - 11 * u; size: tw2, 22 * u; corner: 11 * u }
+                    }
+                    //  the knob: on the hue, faded while the colour is a white (no hue of its own)
+                    body {
+                        color: ink
+                        shadow: 0, 2 * u, 8 * u, 40%, deep
+                        opacity: if(lk > 0.5 and sl_s > 0.05, 100%, 40%)
+                        ellipse { at: hx, hy; radius: (12 + 2 * sl_hue_z.hover) * u }
+                    }
+                    ellipse { at: hx, hy; radius: 8 * u; color: rgb(0.15 + 0.85 * clamp(abs(sl_hs * 6 - 3) - 1, 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 2), 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 4), 0, 1)); opacity: if(lk > 0.5 and sl_s > 0.05, 100%, 40%) }
+                    zone box sl_hue_z { from: tl - 6 * u, hy - 18 * u; size: tw2 + 12 * u, 36 * u; corner: 18 * u; cursor: pointer; label: "{t_color}: {sl_name}"; role: slider; value: "{sl_hs * 360}" }
+                    on press sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); sl_cdirty = true }
+                    on drag sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_cdirty = true }
+                    on release sl_hue_z { emit hl_color(round(sl_h * 360) * 1000 + round(sl_s * 100)); sl_cdirty = false }
+                    //  a pause in the dragging sends it too, as the brightness does
+                    on still sl_h for 280ms while sl_open and sl_cdirty { emit hl_color(round(sl_h * 360) * 1000 + round(sl_s * 100)); sl_cdirty = false }
+                    //  the made ones: hue and saturation, each drawn in the colour it sends
+                    let sgap = (tw2 - 28 * u) / 9
+                    repeat i in 0..10 {
+                        let sx = tl + 14 * u + i * sgap
+                        let sy = ct + 270 * u
+                        let ph = pick(i, 0, 0.09, 0, 0.07, 0.14, 0.33, 0.5, 0.64, 0.76, 0.89)
+                        let ps = pick(i, 0, 0.5, 1, 1, 1, 1, 1, 1, 1, 1)
+                        let here = lk > 0.5 and abs(sl_s - ps) < 0.02 and (ps < 0.01 or abs(sl_h - ph) < 0.01)
+                        zone box sl_sw_z.$i { at: sx, sy; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: "{t_color} {i + 1}" }
+                        on press sl_sw_z.$i { sl_h = ph; sl_s = ps; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); emit hl_color(round(ph * 360) * 1000 + round(ps * 100)); sl_cdirty = false }
+                        box { at: sx, sy; size: 34 * u, 34 * u; corner: 17 * u; stroke: 2 * u; color: ink; opacity: if(here, 90%, 12% * sl_sw_z.$i.hover) }
+                        body {
+                            color: rgb(1 - 0.85 * ps * (1 - clamp(abs(ph * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ps * (1 - clamp(2 - abs(ph * 6 - 2), 0, 1)), 1 - 0.85 * ps * (1 - clamp(2 - abs(ph * 6 - 4), 0, 1)))
+                            rim: 16%
+                            ellipse { at: sx, sy; radius: (12 + if(here, 0, 1) * sl_sw_z.$i.hover) * u }
+                        }
+                    }
                 }
             }
 

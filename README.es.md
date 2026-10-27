@@ -8,6 +8,7 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 
 - **Habitaciones**, cada una con su nombre y, si le pones sensores, su temperatura y humedad.
 - **Clic** en una ficha: enciende o apaga. **Clic derecho** en una luz: abre el control de brillo (arrastra, usa la rueda o pulsa Apagar / 25 / 50 / 75 / 100 %).
+- **Colores**: una luz con `"color": true` tiene además en ese control un arcoíris y una fila de colores hechos, y su ficha brilla del color que tiene.
 - **Impresoras 3D**: un clic derecho en la ficha de una impresora abre una tarjeta con la portada o la cámara, el progreso, los tiempos y sus botones.
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
 - **En la isla**: arrastra la pieza de add-ons a la barra (Ajustes > Bar > Island layout) y el panel se despliega desde la barra como los paneles de la shell.
@@ -48,9 +49,20 @@ La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ej
     - `name`: el nombre de la ficha.
     - `icon`: un nombre de [Material Symbols](https://fonts.google.com/icons) (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…), uno de los iconos propios del addon (abajo), o cualquier `.svg` blanco que pongas en `~/.local/share/pleamar/homeassistant/`.
     - `entity`: la entidad, p. ej. `light.salon`.
+    - `color` (opcional, solo luces): `true` en una luz que cambia de color (una bombilla RGB, una tira LED). Su control del clic derecho muestra también los colores.
     - `on_text`, `off_text` (opcionales): el texto de debajo cuando está encendido o apagado.
 
 Un `items` suelto fuera de `rooms` también vale: sale arriba, sin título.
+
+### Colores
+
+Ponle `"color": true` a una luz y su control del clic derecho muestra, debajo del brillo, un arcoíris para arrastrar y diez colores hechos: dos blancos y después la vuelta a la rueda. El círculo y la barra del control toman el color mientras lo eliges, y la ficha también (su círculo, su brillo y su barra), en directo. Elegir un color en una luz apagada la enciende al máximo. El color se manda como `hs_color` de Home Assistant, así que la luz tiene que admitir color (modos `hs`, `rgb`, `rgbw`, `rgbww` o `xy`).
+
+```json
+{ "type": "light", "name": "Tira LED", "icon": "tira-led.svg", "entity": "light.tira_led", "color": true }
+```
+
+![Los colores](docs/es/color.png)
 
 ### La tarjeta de una impresora 3D
 

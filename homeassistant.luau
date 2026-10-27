@@ -69,7 +69,7 @@ local EXAMPLE = [[{
   "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
-  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
       "name": "Living room",
@@ -83,7 +83,8 @@ local EXAMPLE = [[{
     {
       "name": "Office",
       "items": [
-        { "type": "light",  "name": "Desk",       "icon": "desk",           "entity": "light.desk" }
+        { "type": "light",  "name": "Desk",       "icon": "desk",           "entity": "light.desk" },
+        { "type": "light",  "name": "LED strip",  "icon": "led-strip.svg",  "entity": "light.led_strip", "color": true }
       ]
     }
   ]
@@ -111,7 +112,7 @@ local STR = {
         edit_cfg = "Editar la configuración", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
         title_setup = "Configura Home Assistant", empty = "Aún no hay nada aquí",
         empty_hint = "Añade luces e interruptores en config.json: el engranaje de arriba lo abre.", brightness = "Brillo", close = "Cerrar",
-        off_btn = "Apagar", resize = "Cambiar el tamaño de",
+        off_btn = "Apagar", resize = "Cambiar el tamaño de", color = "Color",
         -- the printer's card
         pr_idle = "En espera", pr_running = "Imprimiendo", pr_paused = "En pausa", pr_finished = "Terminada", pr_failed = "Fallida",
         pr_preparing = "Preparando", pr_offline = "Sin conexión", progress = "Progreso", pr_left = "Quedan %s", pr_started = "Empezó %s",
@@ -136,7 +137,7 @@ local STR = {
         edit_cfg = "Edit the settings", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
         title_setup = "Set up Home Assistant", empty = "Nothing here yet",
         empty_hint = "Add lights and switches in config.json: the gear above opens it.", brightness = "Brightness", close = "Close",
-        off_btn = "Off", resize = "Resize",
+        off_btn = "Off", resize = "Resize", color = "Colour",
         -- the printer's card
         pr_idle = "Idle", pr_running = "Printing", pr_paused = "Paused", pr_finished = "Finished", pr_failed = "Failed",
         pr_preparing = "Preparing", pr_offline = "Offline", progress = "Progress", pr_left = "%s left", pr_started = "Started %s",
@@ -189,6 +190,7 @@ local function scene_words()
     text.t_close = T("close")
     text.t_off = T("off_btn")
     text.t_resize = T("resize")
+    text.t_color = T("color")
     text.t_progress = T("progress")
     text.t_pause = T("pause")
     text.t_resume = T("resume")
@@ -386,7 +388,8 @@ local function show()
                 end
             end
             rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = it.file and 1 or 0, sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
-                avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp }
+                avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
+                cc = it.color and 1 or 0, hk = (it.color and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0 }
         end
         for k, room in ipairs(cfg.rooms) do
             if room.name ~= "" then
@@ -457,10 +460,9 @@ local function poll()
     end
     local quoted = {}
     for k, e in ipairs(ids) do quoted[k] = '"' .. e .. '"' end
-    -- The state, the brightness (0 to 255) and the unit of each entity, as a JSON list, in the order of `ids`.
-    -- The state, the brightness (0 to 255), the unit, the picture's address (an image's or a camera's) and, for a time, when it is (HH:MM, or dd/mm HH:MM
+    -- The state, the brightness (0 to 255), the unit, the picture's address (an image's or a camera's), the colour (hue and saturation, a light's) and, for a time, when it is (HH:MM, or dd/mm HH:MM
     -- another day, in Home Assistant's time zone) of each entity, as a JSON list, in the order of `ids`.
-    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set ts = as_timestamp(states(e), none) %}[{{ states(e) | tojson }},{{ (state_attr(e, 'brightness') or 0) | int }},{{ (state_attr(e, 'unit_of_measurement') or '') | tojson }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{% if ts is not none %}{{ (ts | timestamp_custom('%H:%M') if (ts | timestamp_custom('%Y%m%d')) == now().strftime('%Y%m%d') else ts | timestamp_custom('%d/%m %H:%M')) | tojson }}{% else %}\"\"{% endif %}]{{ ',' if not loop.last }}{% endfor %}]"
+    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set ts = as_timestamp(states(e), none) %}[{{ states(e) | tojson }},{{ (state_attr(e, 'brightness') or 0) | int }},{{ (state_attr(e, 'unit_of_measurement') or '') | tojson }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{{ (state_attr(e, 'hs_color') or []) | list | tojson }},{% if ts is not none %}{{ (ts | timestamp_custom('%H:%M') if (ts | timestamp_custom('%Y%m%d')) == now().strftime('%Y%m%d') else ts | timestamp_custom('%d/%m %H:%M')) | tojson }}{% else %}\"\"{% endif %}]{{ ',' if not loop.last }}{% endfor %}]"
     busy = true
     call("/api/template", json.encode({ template = tpl }), function(ok, out, err)
         busy = false
@@ -476,7 +478,7 @@ local function poll()
         end
         for k, e in ipairs(ids) do
             local row = list[k]
-            if type(row) == "table" then est[e] = { st = tostring(row[1] or "unknown"), bri = tonumber(row[2]) or 0, unit = tostring(row[3] or ""), pic = tostring(row[4] or ""), tm = tostring(row[5] or "") } end
+            if type(row) == "table" then est[e] = { st = tostring(row[1] or "unknown"), bri = tonumber(row[2]) or 0, unit = tostring(row[3] or ""), pic = tostring(row[4] or ""), hs = row[5], tm = tostring(row[6] or "") } end
         end
         local count = 0
         for i, it in ipairs(cfg.items) do
@@ -488,6 +490,11 @@ local function poll()
                 s.avail = st ~= "unavailable" and st ~= "unknown"
                 s.on = st == "on" or st == "open" or st == "playing" or st == "paused" or st == "idle" or st == "buffering" or st == "home"
                 if it.kind == 0 then s.bri = s.on and math.max(0.01, e.bri / 255) or 0 end
+                -- its colour, when it says one (a light that is off says none: the last one is kept)
+                local hs = e.hs
+                if it.color and type(hs) == "table" and tonumber(hs[1]) and tonumber(hs[2]) then
+                    s.hs = { h = (tonumber(hs[1]) % 360) / 360, s = math.max(0, math.min(1, tonumber(hs[2]) / 100)) }
+                end
                 state[i] = s
             end
             if state[i] and state[i].avail then count = count + 1 end
@@ -565,6 +572,7 @@ local function load()
                     off_text = type(it.off_text) == "string" and it.off_text or nil,
                     bad = not valid(entity),
                     printer = parse_printer(it.printer),
+                    color = kind == 0 and it.color == true,          -- its colour is chosen in the card too
                     room = k,
                 }
             end
@@ -635,6 +643,28 @@ on("hl_bri", function(v)
     end)
 end)
 
+-- A colour chosen in the card: hue in degrees times 1000 plus saturation in percent. Home Assistant takes it as hs_color; a light that is off is turned
+-- on with it, at full brightness.
+on("hl_color", function(v)
+    local i = (tonumber(fact.sl_i) or -1) + 1
+    local it = cfg and cfg.items[i]
+    if not it or not it.color or it.bad then return end
+    v = math.floor(tonumber(v) or 0)
+    local h, sat = math.floor(v / 1000) % 361, math.max(0, math.min(100, v % 1000))
+    local s = state[i] or {}
+    local body = { entity_id = it.entity, hs_color = { h, sat } }
+    if not s.on or (s.bri or 0) <= 0 then body.brightness_pct = 100; s.bri = 1 end
+    s.on = true
+    s.hs = { h = (h % 360) / 360, s = sat / 100 }
+    state[i] = s
+    hold_until[i] = tick + 3
+    show()
+    call("/api/services/light/turn_on", json.encode(body), function(ok, _, err)
+        if not ok then set_state(2, T("offline"), err) end
+        after(900, function() hold_until[i] = nil; poll() end)
+    end)
+end)
+
 -- A tile pulled to a new size in edit mode: the others make room at once, and it is kept
 local save_due = false
 on("hl_resize", function(k)
@@ -656,7 +686,6 @@ on("hl_resize", function(k)
     end
 end)
 
--- The slider asks which light it is on: its name and icon
 -- The printer's card: opened (or on another printer), the camera switched, a button pressed
 local function pr_reset()
     pr_shown = ""
@@ -696,6 +725,7 @@ on("pr_act", function(a)
     end)
 end)
 
+-- The slider asks which light it is on: its name and icon
 on("fact:sl_i", function(v)
     local it = cfg and cfg.items[(tonumber(v) or -1) + 1]
     if it then

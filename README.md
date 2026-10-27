@@ -8,6 +8,7 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 
 - **Rooms**, each with its name and, if you give it sensors, its temperature and humidity.
 - **A click** turns a tile on or off. **A right click** on a light opens a brightness slider (drag it, use the wheel, or pick off / 25 / 50 / 75 / 100 %).
+- **Colours**: a light with `"color": true` also gets a rainbow and a row of ready colours in that card, and its tile glows in the colour it has.
 - **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
@@ -49,9 +50,20 @@ The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.js
     - `name`: what the tile says.
     - `icon`: a [Material Symbols](https://fonts.google.com/icons) name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
     - `entity`: the entity id, e.g. `light.living_room`.
+    - `color` (optional, lights only): `true` for a light whose colour can change (an RGB bulb, an LED strip). Its right click card then shows the colours too.
     - `on_text`, `off_text` (optional): the line under the name when it is on or off.
 
 A plain `items` list at the top level (without rooms) works too: it is shown first, with no title.
+
+### Colours
+
+Give a light `"color": true` and its right click card shows, below the brightness, a rainbow to drag along and ten ready colours: two whites, then around the wheel. The card's disc and track take the colour as you choose it, and so does the tile (its disc, its glow and its brightness bar), live. Choosing a colour on a light that is off turns it on at full brightness. The colour is sent as Home Assistant's `hs_color`, so the light has to support colour (`hs`, `rgb`, `rgbw`, `rgbww` or `xy` colour modes).
+
+```json
+{ "type": "light", "name": "LED strip", "icon": "led-strip.svg", "entity": "light.led_strip", "color": true }
+```
+
+![The colours](docs/en/color.png)
 
 ### A 3D printer's card
 
