@@ -418,11 +418,99 @@ local function tv_fetch(pic)
         tv_pbusy = false
         if code == 0 then
             model.tv_pic = { { img = path .. "?" .. n } }
+            fact.tv_has_appic = false
             fact.tv_has_pic = true
         else
             tv_retry = tick + 15          -- (asked again a little later, not every second)
         end
     end)
+end
+-- Artwork where Home Assistant has none (many apps give the Apple TV none): looked up in Apple's public iTunes catalogue (itunes.apple.com/search, no
+-- account, no key), by what plays. The series' poster when the player names a series and a season of it is found under that name; the film's when the title
+-- is exactly a film's; and otherwise the app's own icon. Only the series, the title and the app's name are sent, never anything of Home Assistant's, and
+-- `"artwork_search": false` in config.json turns it off. What is found is kept (in memory, and its picture in the data folder), so each thing is asked once.
+local ITUNES = "https://itunes.apple.com/search"
+local art = {}               -- by what plays ("app|series|title") and by app ("app:Netflix"): { kind = 1 artwork · 2 an app's icon, path }, or false: none
+local art_busy = {}
+local function urlenc(x) return (x:gsub("[^%w%-_%.~]", function(c) return string.format("%%%02X", string.byte(c)) end)) end
+local function norm(x) return (tostring(x or ""):lower():gsub("[^%w]", "")) end
+local function hash(x)
+    local h = 5381
+    for i = 1, #x do h = (h * 33 + x:byte(i)) % 4294967296 end
+    return string.format("%08x", h)
+end
+local function itunes(media, entity, term, choose, done)
+    local q = ITUNES .. "?media=" .. media .. "&entity=" .. entity .. "&limit=8&country=" .. (lang == "es" and "es" or "us") .. "&term=" .. urlenc(term)
+    run("curl", { "-s", "-f", "-L", "--max-time", "10", q }, function(out, code)
+        local ok, j = pcall(json.decode, code == 0 and out or "")
+        if ok and type(j) == "table" and type(j.results) == "table" then
+            for _, r in ipairs(j.results) do
+                local u = type(r) == "table" and choose(r)
+                if type(u) == "string" and u:match("^https://") then done(u) return end
+            end
+        end
+        done(nil)
+    end)
+end
+local function art_get(url, kind, done)
+    local path = folder .. "/art-" .. hash(url) .. ".img"
+    run("curl", { "-s", "-f", "-L", "--max-time", "15", "-o", path, url }, function(_, code)
+        done(code == 0 and { kind = kind, path = path } or false)
+    end)
+end
+local function big(u, size) return (tostring(u or ""):gsub("%d+x%d+bb", size .. "x" .. size .. "bb")) end
+-- the app's icon, once per app
+local function art_app(app, done)
+    local key = "app:" .. app
+    if art[key] ~= nil then done(art[key]) return end
+    itunes("software", "software", app, function(r)
+        local n = norm(r.trackName)
+        return (n:find(norm(app), 1, true) or norm(app):find(n, 1, true)) and big(r.artworkUrl512 or r.artworkUrl100, 512) or nil
+    end, function(u)
+        if not u then art[key] = false; done(false) return end
+        art_get(u, 2, function(a) art[key] = a; done(a) end)
+    end)
+end
+local function art_find(t, done)
+    local series, title, app = t.series or "", t.title or "", t.app or ""
+    local function by_app() if app ~= "" then art_app(app, done) else done(false) end end
+    local function got(u) if u then art_get(u, 1, function(a) if a then done(a) else by_app() end end) else by_app() end end
+    local function season_of(name)            -- a season whose name begins with the series' ("Arcane", "Arcane: Season 2")
+        local n = norm(name)
+        return function(r)
+            local c = norm(r.collectionName)
+            return #n >= 3 and c:sub(1, #n) == n and big(r.artworkUrl100, 600) or nil
+        end
+    end
+    if series ~= "" then
+        itunes("tvShow", "tvSeason", series, season_of(series), got)
+    elseif title ~= "" then
+        itunes("movie", "movie", title, function(r)
+            return norm(r.trackName) == norm(title) and #norm(title) >= 3 and big(r.artworkUrl100, 600) or nil
+        end, function(u)
+            if u then got(u) else itunes("tvShow", "tvSeason", title, season_of(title), got) end       -- some apps put the series in the title
+        end)
+    else
+        by_app()
+    end
+end
+local art_shown = ""
+local function art_show(a)
+    if not a then
+        if art_shown ~= "" then art_shown = ""; fact.tv_has_pic = false; fact.tv_has_appic = false end
+        return
+    end
+    if art_shown == a.path then return end
+    art_shown = a.path
+    if a.kind == 1 then
+        model.tv_pic = { { img = a.path } }
+        fact.tv_has_appic = false
+        fact.tv_has_pic = true
+    else
+        model.tv_appic = { { img = a.path } }
+        fact.tv_has_pic = false
+        fact.tv_has_appic = true
+    end
 end
 local function tv_fill()
     local it = tv_item()
@@ -452,12 +540,26 @@ local function tv_fill()
     -- the artwork: fetched again when it changes (its address carries a token that changes by itself)
     local pic = (t and code > 0) and t.pic or ""
     if pic ~= "" then
+        if art_shown ~= "" then art_shown = ""; fact.tv_has_appic = false end
         local key = (pic:gsub("token=[^&]*", ""))
         if key ~= tv_shown or (tv_retry and tick >= tv_retry) then tv_shown = key; tv_retry = nil; tv_fetch(pic) end
-    elseif tv_shown ~= "none" then
+        return
+    end
+    if tv_shown ~= "none" then
         tv_shown = "none"
         fact.tv_has_pic = false
     end
+    -- none from Home Assistant: the one looked up (or being looked up) for what plays
+    if code == 0 or not cfg.art_search or (title == "" and app == "") then art_show(false) return end
+    local key = app .. "|" .. (t.series or "") .. "|" .. title
+    if art[key] ~= nil then art_show(art[key]) return end
+    if art_busy[key] then return end
+    art_busy[key] = true
+    art_find(t, function(a)
+        art[key] = a or false
+        art_busy[key] = nil
+        tv_fill()
+    end)
 end
 local function tv_poll()
     if tv_busy or not cfg then return end
@@ -742,7 +844,7 @@ local function load()
             add_items(r.items, k)
         end
     end
-    cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items }
+    cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false }
     local wrote = pcall(sys.call, "files.write", AUTH, 'header = "Authorization: Bearer ' .. token .. '"\n')
     if not wrote then
         set_state(2, T("offline"), T("no_auth"))
@@ -878,8 +980,8 @@ end)
 -- transport and the power to the media player.
 local tv_muted = false
 local TV_REMOTE = { [0] = "up", "down", "left", "right", "select", "menu", "home", "play_pause", "volume_up", "volume_down" }
-on("fact:tv_open", function(v) if v == true then tv_shown = ""; fact.tv_has_pic = false; model.tv_pic = {}; tv_fill(); tv_poll() end end)
-on("fact:tv_i", function() if fact.tv_open == true then tv_shown = ""; tv_fill() end end)
+on("fact:tv_open", function(v) if v == true then tv_shown = ""; art_shown = ""; fact.tv_has_pic = false; fact.tv_has_appic = false; model.tv_pic = {}; tv_fill(); tv_poll() end end)
+on("fact:tv_i", function() if fact.tv_open == true then tv_shown = ""; art_shown = ""; tv_fill() end end)
 on("tv_cmd", function(c)
     c = tonumber(c) or -1
     local it = tv_item()

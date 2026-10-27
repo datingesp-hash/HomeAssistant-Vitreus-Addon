@@ -42,6 +42,7 @@ La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ej
 - `url`: la dirección de tu Home Assistant, p. ej. `http://homeassistant.local:8123`.
 - `token`: un token de larga duración. En Home Assistant: tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.
 - `insecure`: `true` solo si usas https con un certificado propio.
+- `artwork_search` (opcional): `false` para no buscar carátulas en el catálogo de Apple para un Apple TV (ver su tarjeta, abajo).
 - `rooms`: las habitaciones, en orden. Cada una lleva:
   - `name`: su nombre, que sale como título.
   - `temperature`, `humidity` (opcionales): un sensor; su lectura sale junto al nombre.
@@ -81,6 +82,8 @@ Ponle a la ficha de un Apple TV un bloque `"apple_tv"` con su entidad de mando, 
 ![La tarjeta del Apple TV y su mando](docs/es/apple-tv.png)
 
 Son las entidades de la [integración de Apple TV](https://www.home-assistant.io/integrations/apple_tv/): crea un `media_player.` y un `remote.` con el mismo nombre para cada Apple TV (míralos en Ajustes > Dispositivos y servicios > Apple TV). Los botones del mando van a `remote.send_command` y el resto al reproductor (silenciar baja su volumen a cero y lo devuelve, si lo informa). La tarjeta se encoge un poco si el panel no es lo bastante alto. Si la entidad de la ficha no es el reproductor, añade `"media_player": "media_player.…"` al bloque. Sin `remote` la tarjeta no tiene la pestaña del mando, así que también sirve para cualquier otro reproductor. Mientras reproduce, la ficha lo dice: *Reproduciendo · La casa de papel*.
+
+**Carátulas.** Muchas veces Home Assistant no tiene: muchas apps (Crunchyroll y la mayoría de las que no son de Apple) no le dan carátula al Apple TV. Entonces el addon la busca en el catálogo público de iTunes de Apple: el póster de la serie si el reproductor dice la serie y hay una temporada con ese nombre, el de la película si el título es exactamente el de una película, y si no, el icono de la app con su nombre. Solo se manda a Apple la serie, el título y el nombre de la app; cada cosa se pregunta una vez y se guarda. `"artwork_search": false` lo desactiva.
 
 ### La tarjeta de una impresora 3D
 
@@ -150,6 +153,8 @@ chmod 700 ~/.local/share/pleamar/homeassistant
 ```
 
 En los dos casos esto protege el token de otros usuarios del equipo; los programas que se ejecutan con tu usuario pueden seguir leyéndolo.
+
+La búsqueda de carátulas del Apple TV (arriba) pregunta a `itunes.apple.com` con lo que se está reproduciendo (serie, título, app); se desactiva con `"artwork_search": false`.
 
 ## Notas
 

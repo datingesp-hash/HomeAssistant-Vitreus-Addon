@@ -195,6 +195,8 @@ scene HomeAssistant {
     text tv_sub = ""
     text tv_app = ""                                  // the app it is in (Netflix, Crunchyroll…), for the artwork's place when there is none
     fact tv_app_on = false
+    fact tv_has_appic = false                         // no artwork, but the app's icon (looked up by the logic)
+    model tv_appic max 1 { img: image 256, 256 }
     text tv_pos = ""
     text tv_rem = ""
     model tv_pic max 1 { img: image 512, 512 }
@@ -768,8 +770,14 @@ scene HomeAssistant {
                             rim: 10%
                             box { from: ax, cy0; size: as, as; corner: 14 * v }
                         }
-                        text "live_tv" { at: ax + as / 2, cy0 + as / 2 - if(tv_app_on, 14, 0) * v; anchor: center; size: 30 * tsc; color: mint; opacity: 85%; family: "Material Symbols Outlined" }
-                        text tv_app { at: ax + as / 2, cy0 + as / 2 + 20 * v; anchor: center; size: 14 * tsc; weight: 700; width: as - 16 * v; lines: 1; align: center; color: ink; show: tv_app_on; family: "Space Grotesk" }
+                        text "live_tv" { at: ax + as / 2, cy0 + as / 2 - if(tv_app_on, 14, 0) * v; anchor: center; size: 30 * tsc; color: mint; opacity: 85%; show: not tv_has_appic; family: "Material Symbols Outlined" }
+                        //  the app's icon, rounded as on the Apple TV's home screen
+                        group {
+                            show: tv_has_appic
+                            clip box { from: ax + as / 2 - 28 * v, cy0 + as / 2 - 44 * v; size: 56 * v, 56 * v; corner: 13 * v }
+                            for p in tv_appic { image p.img { at: ax + as / 2 - 28 * v, cy0 + as / 2 - 44 * v; size: 56 * v, 56 * v; fit: cover } }
+                        }
+                        text tv_app { at: ax + as / 2, cy0 + as / 2 + if(tv_has_appic, 30, 20) * v; anchor: center; size: 14 * tsc; weight: 700; width: as - 16 * v; lines: 1; align: center; color: ink; show: tv_app_on; family: "Space Grotesk" }
                     }
                     group {
                         clip box { from: ax, cy0; size: as, as; corner: 14 * v }
