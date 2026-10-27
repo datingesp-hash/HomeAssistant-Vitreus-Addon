@@ -193,6 +193,8 @@ scene HomeAssistant {
     text tv_status = ""
     text tv_title = ""
     text tv_sub = ""
+    text tv_app = ""                                  // the app it is in (Netflix, Crunchyroll…), for the artwork's place when there is none
+    fact tv_app_on = false
     text tv_pos = ""
     text tv_rem = ""
     model tv_pic max 1 { img: image 512, 512 }
@@ -758,7 +760,17 @@ scene HomeAssistant {
                     let as = 116 * v
                     let ax = tcl + 20 * v
                     box { from: ax, cy0; size: as, as; corner: 14 * v; color: ink; opacity: 6% }
-                    text "live_tv" { at: ax + as / 2, cy0 + as / 2; anchor: center; size: 38 * tsc; color: faint; opacity: if(tv_has_pic, 0%, 60%); family: "Material Symbols Outlined" }
+                    //  no artwork (many apps give the Apple TV none, and Home Assistant has none to give): the app's name on a wash of the accent instead
+                    group {
+                        show: not tv_has_pic
+                        body {
+                            gradient: ax, cy0 to ax + as, cy0 + as, mix(card, mint, 0.28), mix(card, mint, 0.06)
+                            rim: 10%
+                            box { from: ax, cy0; size: as, as; corner: 14 * v }
+                        }
+                        text "live_tv" { at: ax + as / 2, cy0 + as / 2 - if(tv_app_on, 14, 0) * v; anchor: center; size: 30 * tsc; color: mint; opacity: 85%; family: "Material Symbols Outlined" }
+                        text tv_app { at: ax + as / 2, cy0 + as / 2 + 20 * v; anchor: center; size: 14 * tsc; weight: 700; width: as - 16 * v; lines: 1; align: center; color: ink; show: tv_app_on; family: "Space Grotesk" }
+                    }
                     group {
                         clip box { from: ax, cy0; size: as, as; corner: 14 * v }
                         for p in tv_pic { image p.img { at: ax, cy0; size: as, as; fit: cover; show: tv_has_pic } }

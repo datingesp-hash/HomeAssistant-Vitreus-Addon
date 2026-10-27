@@ -435,6 +435,8 @@ local function tv_fill()
     fact.tv_has_rm = it.tv.remote ~= nil
     fact.tv_st = code
     local app = t and t.app or ""
+    text.tv_app = code > 0 and app or ""
+    fact.tv_app_on = code > 0 and app ~= ""
     text.tv_status = T(TV_LABEL[code]) .. ((code > 0 and app ~= "") and (" · " .. app) or "")
     local title = t and t.title or ""
     text.tv_title = title ~= "" and title or (code > 0 and app ~= "" and app or T("tv_nothing"))
