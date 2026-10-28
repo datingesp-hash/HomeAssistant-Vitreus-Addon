@@ -1,124 +1,211 @@
 # Home Assistant for Vitreus
 
-A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Assistant lights and switches in a panel of the shell's own glass, grouped by room.
+A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that brings your Home Assistant home into the shell: lights, switches, an Apple TV and a 3D printer, grouped by room, in a panel made of Vitreus's own glass.
 
-*[Leer en español](README.es.md)*
+It speaks English by default and ships with a Spanish translation already installed (see [Languages](#languages)).
 
-![The panel, by rooms, on the Island](docs/en/island.png)
+![The panel](docs/img/panel.png)
 
-- **Rooms**, each with its name and, if you give it sensors, its temperature and humidity.
-- **A click** turns a tile on or off. **A right click** on a light opens a brightness slider (drag it, use the wheel, or pick off / 25 / 50 / 75 / 100 %).
-- **Colours**: a light with `"color": true` also gets a rainbow and a row of ready colours in that card; with `"tint": true` its tile and card are drawn in the colour it has.
-- **Apple TV**: a right click on its tile opens a card with what is playing (artwork, title, progress, transport and volume) and a remote like the Siri Remote's, which the keyboard drives too.
-- **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
-- **Tiles of any size, anywhere**: the pencil puts the panel in edit mode. The handle in each tile's corner pulls it wider or narrower in half columns (half a column shows the icon alone; up to 4 columns) or taller (up to 3 rows), and a tile dragged by its middle goes where it is dropped: in the place of the tile under it, or at the end of another room. Sizes and order are kept.
-- **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
-- **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them; its switches, sliders and icons are the Control Center's pencil (from Vitreus's add-on template), and the content arrives as the Control Center's does.
-- **A demo** until it is set up: with no token in `config.json` the panel says so in a banner and lets you play with the example's rooms.
-- **Any language**: English by default, Spanish included, and any other from a JSON file you add (French.json, say): `"language"` in its settings picks it.
-- Lights use `light.toggle` / `light.turn_on`; anything else (`input_boolean`, `switch`, `media_player`, scripts…) uses `homeassistant.toggle`.
+## Contents
 
-| The panel | Edit mode | Brightness |
-| --- | --- | --- |
-| ![The panel](docs/en/panel.png) | ![Edit mode](docs/en/edit-mode.png) | ![Brightness](docs/en/brightness.png) |
+- [Features](#features)
+- [Install and update](#install-and-update)
+- [Setting it up](#setting-it-up)
+- [Using the panel](#using-the-panel)
+- [Lights and colours](#lights-and-colours)
+- [Apple TV](#apple-tv)
+- [3D printer](#3d-printer)
+- [Icons](#icons)
+- [Languages](#languages)
+- [config.json reference](#configjson-reference)
+- [Privacy](#privacy)
+- [Notes](#notes)
+- [License](#license)
 
-## Install
+## Features
+
+- **Rooms and tiles.** Each room has a title and, optionally, its temperature and humidity. A click turns a tile on or off.
+- **Lights.** A right click opens a brightness card. Colour lights can also get a colour picker, and their tiles can be tinted in the colour they have.
+- **Apple TV.** A card shows what is playing, with artwork, progress, transport controls and volume. A second tab holds a remote laid out like the Siri Remote, which the keyboard can drive too.
+- **3D printer.** A card shows the print's cover or the live camera, its progress and times, and Pause / Resume / Stop buttons.
+- **Settings menu.** The gear opens a settings page where you set everything from the panel itself, with no JSON needed. Your entities are suggested as you type.
+- **Edit mode.** You can resize tiles in half columns, down to icon-only tiles, and drag them to rearrange.
+- **Native look.** It uses Vitreus's palette, theme, pencil icons, switches and sliders, and follows the shell when its theme changes.
+- **Demo mode** until a token is set, so you can try the panel before connecting it.
+- **Translatable.** Every text lives in a JSON file. English and Spanish are included, and adding a language is just one more file.
+
+## Install and update
+
+You need a Vitreus with add-on support, and `curl`.
 
 ```sh
 git clone https://github.com/datingesp-hash/HomeAssistant-Vitreus-Addon ~/.config/pleamar/vitreus-addons/homeassistant
 ```
 
-Then turn it on in **Settings > Add-ons**. To update it later:
+Then turn it on in Vitreus under **Settings > Add-ons**.
+
+To update, pull and restart Vitreus:
 
 ```sh
 git -C ~/.config/pleamar/vitreus-addons/homeassistant pull
 ```
 
-It needs a Vitreus with add-ons, and `curl`.
+## Setting it up
 
-## Set it up
+### From the panel
 
-### On the panel
+Click the **gear** to open the settings. It has two tabs.
 
-The gear opens the **settings**, over the tiles, in two tabs:
+**Settings**
+- Home Assistant's address and a long-lived access token. To make the token in Home Assistant, go to your profile > Security > Long-lived access tokens > Create token.
+- The panel's language.
+- A switch for HTTPS with a self-signed certificate.
+- A switch for looking up Apple TV artwork online.
 
-- **Settings**: Home Assistant's address and token, the panel's language (any language file it finds), and the switches for a self-signed certificate and for looking up artwork. Each is saved as soon as it is written (Enter, or moving to another field) or flipped.
-- **Entities**: the rooms and their tiles. **+ Entity** and **+ Room** add one; a click on a tile or a room opens it. An entity is found by typing (the suggestions are Home Assistant's own entities, by id or by name); then its name, its kind (light or switch), its room, its icon (the pencil's and the add-on's own), and what fits it: the colour picker and the tint for a light, the player card and remote for a media player (the remote is found by its name), the 3D printer's card (a Bambu Lab printer is found in Home Assistant and its entities filled in), and the texts for on and off. A room has its name, its temperature and humidity sensors (suggested too), and can be moved up or down or deleted.
+**Entities**
+- **+ Room** and **+ Entity** add one. Click an existing room or tile to edit it.
+- An entity is found by typing. The suggestions are your Home Assistant entities, matched by id or by name.
+- For each tile you choose:
+  - its name, kind (light or switch), room and icon;
+  - the on/off texts;
+  - the options that fit it: colour picker and tint for a light, card and remote for a media player, card for a printer.
+- A Bambu Lab printer is detected automatically, and all its entities are filled in for you.
+- A room has a name and optional temperature and humidity sensors. Rooms can be moved up or down, or deleted.
 
-The fields are typed through Vitreus, as its own are: the pointer over a field puts it there, and a click on it starts typing. Everything is written to `config.json` (in a fixed order, its notes kept), which can still be edited by hand: **Open config.json in the editor**, at the foot of the settings.
+Fields are typed through Vitreus's own text field. Hover a field, then click it to type. Each change is saved right away: press Enter, move to another field, or flip a switch.
 
-![The settings, the entities, and an entity being edited](docs/en/settings.png)
+![Settings, the entity list, and an entity being edited](docs/img/settings.png)
 
 ### By hand
 
-The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor, through Vitreus's `vitreus-edit` (`$VISUAL` or `$EDITOR`, the desktop's text editor, or the usual ones; with no editor at all the panel says so for a few seconds and copies the file's path; an older Vitreus without it uses `$VISUAL`, `$EDITOR` or `nvim` in a terminal), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
+Everything is stored in `~/.local/share/pleamar/homeassistant/config.json`. On first run the add-on writes it with an example, the same as [`config.example.json`](config.example.json). The settings menu writes this file in a fixed order and keeps its notes, so you can still edit it by hand.
 
-Until it has a token, the panel is a **demo**: a banner at the top says what to put in `config.json`, and the rooms below (the example's, or yours) can be tried out, though nothing reaches Home Assistant.
+**Open config.json in the editor**, at the bottom of the settings, opens the file through Vitreus's `vitreus-edit`. That uses `$VISUAL`, `$EDITOR` or your desktop's text editor. If no editor is found, the panel says so and copies the file's path. The panel reloads as soon as the file is saved.
 
-![The demo](docs/en/demo.png)
+See the [config.json reference](#configjson-reference) for every key.
 
-- `language`: the language file to use, by its name: `"English"` (the default, also when it is left out), `"Spanish"`, or one you add (`"French"` for `French.json`). See [Translations](#translations).
-- `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
-- `token`: a long-lived access token. In Home Assistant: your profile > Security > Long-lived access tokens > Create token.
-- `insecure`: `true` only for https with a self-signed certificate.
-- Icons: every icon is drawn in Vitreus's pencil. A tile's `icon` picks one by name: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (and a few close names); any other name is a bulb for a light and a power sign for a switch. The add-on's own icons (below) and any `.svg` of yours work too.
-- `artwork_search` (optional): `false` to not look up artwork online for an Apple TV (see its card, below).
-- `rooms`: the rooms, in order. Each has:
-  - `name`: shown as its title.
-  - `temperature`, `humidity` (optional): a sensor entity; its reading is shown beside the name.
-  - `items`: its tiles. Each has:
-    - `type`: `"light"` (with brightness) or `"toggle"`.
-    - `name`: what the tile says.
-    - `icon`: an icon's name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: see Icons above), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
-    - `entity`: the entity id, e.g. `light.living_room`.
-    - `apple_tv` (optional): `{ "remote": "remote.living_room" }` on an Apple TV's tile gives it its card and remote (below).
-    - `color` (optional, lights only): `true` for a light whose colour can change (an RGB bulb, an LED strip). Its right click card then shows the colours too.
-    - `tint` (optional, lights only): `true` draws the light's tile and card in its own colour (read from Home Assistant) instead of the theme's accent. Without it the light looks like every other tile.
-    - `on_text`, `off_text` (optional): the line under the name when it is on or off.
+### Demo mode
 
-A plain `items` list at the top level (without rooms) works too: it is shown first, with no title.
+Until a token is set, the panel runs as a demo. A banner explains what is missing, and the rooms below can be tried out, but nothing is sent to Home Assistant.
 
-### Colours
+![Demo mode](docs/img/demo.png)
 
-Give a light `"color": true` and its right click card shows, below the brightness, a rainbow to drag along and ten ready colours: two whites, then around the wheel. With `"tint": true` too, the card's disc and track take the colour as you choose it, and so does the tile (its disc, its glow and its brightness bar), live; without it they keep the theme's accent, like the other tiles. Choosing a colour on a light that is off turns it on at full brightness. The colour is sent as Home Assistant's `hs_color`, so the light has to support colour (`hs`, `rgb`, `rgbw`, `rgbww` or `xy` colour modes).
+## Using the panel
+
+- **Click** a tile to toggle it.
+- **Right click** a light, an Apple TV or a printer to open its card.
+- The **refresh** button reloads states from Home Assistant.
+
+### Edit mode
+
+The **pencil** button puts the panel in edit mode.
+
+- **Resize** a tile with the handle in its corner. Width goes in half columns, up to 4 columns: a half-column tile shows only its icon. Height goes up to 3 rows. The size being pulled is shown on the tile.
+- **Move** a tile by dragging it from the middle. Drop it on another tile to take that tile's place, or on a room to put it at the end of that room.
+
+The new order is saved to `config.json`, and sizes to `layout.json` beside it.
+
+![Edit mode: a tile being moved](docs/img/edit-mode.png)
+
+### On the Island
+
+Drag the add-ons piece onto the bar (**Settings > Bar > Island layout**), and the panel drops down from the bar like the shell's own panels.
+
+### A key to open it
+
+`ax_toggle` opens the first add-on that has a panel. On Hyprland (Lua config), add this to `hyprland.lua`:
+
+```lua
+hl.unbind("SUPER + H")
+hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --say vitreus \"emit ax_toggle\""))
+```
+
+## Lights and colours
+
+A right click on a light opens its card. You can change the brightness by:
+- dragging the slider;
+- scrolling the wheel;
+- picking off, 25, 50, 75 or 100 %.
+
+There are two optional settings for colour lights (RGB bulbs, LED strips):
+
+| Setting | What it does |
+| --- | --- |
+| `"color": true` | Adds a colour section to the card: a hue bar to drag along, and ten ready colours (two whites, then around the wheel). |
+| `"tint": true` | Draws the tile and the card in the light's current colour instead of the theme's accent, and updates live as you choose. |
+
+Picking a colour on a light that is off turns it on at full brightness. Colours are sent as `hs_color`, so the light must support a colour mode (`hs`, `rgb`, `rgbw`, `rgbww` or `xy`).
 
 ```json
 { "type": "light", "name": "LED strip", "icon": "led-strip.svg", "entity": "light.led_strip", "color": true, "tint": true }
 ```
 
-![The colours](docs/en/color.png)
+![A light's card with colours and tint](docs/img/light-card.png)
 
-### An Apple TV's card and remote
+## Apple TV
 
-Give an Apple TV's tile an `"apple_tv"` block with its remote entity, and a right click on it opens a card with two tabs (a click still turns it on and off):
-
-- **Now playing**: the artwork, the title and the series or artist, the app, how far it has got (it moves every second), and volume down, previous, play/pause, next and volume up. The power button is in the head.
-- **Remote**: laid out as the Siri Remote: the clickpad (its four edges move, its middle selects, held it is a long press; the wheel over it moves up and down), and beside it back and TV (held: the control centre), play/pause and the volume rocker, and mute. While this tab is showing the keyboard drives it: the arrows, Return to select, BackSpace for back, Space for play/pause, and Escape shuts the card (the card takes the keyboard while it shows the remote, and gives it back when it shuts or goes back to the other tab).
+Add an `apple_tv` block with the remote entity to an Apple TV's tile:
 
 ```json
 { "type": "toggle", "name": "Apple TV", "icon": "tv-box.svg", "entity": "media_player.living_room",
   "apple_tv": { "remote": "remote.living_room" } }
 ```
 
-![The Apple TV's card and its remote](docs/en/apple-tv.png)
+A click still turns it on or off. A right click opens a card with two tabs.
 
-These are the [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/)'s entities: it makes a `media_player.` and a `remote.` with the same name for each Apple TV (check yours in Settings > Devices & services > Apple TV). The remote's buttons go to `remote.send_command`, the rest to the media player (mute sets its volume to nothing and back, when it reports one). The card shrinks a little when the panel is not tall enough for it. If the tile's entity is not the media player, add `"media_player": "media_player.…"` to the block. Without `remote` the card has no remote tab, so it works for any other media player too. While it plays, the tile says so: *Playing · La casa de papel*.
+**Now playing**
+- Artwork, title, series or artist, and the app.
+- Live progress.
+- Volume down, previous, play/pause, next, volume up.
+- Power, in the card's header.
 
-**Artwork.** Home Assistant often has none: many apps (Crunchyroll and most that are not Apple's) give the Apple TV no artwork. Then the add-on looks it up in the free public catalogue that knows that kind of thing best (none needs an account or a key), chosen by the app and by what it plays:
+**Remote**
+- Laid out like the Siri Remote:
+  - the clickpad: its edges move, its centre selects, and holding it does a long press; the wheel moves up and down;
+  - back and TV (hold TV for Control Centre);
+  - play/pause, the volume rocker and mute.
+- While this tab is open, the keyboard drives it:
 
-| What plays | Where |
+  | Key | Does |
+  | --- | --- |
+  | Arrows | Move |
+  | Return | Select |
+  | BackSpace | Back |
+  | Space | Play/pause |
+  | Escape | Close the card |
+
+  The card gives the keyboard back when it closes or you switch tabs.
+
+![The Apple TV card: now playing and remote](docs/img/apple-tv.png)
+
+While it plays, the tile itself says so, for example *Playing · La casa de papel*.
+
+These are the entities the [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/) makes: a `media_player.` and a `remote.` with the same name.
+- If the tile's entity is not the media player, add `"media_player": "media_player.…"` to the block.
+- Without `remote`, the card has no remote tab, so it works for any other media player too.
+- The card shrinks a little when the panel is not tall enough for it.
+
+### Artwork
+
+Many apps, including Crunchyroll and most non-Apple apps, give Home Assistant no artwork. When that happens, the add-on looks the artwork up in a free public catalogue chosen by the app and by what is playing. None of them needs an account or an API key.
+
+| What is playing | Where the artwork comes from |
 | --- | --- |
-| Music (Spotify, Music…) with its artist | [Deezer](https://developers.deezer.com/api), the album's cover; then Apple's iTunes |
-| A series, in an anime app (Crunchyroll…) | [AniList](https://anilist.co), its cover |
-| A series, in any other app | [TVmaze](https://www.tvmaze.com/api), its poster; then iTunes |
-| Only a title | iTunes, a film with exactly that title; then TVmaze, a series with exactly that name |
-| None of that found | the app's own icon (iTunes), over its name |
+| Music with an artist (Spotify, Music…) | [Deezer](https://developers.deezer.com/api) album cover, then iTunes |
+| A series in an anime app (Crunchyroll…) | [AniList](https://anilist.co) cover |
+| A series in any other app | [TVmaze](https://www.tvmaze.com/api) poster, then iTunes |
+| Only a title | iTunes film with that exact title, then a TVmaze series with that exact name |
+| Nothing found | The app's own icon, over its name |
 
-A match must carry the name it was asked for, so a near miss shows the app's icon rather than somebody else's poster. What the Apple TV sends decides how far it gets: Crunchyroll, for one, sends only the episode's title (no series), so it shows its icon. Only the series, the title, the artist and the app's name are sent; each is asked once and kept. `"artwork_search": false` turns it off.
+A match must carry the exact name it was asked for, so a near miss shows the app's icon rather than the wrong poster. Results are looked up once and cached.
 
-### A 3D printer's card
+What the app sends sets the limit. Netflix and Crunchyroll, for example, don't send the series name, so they show the app's icon.
 
-Give a tile a `"printer"` block and a right click on it opens a card with the print: the model's cover (or the printer's camera), the job, its state, its progress, the time left, when it started and when it ends, and Pause / Resume / Stop (Stop asks again). A click on the tile still toggles its own entity (the printer's light, say), and while it prints the tile shows *Printing · 62 %* with a bar. Every entity is optional; leave out the ones your printer does not have.
+Turn the lookup off with `"artwork_search": false`, or with its switch in the settings.
+
+## 3D printer
+
+Add a `printer` block to a tile. Every entity is optional: leave out the ones your printer doesn't have.
 
 ```json
 { "type": "toggle", "name": "Printer", "icon": "3d-printer.svg", "entity": "light.p1p_chamber_light",
@@ -137,68 +224,118 @@ Give a tile a `"printer"` block and a right click on it opens a card with the pr
   } }
 ```
 
-![The printer's card](docs/en/printer.png)
+A right click opens the card. It shows:
+- the model's cover, or the camera, refreshed every two seconds (click it to open the live stream in your browser);
+- the job, its state, progress, time left, start and end;
+- Pause / Resume / Stop. Stop asks for confirmation.
 
-These are the [Bambu Lab integration](https://github.com/greghesp/ha-bambulab)'s entities for a printer called P1P (their names follow Home Assistant's language and your printer's name: check yours in Settings > Devices & services > Entities). `status` understands `running`, `pause`, `finish`, `failed`, `prepare`, `idle` and `offline`; `remaining` is read in its own unit (minutes, hours or seconds). The camera shows a frame every two seconds inside the card; a click on it opens the live stream in your browser.
+A click on the tile still toggles its own entity (the chamber light, say). While printing, the tile shows *Printing · 62 %* with a progress bar.
 
-### The add-on's own icons
+![The printer card](docs/img/printer.png)
 
-For what the pencil's set has no icon for. They are drawn in Vitreus's pencil like the rest (they boil under the pointer); the white `.svg` files below are what they look like. All of the panel's own icons (its buttons, the cards, the remote) are pencil drawings too, from `ha-icons.plm`, which `tools/icons.py` writes from a table of strokes.
+The example uses the [Bambu Lab integration](https://github.com/greghesp/ha-bambulab)'s entities for a printer named P1P. In the settings menu a Bambu printer is detected and filled in for you.
+- `status` understands `running`, `pause`, `finish`, `failed`, `prepare`, `idle` and `offline`.
+- `remaining` is read in its own unit: minutes, hours or seconds.
 
-![The add-on's icons](docs/en/icons.png)
+## Icons
 
-| English | Spanish |
+Every icon in the panel is drawn in Vitreus's pencil style, and it sketches itself when hovered or lit. You can pick an icon from the settings menu, or set `icon` by hand. There are three kinds:
+
+1. **Pencil icons**, by name:
+   - `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home`, and a few close names.
+   - An unknown name falls back to a bulb for a light, and a power sign for a switch.
+2. **The add-on's own icons**, also in pencil:
+
+   | Icon | File |
+   | --- | --- |
+   | LED strip | `led-strip.svg` |
+   | Wall lantern | `wall-lantern.svg` |
+   | Pendant lamp | `pendant-lamp.svg` |
+   | Floor lamp | `floor-lamp.svg` |
+   | 3D printer | `3d-printer.svg` |
+   | TV box | `tv-box.svg` |
+   | Terrarium | `terrarium.svg` |
+   | Fan heater | `fan-heater.svg` |
+
+   Their Spanish file names (`tira-led.svg`, `impresora-3d.svg`…) work too.
+3. **Your own**: put any white `.svg` in `~/.local/share/pleamar/homeassistant/` and use its file name.
+
+## Languages
+
+English is the default. **A Spanish translation comes installed with the add-on.** To use it, choose it in the settings menu or set `"language": "Spanish"` in `config.json`.
+
+Every text the panel shows lives in a JSON file in `~/.local/share/pleamar/homeassistant/`. `English.json` and `Spanish.json` are written there on first run. You can edit them: updates add new texts and keep your edits.
+
+To add a language:
+
+1. Copy `English.json` to, say, `French.json`, in the same folder.
+2. Translate the text on the right of each line.
+   - Keep the keys on the left unchanged.
+   - Keep `%s` and `%d` where they are.
+3. Set `"_code"` to the language's two-letter code (`"fr"`). It also picks the country used for artwork lookups.
+4. Choose it in the settings menu, or set `"language": "French"` in `config.json`. The panel switches as soon as the file is saved.
+
+Missing texts fall back to English, so you can translate a little at a time. To share a translation, open an issue or a pull request with the file and it will ship with the add-on.
+
+## config.json reference
+
+| Key | Meaning |
 | --- | --- |
-| `led-strip.svg` | `tira-led.svg` |
-| `wall-lantern.svg` | `farol-pared.svg` |
-| `pendant-lamp.svg` | `lampara-pergola.svg` |
-| `floor-lamp.svg` | `lampara-pie.svg` |
-| `3d-printer.svg` | `impresora-3d.svg` |
-| `tv-box.svg` | `reproductor.svg` |
-| `terrarium.svg` | `terrario.svg` |
-| `fan-heater.svg` | `calefactor.svg` |
+| `language` | Language file to use: `"English"` (the default), `"Spanish"`, or one you added. |
+| `url` | Home Assistant's address, e.g. `http://homeassistant.local:8123`. |
+| `token` | A long-lived access token. |
+| `insecure` | `true` only for HTTPS with a self-signed certificate. |
+| `artwork_search` | `false` to stop looking up Apple TV artwork online. |
+| `rooms` | The rooms, in order. |
 
-### A key to open it
+Each room:
 
-On Hyprland (Lua config), in your `hyprland.lua`:
+| Key | Meaning |
+| --- | --- |
+| `name` | The room's title. |
+| `temperature`, `humidity` | Optional sensor entities, shown beside the title. |
+| `items` | The room's tiles. |
 
-```lua
-hl.unbind("SUPER + H")
-hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --say vitreus \"emit ax_toggle\""))
-```
+Each tile:
 
-`ax_toggle` opens the first add-on that has a panel.
+| Key | Meaning |
+| --- | --- |
+| `type` | `"light"` (with brightness) or `"toggle"`. |
+| `name` | The tile's label. |
+| `entity` | The entity id, e.g. `light.living_room`. |
+| `icon` | An icon name or `.svg` file (see [Icons](#icons)). |
+| `on_text`, `off_text` | Optional line under the name when it is on or off. |
+| `color` | Lights only: show the colour picker. |
+| `tint` | Lights only: draw the tile and card in the light's colour. |
+| `apple_tv` | `{ "remote": "remote.…" }`: the Apple TV card (see [Apple TV](#apple-tv)). |
+| `printer` | The printer card's entities (see [3D printer](#3d-printer)). |
 
-## Translations
+Tile sizes set in edit mode are kept apart, in `layout.json`. A plain `items` list at the top level (outside any room) also works: it is shown first, with no title.
 
-Every word the panel shows is in a JSON file in its data folder, `~/.local/share/pleamar/homeassistant/`: `English.json` and `Spanish.json` are written there the first time it runs, one text a line, and can be edited (a newer version of the add-on adds the texts it brings and keeps your edits). To add a language:
-
-1. Copy `English.json` as, say, `French.json`, in the same folder.
-2. Translate the texts on the right of each line. Keep the names on the left as they are, and keep `%s` and `%d` where they are (a name or a number goes there).
-3. Set `"_code"` to the language's two letters (`"fr"`): it is the country whose catalogue the Apple TV's artwork is looked up in.
-4. Put `"language": "French"` in `config.json`. The panel changes as soon as either file is saved.
-
-A text the file lacks is said in English, so a translation can be done a bit at a time. To share one, open an issue or a pull request with the file, and it will come with the add-on.
+Lights use `light.toggle` and `light.turn_on`. Everything else (`switch`, `input_boolean`, `media_player`, scripts…) uses `homeassistant.toggle`.
 
 ## Privacy
 
-The token is never put on curl's command line, where other programs could read it: the add-on writes it to `auth.curl` in its data folder and curl reads it from there with `-K`.
+**The token never goes on curl's command line**, where other programs could see it. The add-on writes it to `auth.curl` in its data folder, and curl reads it from there with `-K`.
 
-That folder (`~/.local/share/pleamar/homeassistant/`, which holds `config.json` and `auth.curl`, both with the token) is private: pleamar after 0.4.31 keeps a scene's data folder 0700 and the files it writes 0600 ([pleamar#107](https://github.com/k4ditano/pleamar/issues/107)). A folder made before is tightened too, since the add-on writes `auth.curl` every time it starts. With pleamar 0.4.31 or older, do it by hand:
+**The data folder is private.** `~/.local/share/pleamar/homeassistant/` holds `config.json` and `auth.curl`, both of which contain the token.
+- pleamar after 0.4.31 keeps a scene's data folder at 0700 and its files at 0600 ([pleamar#107](https://github.com/k4ditano/pleamar/issues/107)).
+- With pleamar 0.4.31 or older, tighten it yourself:
 
-```sh
-chmod 700 ~/.local/share/pleamar/homeassistant
-```
+  ```sh
+  chmod 700 ~/.local/share/pleamar/homeassistant
+  ```
 
-Either way this keeps the token from other users of the machine; programs running as you can still read it.
+This keeps the token from other users of the machine. Programs running as you can still read it.
 
-An Apple TV's artwork lookup (above) asks public catalogues (Deezer, AniList, TVmaze, iTunes) with what is playing (series, title, artist, app); turn it off with `"artwork_search": false`.
+**Artwork lookups** send only the series, title, artist and app name to the catalogues listed above (Deezer, AniList, TVmaze, iTunes). Turn them off with `"artwork_search": false`.
 
 ## Notes
 
-- With two monitors of the same size, the panel shows on the one Vitreus opened it on (Vitreus tells the add-on the monitor's name; an older Vitreus that does not falls back to the monitor's size).
 - Up to 12 rooms and 32 tiles.
+- With two monitors of the same size, the panel opens on the one Vitreus opened it from.
+- The repository's lint workflow runs Vitreus's add-on checks (`vitreus-sync-addons lint`) on every push.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). `addon-palette.plm` comes from Vitreus's add-on template (MIT, © natepayn3).
+MIT, see [LICENSE](LICENSE). `addon-palette.plm`, `addon-theme.plm` and `addon-pencil.plm` come from Vitreus's add-on template (MIT, © natepayn3).
