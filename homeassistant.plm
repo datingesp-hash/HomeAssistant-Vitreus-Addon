@@ -1,5 +1,6 @@
 language 0.1
 import "addon-palette.plm"
+import "addon-pencil.plm"                         // Vitreus's pencil (its add-on template): the sliders are drawn with it, as the Control Center's
 
 //  Home Assistant, as a Vitreus add-on with a panel: the rooms listed in config.json (the scene's data folder, ~/.local/share/pleamar/homeassistant/),
 //  each with its name, its temperature and humidity if it has sensors for them, and a tile for each of its lights and switches, drawn in the shell's own
@@ -235,6 +236,37 @@ scene HomeAssistant {
     spin hl_spin by if(hl_state == 0, 1, 0)
 
     let u = 1.1
+    let fr = if(shown > 0.5 and look < 4.5, floor(time * 8), 0)       // which redrawing of the pencil this is (it holds still on the Proxy theme, whose HUD is crisp)
+
+    //  The Control Center's sliders (addon-pencil.plm's PSlider and PSliderMini), with the level coloured in `c` rather than always the accent: a light with a colour
+    //  of its own is coloured in with it. A pill track in a crooked double outline, the level in tight pencil columns, a ring for a knob; it rests unless `f` is the
+    //  scene's frame (under the pointer, or being dragged), and then it boils.
+    component HSlider(x0: number, y: number, w: number, lv: number, h: number, f: number, c: color) {
+        let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
+        let xs = x0 + h * 0.5
+        let xe = max(x0 + w * lv - h * 0.1, xs)
+        let sp = max(2.5 * u, (w - h) / 39)
+        PRound(x: x0, y: y - h / 2, w: w, h: h, r: h / 2, s: 81, wd: 1.5 * u, c: ink, a: 0.65, f: f)
+        repeat i in 0..40 {
+            let cxi = xs + i * sp
+            PLn(ax: cxi + h * 0.1, ay: y - h * 0.38, bx: cxi - h * 0.1, by: y + h * 0.38, s: 200 + i, wd: 1.1 * u, c: c, a: if(cxi < xe, 0.62, 0), f: f)
+        }
+        ellipse { at: kx, y; radius: h * 0.85; color: ink; opacity: 14% }
+        PCir(cx: kx, cy: y, rad: h * 0.85, s: 83, wd: 1.5 * u, c: ink, a: 0.9, gapk: -1, f: f)
+    }
+    component HSliderMini(x0: number, y: number, w: number, lv: number, h: number, f: number, c: color) {
+        let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
+        let xs = x0 + h * 0.5
+        let xe = max(x0 + w * lv - h * 0.1, xs)
+        let sp = (w - h) / 15
+        PRound(x: x0, y: y - h / 2, w: w, h: h, r: h / 2, s: 85, wd: 1.3 * u, c: ink, a: 0.6, f: f)
+        repeat i in 0..16 {
+            let cxi = xs + i * sp
+            PLn(ax: cxi + h * 0.1, ay: y - h * 0.36, bx: cxi - h * 0.1, by: y + h * 0.36, s: 300 + i, wd: 1 * u, c: c, a: if(cxi < xe, 0.6, 0), f: f, j: 0.6)
+        }
+        ellipse { at: kx, y; radius: h * 0.85; color: ink; opacity: 14% }
+        ellipse { at: kx, y; radius: h * 0.85; stroke: 1.3 * u; color: ink; opacity: 90% }
+    }
     let W = max(slot_w, 1)
     let H = max(slot_h, 1)
 
@@ -364,8 +396,8 @@ scene HomeAssistant {
                             show: r.kind == 0 and lit > 0.5
                             let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
                             let bw = mix(tww - 76 * u, tww - 36 * u, tall)
-                            box { from: bx, cy0 + thh - 13 * u; size: bw, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
-                            box { from: bx, cy0 + thh - 13 * u; size: max(3 * u, bw * bv), 3 * u; corner: 1.5 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk) }
+                            //  (the Control Center's little slider, at the foot of a lit light, as the add-on template has it; it boils under the pointer)
+                            HSliderMini(x0: bx, y: cy0 + thh - 13 * u, w: bw, lv: bv, h: 8 * u, f: if(hl_tile_z.hover > 0.5 or (sl_open and sl_i == r.index), fr, 0), c: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk))
                         }
                         //  a printer: the print's progress along the bottom, while one runs
                         group {
@@ -484,22 +516,11 @@ scene HomeAssistant {
                 text "close" { at: cl + cw - 30 * u, ct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, sl_x_z.hover); family: "Material Symbols Outlined" }
                 zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
                 on press sl_x_z { sl_open = false }
-                //  the track: hollow, filled with the accent up to the knob
-                box { from: tl, ty - 17 * u; size: tw2, 34 * u; corner: 17 * u; color: ink; opacity: 9% }
-                body {
-                    gradient: tl, ty to tl + tw2, ty, mix(mintlo, mix(mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), deep, 0.3), lk), mix(minthi, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), lk)
-                    shadow: 0, 0, 10 * u, 30%, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk)
-                    rim: 16%
-                    box { from: tl, ty - 17 * u; size: max(34 * u, kx - tl + 17 * u), 34 * u; corner: 17 * u }
-                }
-                body {
-                    color: ink
-                    shadow: 0, 2 * u, 8 * u, 40%, deep
-                    ellipse { at: kx, ty; radius: (12 + 2 * sl_tr_z.hover) * u }
-                }
+                //  the track: the Control Center's slider, coloured in with the accent (or the light's colour); it boils under the pointer and while it is dragged
+                HSlider(x0: tl, y: ty, w: tw2, lv: sl_vs, h: 18 * u, f: if(sl_tr_z.hover > 0.5 or sl_dirty, fr, 0), c: mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk))
                 zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: "{t_brightness}: {sl_name}"; role: slider; value: "{sl_vs * 100} %" }
-                on press sl_tr_z { sl_v = clamp((local.x - tl - 17 * u) / (tw2 - 34 * u), 0, 1); sl_dirty = true }
-                on drag sl_tr_z { sl_v = clamp((local.x - tl - 17 * u) / (tw2 - 34 * u), 0, 1); sl_dirty = true }
+                on press sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
+                on drag sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
                 on scroll sl_card_z { sl_v = clamp(sl_v + wheel * 0.05, 0, 1); sl_dirty = true }
                 on release sl_tr_z { emit hl_bri(sl_v); sl_dirty = false }
                 //  a pause in the moving sends it too, so the light follows the finger without a request per frame
@@ -530,13 +551,9 @@ scene HomeAssistant {
                         rim: 16%
                         box { from: tl, hy - 11 * u; size: tw2, 22 * u; corner: 11 * u }
                     }
-                    //  the knob: on the hue, faded while the colour is a white (no hue of its own)
-                    body {
-                        color: ink
-                        shadow: 0, 2 * u, 8 * u, 40%, deep
-                        opacity: if(lk > 0.5 and sl_s > 0.05, 100%, 40%)
-                        ellipse { at: hx, hy; radius: (12 + 2 * sl_hue_z.hover) * u }
-                    }
+                    //  in pencil, as the sliders: a crooked outline round it, and a ring for a knob around the hue (faded while the colour is a white, which has none)
+                    PRound(x: tl, y: hy - 11 * u, w: tw2, h: 22 * u, r: 11 * u, s: 87, wd: 1.5 * u, c: ink, a: 0.55, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
+                    PCir(cx: hx, cy: hy, rad: 13 * u, s: 89, wd: 1.6 * u, c: ink, a: if(lk > 0.5 and sl_s > 0.05, 0.95, 0.45), gapk: -1, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
                     ellipse { at: hx, hy; radius: 8 * u; color: rgb(0.15 + 0.85 * clamp(abs(sl_hs * 6 - 3) - 1, 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 2), 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 4), 0, 1)); opacity: if(lk > 0.5 and sl_s > 0.05, 100%, 40%) }
                     zone box sl_hue_z { from: tl - 6 * u, hy - 18 * u; size: tw2 + 12 * u, 36 * u; corner: 18 * u; cursor: pointer; label: "{t_color}: {sl_name}"; role: slider; value: "{sl_hs * 360}" }
                     on press sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); sl_cdirty = true }

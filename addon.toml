@@ -2,9 +2,11 @@
 # The lights, switches and booleans it shows are in ~/.local/share/pleamar/homeassistant/config.json (made the first time it runs; the gear in the panel opens it).
 
 name        = "Home Assistant"
-description = "Tus luces e interruptores de Home Assistant"
+description = "Your Home Assistant lights, switches, printer and Apple TV"
 author      = "datingesp-hash"
 version     = "1.0"
+vitreus_api = 1
+repo        = "datingesp-hash/HomeAssistant-Vitreus-Addon"
 
 scene = "homeassistant.plm"
 icon  = "icon.svg"
