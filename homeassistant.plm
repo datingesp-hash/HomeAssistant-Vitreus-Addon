@@ -407,17 +407,12 @@ scene HomeAssistant {
                             box { from: px0, cy0 + thh - 13 * u; size: pw0, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
                             box { from: px0, cy0 + thh - 13 * u; size: max(3 * u, pw0 * r.pp), 3 * u; corner: 1.5 * u; color: mint }
                         }
-                        //  a switch: the shell's pill, the knob sliding to the lit side (top right in a tall tile)
+                        //  a switch: the Control Center's (addon-pencil.plm's PSwitch: grey and hollow off, lit and wider on, the knob stretching as it travels), top right in
+                        //  a tall tile; its pencil outline boils while it is on or under the pointer, as the shell's
                         group {
                             show: r.kind == 1
                             let sy = mix(cy0 + thh / 2, cy0 + 30 * u, tall)
-                            body {
-                                color: mix(off, mint, lit)
-                                shadow: 0, 0, 8 * u * lit, 40% * lit, mint
-                                rim: 16% * lit
-                                box { at: cx0 + tww - 34 * u, sy; size: 34 * u, 20 * u; corner: 10 * u }
-                            }
-                            ellipse { at: cx0 + tww - 42 * u + 16 * u * lit, sy; radius: 7.5 * u; color: ink; opacity: 70% + 30% * lit }
+                            PSwitch(sx: cx0 + tww - 36 * u, sy: sy, on: lit, av: 1, s: 7 + r.index, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0))
                         }
                         //  edit mode: the handle in the corner. While it is held its zone covers the panel, so the drag is not lost as the tile grows under it;
                         //  the size it would take, in cells, in the middle of the tile
