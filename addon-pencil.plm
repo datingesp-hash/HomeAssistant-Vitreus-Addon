@@ -10,7 +10,8 @@ language 0.1
 //
 //    PLn, PCir, PRound   a stroke, a ring and a rounded box in pencil (each drawn twice, the second a hair off and fainter)
 //    PSwitch, PFill      the Control Center's pill switch, and the fill that rises from it into its card
-//    PSlider, PSliderMini the Control Center's slider (a pill track, the level coloured in with pencil columns, a ring for a knob), and a smaller one for the foot of a card
+//    PSlider, PSliderMini the Control Center's slider (a pill track, the level coloured in with pencil columns, a ring for a knob), and a smaller one for the foot of a card;
+//                        PSliderTint and PSliderMiniTint take the pencil's colour too (a light in its own colour)
 //    PIcon               nine icons (0 bulb, 1 lamp, 2 power, 3 moon, 4 fan, 5 TV, 6 plug, 7 door, 8 house) drawn from one shared set of strokes: draw your own set the same way
 //                        (a table of strokes looked up with `pick(k, …)`) rather than one drawing per icon: every drawing is instantiated once for every copy of a model, and a scene
 //                        may hold only 65 536 properties.
@@ -106,7 +107,11 @@ library Pencil {
 
     //  The slider, as the Control Center's PSlider: a pill-shaped track in a crooked double outline, the level coloured in with the pencil (tight columns up and down, the second pass fainter and a hair
     //  off), and a ring for a knob, drawn twice and bigger than the track is thick. `lv` is 0 to 1, `h` the track's thickness; it rests unless `f` (the frame) is the scene's.
+    //  The level is pencilled in the accent; PSliderTint takes the colour (`c`) instead, for a slider that stands for something with a colour of its own (a light).
     component PSlider(x0: number, y: number, w: number, lv: number, h: number, f: number) {
+        PSliderTint(x0, y, w, lv, h, f, mint)
+    }
+    component PSliderTint(x0: number, y: number, w: number, lv: number, h: number, f: number, c: color) {
         let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
         let xs = x0 + h * 0.5
         let xe = max(x0 + w * lv - h * 0.1, xs)
@@ -114,13 +119,16 @@ library Pencil {
         PRound(x: x0, y: y - h / 2, w: w, h: h, r: h / 2, s: 81, wd: 1.5 * u, c: ink, a: 0.65, f: f)
         repeat i in 0..40 {
             let cxi = xs + i * sp
-            PLn(ax: cxi + h * 0.1, ay: y - h * 0.38, bx: cxi - h * 0.1, by: y + h * 0.38, s: 200 + i, wd: 1.1 * u, c: mint, a: if(cxi < xe, 0.62, 0), f: f)
+            PLn(ax: cxi + h * 0.1, ay: y - h * 0.38, bx: cxi - h * 0.1, by: y + h * 0.38, s: 200 + i, wd: 1.1 * u, c: c, a: if(cxi < xe, 0.62, 0), f: f)
         }
         ellipse { at: kx, y; radius: h * 0.85; color: ink; opacity: 14% }
         PCir(cx: kx, cy: y, rad: h * 0.85, s: 83, wd: 1.5 * u, c: ink, a: 0.9, gapk: -1, f: f)
     }
     //  The slider of the card, in miniature, along the foot of a lit light's tile (16 columns of pencil and a plain ring: there is one on each tile that is lit).
     component PSliderMini(x0: number, y: number, w: number, lv: number, h: number, f: number) {
+        PSliderMiniTint(x0, y, w, lv, h, f, mint)
+    }
+    component PSliderMiniTint(x0: number, y: number, w: number, lv: number, h: number, f: number, c: color) {
         let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
         let xs = x0 + h * 0.5
         let xe = max(x0 + w * lv - h * 0.1, xs)
@@ -128,7 +136,7 @@ library Pencil {
         PRound(x: x0, y: y - h / 2, w: w, h: h, r: h / 2, s: 85, wd: 1.3 * u, c: ink, a: 0.6, f: f)
         repeat i in 0..16 {
             let cxi = xs + i * sp
-            PLn(ax: cxi + h * 0.1, ay: y - h * 0.36, bx: cxi - h * 0.1, by: y + h * 0.36, s: 300 + i, wd: 1 * u, c: mint, a: if(cxi < xe, 0.6, 0), f: f, j: 0.6)
+            PLn(ax: cxi + h * 0.1, ay: y - h * 0.36, bx: cxi - h * 0.1, by: y + h * 0.36, s: 300 + i, wd: 1 * u, c: c, a: if(cxi < xe, 0.6, 0), f: f, j: 0.6)
         }
         ellipse { at: kx, y; radius: h * 0.85; color: ink; opacity: 14% }
         ellipse { at: kx, y; radius: h * 0.85; stroke: 1.3 * u; color: ink; opacity: 90% }

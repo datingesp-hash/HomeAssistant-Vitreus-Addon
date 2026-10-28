@@ -38,7 +38,7 @@ It needs a Vitreus with add-ons, and `curl`.
 
 ## Set it up
 
-The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor (`$VISUAL`, then `$EDITOR`, then `nvim`), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
+The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor, through Vitreus's `vitreus-edit` (`$VISUAL` or `$EDITOR`, the desktop's text editor, or the usual ones; with no editor at all the panel says so for a few seconds and copies the file's path; an older Vitreus without it uses `$VISUAL`, `$EDITOR` or `nvim` in a terminal), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
 
 Until it has a token, the panel is a **demo**: a banner at the top says what to put in `config.json`, and the rooms below (the example's, or yours) can be tried out, though nothing reaches Home Assistant.
 
@@ -48,7 +48,7 @@ Until it has a token, the panel is a **demo**: a banner at the top says what to 
 - `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
 - `token`: a long-lived access token. In Home Assistant: your profile > Security > Long-lived access tokens > Create token.
 - `insecure`: `true` only for https with a self-signed certificate.
-- `icons` (optional): `"pencil"` (the default) draws the tiles with Vitreus's pencil icons, chosen by the icon's name: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (and a few close names); any other name is a bulb for a light and a power sign for a switch. `"material"` draws any [Material Symbols](https://fonts.google.com/icons) name instead. An `.svg` of your own is drawn as it is either way.
+- Icons: every icon is drawn in Vitreus's pencil. A tile's `icon` picks one by name: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (and a few close names); any other name is a bulb for a light and a power sign for a switch. The add-on's own icons (below) and any `.svg` of yours work too.
 - `artwork_search` (optional): `false` to not look up artwork online for an Apple TV (see its card, below).
 - `rooms`: the rooms, in order. Each has:
   - `name`: shown as its title.
@@ -56,7 +56,7 @@ Until it has a token, the panel is a **demo**: a banner at the top says what to 
   - `items`: its tiles. Each has:
     - `type`: `"light"` (with brightness) or `"toggle"`.
     - `name`: what the tile says.
-    - `icon`: an icon's name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: see `icons` above), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
+    - `icon`: an icon's name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: see Icons above), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
     - `entity`: the entity id, e.g. `light.living_room`.
     - `apple_tv` (optional): `{ "remote": "remote.living_room" }` on an Apple TV's tile gives it its card and remote (below).
     - `color` (optional, lights only): `true` for a light whose colour can change (an RGB bulb, an LED strip). Its right click card then shows the colours too.
@@ -130,7 +130,7 @@ These are the [Bambu Lab integration](https://github.com/greghesp/ha-bambulab)'s
 
 ### The add-on's own icons
 
-For what Material Symbols has no good icon for. With the default `"icons": "pencil"` they are drawn in Vitreus's pencil like the rest (they boil under the pointer); with `"material"` they are the white `.svg` files below, tinted the same way. All of the panel's own icons (its buttons, the cards, the remote) are pencil drawings too, from `ha-icons.plm`, which `tools/icons.py` writes from a table of strokes. Each has an English and a Spanish name, and either works in `icon`:
+For what the pencil's set has no icon for. They are drawn in Vitreus's pencil like the rest (they boil under the pointer); the white `.svg` files below are what they look like. All of the panel's own icons (its buttons, the cards, the remote) are pencil drawings too, from `ha-icons.plm`, which `tools/icons.py` writes from a table of strokes.
 
 ![The add-on's icons](docs/en/icons.png)
 

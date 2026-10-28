@@ -37,7 +37,7 @@ Necesita un Vitreus con add-ons, y `curl`.
 
 ## Configurar
 
-La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre en tu editor (`$VISUAL`, si no `$EDITOR`, si no `nvim`), y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
+La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre en tu editor con `vitreus-edit`, de Vitreus (`$VISUAL` o `$EDITOR`, el editor de textos del escritorio, o los habituales; si no hay ninguno, el panel lo avisa unos segundos y copia la ruta del archivo; con un Vitreus antiguo sin él, usa `$VISUAL`, `$EDITOR` o `nvim` en una terminal), y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
 
 Mientras no tenga token, el panel es una **demostración**: un aviso arriba dice qué poner en `config.json`, y las habitaciones de debajo (las del ejemplo, o las tuyas) se pueden probar, aunque nada llega a Home Assistant.
 
@@ -47,7 +47,7 @@ Mientras no tenga token, el panel es una **demostración**: un aviso arriba dice
 - `url`: la dirección de tu Home Assistant, p. ej. `http://homeassistant.local:8123`.
 - `token`: un token de larga duración. En Home Assistant: tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.
 - `insecure`: `true` solo si usas https con un certificado propio.
-- `icons` (opcional): `"pencil"` (por defecto) dibuja las fichas con los iconos a lápiz de Vitreus, elegidos por el nombre del icono: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (y algunos nombres parecidos); cualquier otro sale como una bombilla en una luz y como un símbolo de encendido en un interruptor. `"material"` dibuja cualquier nombre de [Material Symbols](https://fonts.google.com/icons). Un `.svg` propio se dibuja tal cual en los dos casos.
+- Iconos: todos se dibujan a lápiz, como los de Vitreus. El `icon` de una ficha elige uno por su nombre: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (y algunos nombres parecidos); cualquier otro sale como una bombilla en una luz y como un símbolo de encendido en un interruptor. Los iconos propios del addon (abajo) y cualquier `.svg` tuyo también valen.
 - `artwork_search` (opcional): `false` para no buscar carátulas en internet para un Apple TV (ver su tarjeta, abajo).
 - `rooms`: las habitaciones, en orden. Cada una lleva:
   - `name`: su nombre, que sale como título.
@@ -55,7 +55,7 @@ Mientras no tenga token, el panel es una **demostración**: un aviso arriba dice
   - `items`: sus fichas. Cada ficha lleva:
     - `type`: `"light"` (con brillo) o `"toggle"`.
     - `name`: el nombre de la ficha.
-    - `icon`: el nombre de un icono (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: ver `icons` arriba), uno de los iconos propios del addon (abajo), o cualquier `.svg` blanco que pongas en `~/.local/share/pleamar/homeassistant/`.
+    - `icon`: el nombre de un icono (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: ver Iconos arriba), uno de los iconos propios del addon (abajo), o cualquier `.svg` blanco que pongas en `~/.local/share/pleamar/homeassistant/`.
     - `entity`: la entidad, p. ej. `light.salon`.
     - `apple_tv` (opcional): `{ "remote": "remote.salon" }` en la ficha de un Apple TV le da su tarjeta y su mando (abajo).
     - `color` (opcional, solo luces): `true` en una luz que cambia de color (una bombilla RGB, una tira LED). Su control del clic derecho muestra también los colores.
@@ -129,7 +129,7 @@ Son las entidades de la [integración de Bambu Lab](https://github.com/greghesp/
 
 ### Los iconos propios del addon
 
-Para lo que Material Symbols no tiene un buen icono. Con `"icons": "pencil"` (por defecto) se dibujan a lápiz como el resto (se mueven bajo el ratón); con `"material"` son los `.svg` blancos de abajo, teñidos igual. Todos los iconos propios del panel (sus botones, las tarjetas, el mando) son también dibujos a lápiz, de `ha-icons.plm`, que `tools/icons.py` escribe a partir de una tabla de trazos. Cada uno tiene un nombre en español y otro en inglés, y los dos valen en `icon`:
+Para lo que el juego de iconos a lápiz no tiene. Se dibujan a lápiz como el resto (se mueven bajo el ratón); los `.svg` blancos de abajo son su aspecto. Todos los iconos propios del panel (sus botones, las tarjetas, el mando) son también dibujos a lápiz, de `ha-icons.plm`, que `tools/icons.py` escribe a partir de una tabla de trazos.
 
 ![Los iconos del addon](docs/es/icons.png)
 
