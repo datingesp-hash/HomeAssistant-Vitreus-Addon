@@ -19,7 +19,7 @@ scene HomeAssistant {
 
     permissions {
         services: "files", "files.write", "env"
-        run: "curl", "xdg-terminal-exec", "xdg-open", "vitreus-edit", "wl-copy"
+        run: "curl", "xdg-terminal-exec", "xdg-open", "vitreus-edit", "wl-copy", "pleamar"
     }
 
     fact pal_ink_r = 0.9608
@@ -89,6 +89,52 @@ scene HomeAssistant {
     text t_ed = ""                                    // the pencil's name: what pressing it does now
     text t_refresh = ""
     text t_noed = ""                                  // the gear found no text editor: what to do, for a few seconds in the head (`hl_noed`)
+    //  ── Settings: the gear opens them over the panel. Two tabs: the add-on's settings (the address, the token, the language, two switches) and its entities (the rooms
+    //  and their tiles, each opened to edit, and a button to add one). What is shown is laid out by the logic (settings.luau) as rows: `st_rows` (a section's title, a
+    //  field, a switch, a note, a suggestion, a button), `st_chips` (a choice among a few), `st_icons` (the icon grid) and `st_ents` (the entities' list), each with its
+    //  place (unscaled, from the top of the scrolling list). A field is typed through the shell, as the add-on template's is: the logic tells the shell where the field
+    //  is (the pointer over a field puts it there, so a click on it goes to the shell), and the shell sends back what is written (`field_q`) and Enter and Escape.
+    fact st_open = false
+    prop st_k = 0 ~240ms
+    follow st_k = if(st_open, 1, 0)
+    fact st_tab = 0                                   // 0 the settings · 1 the entities
+    prop st_tk = 0 ~quick
+    follow st_tk = st_tab
+    fact st_page = 0                                  // 0 the tabs · 1 an entity being edited · 2 a room being edited
+    text st_title = ""                                // the page's title, while one is being edited
+    fact st_content = 0                               // how tall the list is, unscaled
+    fact st_sc = 0
+    on change st_list.scroll { st_sc = st_list.scroll }
+    on change st_page { st_list.scroll: 0 }          // (a page opens at its top)
+    on change st_tab { st_list.scroll: 0 }
+    model st_rows max 30 { kind: number; label: text; val: text; ph: text; sub: text; x: number; y: number; w: number; h: number; on: number; tone: number }
+    model st_sws max 8 { label: text; y: number; on: number }      // the switches (their own model: a switch is a heavy drawing, and few rows are one)
+    //  kind: 0 a section's title · 1 a field (label, value or placeholder; `on` 1: it has a value) · 4 a note · 5 a suggestion (label, sub) · 6 a button (`tone`: 0 plain,
+    //  1 the accent, 2 danger, 3 danger armed: pressed once, asking again)
+    model st_chips max 24 { label: text; x: number; y: number; w: number; sel: number }
+    model st_icons max 18 { pk: number; dk: number; x: number; y: number; sel: number }
+    model st_ents max 44 { kind: number; name: text; sub: text; pk: number; y: number }      // kind 0 a room · 1 a tile
+    fact st_fa = -1                                   // the field the shell's field is on (a row of st_rows), where it is, and what it says (masked for the token)
+    fact st_fx = 0
+    fact st_fy = 0
+    fact st_fw = 0
+    text st_fv = ""
+    fact st_fvon = false
+    measure stf
+    text t_st_settings = ""
+    text t_st_entities = ""
+    text t_st_back = ""
+    event st_do ->                                    // a row of st_rows pressed (a switch, a suggestion, a button)
+    event st_fld ->                                   // a field wanted: the shell's field goes there
+    event st_sw ->                                    // a switch flipped
+    event st_chip ->
+    event st_icon ->
+    event st_ent ->                                   // an entry of the entities' list: open it
+    event st_back ->                                  // back from an entity or a room to the list
+    text field_q = ""                                 // what the shell's field says, whether it is being typed in, and its Enter and Escape
+    fact field_kb = false
+    event field_enter ->
+    event field_esc ->
     fact hl_noed = false
     prop hl_ne = 0 ~calm
     follow hl_ne = if(hl_noed, 1, 0)
@@ -303,7 +349,7 @@ scene HomeAssistant {
                 ellipse { at: W - 121 * u, 28 * u; radius: 16 * u }
             }
             HUi(k: if(hl_editing, 1, 0), cx: W - 121 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed), a: 1, s: 401, f: if(hl_ed_z.hover > 0.5, fr, 0), z: 0.73)
-            zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_ed }
+            zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_ed; active: not st_open }
             on press hl_ed_z { toggle hl_editing; rz_i = -1 }
 
             ellipse { at: W - 37 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_rf_z.hover }
@@ -311,16 +357,22 @@ scene HomeAssistant {
             zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_refresh }
             on press hl_rf_z { emit hl_refresh }
 
-            ellipse { at: W - 79 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_gear_z.hover }
-            HUi(k: 3, cx: W - 79 * u, cy: 28 * u, c: mix(ink, mint, hl_gear_z.hover), a: 1, s: 421, f: if(hl_gear_z.hover > 0.5, fr, 0), z: 0.7)
+            body {
+                color: mix(ink, mint, st_k)
+                opacity: 8% + 10% * hl_gear_z.hover + 82% * st_k
+                shadow: 0, 0, 10 * u * st_k, 35% * st_k, mint
+                ellipse { at: W - 79 * u, 28 * u; radius: 16 * u }
+            }
+            HUi(k: 3, cx: W - 79 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_gear_z.hover), onmint, st_k), a: 1, s: 421, f: if(hl_gear_z.hover > 0.5, fr, 0), z: 0.7)
             zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_edit_cfg }
-            on press hl_gear_z { emit hl_edit }
+            on press hl_gear_z { toggle st_open }
 
             box { at: W / 2, 50 * u; size: W - 2 * gx, 1.5; color: ink; opacity: 12% }
 
             //  ── the demo: no token yet. A banner on what to do, over the example's rooms, which can be played with ──
             group {
                 show: hl_demo
+                opacity: 1 - st_k
                 box { from: 14 * u, 60 * u; size: W - 28 * u, 62 * u; corner: 12 * u; color: mint; opacity: 14% }
                 PRound(x: 16.6 * u, y: 62.6 * u, w: W - 33.2 * u, h: 56.8 * u, r: 9.7 * u, s: 5, wd: 1.5 * u, c: mint, a: 0.7, f: 0)
                 PIcon(k: 8, cx: 38 * u, cy: 91 * u, lit: 0, c: mint, a: 1, s: 11, f: 0, z: 1)
@@ -329,7 +381,7 @@ scene HomeAssistant {
             }
             }
             group {
-            opacity: en2
+            opacity: en2 * (1 - st_k)
             move: 0, (1 - en2) * 12 * u
             //  ── the rooms and their tiles ──
             //  One list that scrolls as the shell's own do (the wheel, a drag, the layout's spring): what it holds is laid out by the logic, in a single piece
@@ -460,7 +512,7 @@ scene HomeAssistant {
 
             }
             group {
-            opacity: en3
+            opacity: en3 * (1 - st_k)
             move: 0, (1 - en3) * 12 * u
             //  ── when there is nothing to show ──
             group {
@@ -474,7 +526,7 @@ scene HomeAssistant {
                 text t_title { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
                 text hl_msg { at: W / 2, H / 2 + 4 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
                 zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: t_edit_cfg }
-                on press hl_cfg_z { emit hl_edit }
+                on press hl_cfg_z { st_open = true }
                 body {
                     color: mint
                     shadow: 0, 0, 10 * u, 35% + 15% * hl_cfg_z.hover, mint
@@ -490,6 +542,163 @@ scene HomeAssistant {
                 text t_empty_hint { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
             }
 
+            }
+            //  ── the settings (the gear): over the tiles, under the cards ──
+            group {
+                opacity: en2 * st_k
+                show: st_k > 0.01
+                move: 0, (1 - st_k) * 10 * u
+                let stw = W - 28 * u
+                //  the tabs (the theme's lit piece under the chosen one), or, on an entity or a room, the way back and its title
+                group {
+                    show: st_page == 0
+                    let tbw2 = stw / 2
+                    box { from: 14 * u, 62 * u; size: stw, 32 * u; corner: 16 * u; color: ink; opacity: 7% }
+                    PThumb(x: 14 * u + tbw2 / 2 + st_tk * tbw2, y: 78 * u, w: tbw2 - 6 * u, h: 26 * u, rad: 13 * u, th: 32 * u, a: 1)
+                    repeat i in 0..2 {
+                        text pick(i, t_st_settings, t_st_entities) { at: 14 * u + i * tbw2 + tbw2 / 2, 78 * u; anchor: center; size: 12.5; weight: 700; color: mix(faint, onmint, clamp(1 - abs(st_tk - i), 0, 1)); family: "Space Grotesk" }
+                        zone box st_tab_z.$i { from: 14 * u + i * tbw2, 62 * u; size: tbw2, 32 * u; corner: 16 * u; cursor: pointer; label: pick(i, t_st_settings, t_st_entities); role: tab; selected: st_tab == i }
+                    }
+                    on press st_tab_z.0 { st_tab = 0 }
+                    on press st_tab_z.1 { st_tab = 1 }
+                }
+                group {
+                    show: st_page > 0
+                    ellipse { at: 30 * u, 78 * u; radius: 15 * u; color: ink; opacity: 8% + 10% * st_back_z.hover }
+                    HUi(k: 27, cx: 30 * u, cy: 78 * u, c: mix(ink, mint, st_back_z.hover), a: 1, s: 801, f: if(st_back_z.hover > 0.5, fr, 0), z: 0.62)
+                    zone box st_back_z { at: 30 * u, 78 * u; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: t_st_back }
+                    on press st_back_z { emit st_back }
+                    text st_title { at: 54 * u, 78 * u; anchor: left center; size: 15; weight: 700; width: W - 80 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                }
+                //  the page: one list that scrolls, everything in it placed by the logic
+                let stv = max(H - 104 * u - 10 * u, 1)
+                column st_list ~quick {
+                  at: 0, 104 * u
+                  view: W, stv
+                  step: 60 * u
+                  group {
+                    size: W, max(st_content * u, stv)
+                    //  the rows
+                    for r in st_rows {
+                        let rx = 14 * u + r.x * u
+                        let ry = r.y * u
+                        let rw = if(r.w > 0, r.w * u, stw)
+                        let rh = r.h * u
+                        let act = if(r.index == st_fa, 1, 0)
+                        //  a section's title
+                        text r.label { at: rx + 2 * u, ry + rh / 2; anchor: left center; size: 11.5; weight: 700; color: mint; show: r.kind == 0; family: "Space Grotesk" }
+                        //  a note
+                        text r.label { at: rx + 2 * u, ry; anchor: left top; size: 11; weight: 500; width: rw - 4 * u; lines: 3; color: faint; show: r.kind == 4; family: "Space Grotesk" }
+                        //  a field: its label above, its box, what it says (or its placeholder); the one the shell's field is on shows the text being written, and a caret
+                        group {
+                            show: r.kind == 1
+                            text r.label { at: rx + 2 * u, ry + 8 * u; anchor: left center; size: 11.5; weight: 600; width: rw; lines: 1; color: faint; family: "Space Grotesk" }
+                            box { from: rx, ry + 18 * u; size: rw, 38 * u; corner: 12 * u; color: ink; opacity: 7% + 4% * st_fz.hover + 5% * act }
+                            PRound(x: rx + 1.6 * u, y: ry + 19.6 * u, w: rw - 3.2 * u, h: 34.8 * u, r: 10.5 * u, s: 900 + r.index, wd: 1.3 * u, c: mix(faint, mint, act), a: 0.3 + 0.5 * act, f: if(act > 0.5 and field_kb, fr, 0))
+                            text r.val { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: ink; show: act < 0.5 and r.on > 0.5; family: "Space Grotesk" }
+                            text r.ph { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: faint; opacity: 60%; show: r.on < 0.5 and (act < 0.5 or not st_fvon); family: "Space Grotesk" }
+                        }
+                        zone box st_fz { from: rx, ry + 18 * u; size: rw, 38 * u; corner: 12 * u; cursor: pointer; active: r.kind == 1 and act < 0.5 and st_k > 0.9; label: "{r.label}" }
+                        on enter st_fz while not field_kb { emit st_fld(r.index) }
+                        on press st_fz { emit st_fld(r.index) }
+                        //  a suggestion under a field: what Home Assistant calls it, and its id
+                        group {
+                            show: r.kind == 5
+                            box { from: rx, ry; size: rw, rh - 2 * u; corner: 10 * u; color: mix(ink, mint, st_sg_z.hover); opacity: 5% + 8% * st_sg_z.hover }
+                            text r.label { at: rx + 12 * u, ry + rh / 2 - 7 * u; anchor: left center; size: 12.5; weight: 600; width: rw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                            text r.sub { at: rx + 12 * u, ry + rh / 2 + 8 * u; anchor: left center; size: 10.5; weight: 500; width: rw - 24 * u; lines: 1; color: faint; family: "Space Grotesk" }
+                        }
+                        zone box st_sg_z { from: rx, ry; size: rw, rh - 2 * u; corner: 10 * u; cursor: pointer; active: r.kind == 5 and st_k > 0.9; label: "{r.label}" }
+                        on press st_sg_z { emit st_do(r.index) }
+                        //  a button: a pill, plain, in the accent, or for deleting (red, filled once it asks again)
+                        group {
+                            show: r.kind == 6
+                            let lit = if(r.tone == 1, 1, 0)
+                            box { from: rx, ry; size: rw, rh; corner: rh / 2; color: if(r.tone >= 2, alert, ink); opacity: if(r.tone == 0, 9% + 9% * st_bt_z.hover, if(r.tone == 2, 12% + 10% * st_bt_z.hover, 0%)) }
+                            body {
+                                color: if(r.tone == 3, alert, mint)
+                                opacity: if(r.tone == 1 or r.tone == 3, 100%, 0%)
+                                shadow: 0, 0, 10 * u * lit, 30% + 15% * st_bt_z.hover, mint
+                                rim: 16%
+                                box { from: rx, ry; size: rw, rh; corner: rh / 2 }
+                            }
+                            text r.label { at: rx + rw / 2, ry + rh / 2; anchor: center; size: 12.5; weight: 700; width: rw - 16 * u; lines: 1; align: center; color: if(r.tone == 1 or r.tone == 3, onmint, if(r.tone == 2, alert, mix(ink, mint, st_bt_z.hover))); family: "Space Grotesk" }
+                        }
+                        zone box st_bt_z { from: rx, ry; size: rw, rh; corner: rh / 2; cursor: pointer; active: r.kind == 6 and st_k > 0.9; label: "{r.label}" }
+                        on press st_bt_z { emit st_do(r.index) }
+                    }
+                    //  the switches: a name, and the Control Center's switch at the right; the whole row is the button
+                    for w in st_sws {
+                        let wy = w.y * u
+                        box { from: 14 * u, wy; size: stw, 40 * u; corner: 12 * u; color: ink; opacity: 4% * st_sw_z.hover }
+                        text w.label { at: 16 * u, wy + 20 * u; anchor: left center; size: 13; weight: 600; width: stw - 60 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                        PSwitch(sx: W - 35 * u, sy: wy + 20 * u, on: if(w.on > 0.5, 1, 0), av: 1, s: 950 + w.index, f: if(st_sw_z.hover > 0.5, fr, 0))
+                        zone box st_sw_z { from: 14 * u, wy; size: stw, 40 * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; label: "{w.label}"; role: toggle; checked: w.on > 0.5 }
+                        on press st_sw_z { emit st_sw(w.index) }
+                    }
+                    //  the text being written in the field the shell's field is on, measured for the caret
+                    group {
+                        show: st_fa >= 0
+                        text st_fv { at: 14 * u + st_fx * u + 14 * u, st_fy * u + 37 * u; anchor: left center; size: 13.5; weight: 500; width: st_fw * u - 28 * u; lines: 1; color: ink; measure: stf; family: "Space Grotesk" }
+                        box { from: 14 * u + st_fx * u + 15 * u + min(stf.width, st_fw * u - 30 * u), st_fy * u + 28 * u; size: 2 * u, 18 * u; color: mint; opacity: if(field_kb, 1, 0) * (0.55 + 0.45 * sin(time * 6)) }
+                    }
+                    //  a choice among a few (the language, a tile's kind, its room, a printer): the theme's lit piece under the chosen one
+                    for c in st_chips {
+                        let chx = 14 * u + c.x * u
+                        let chy = c.y * u
+                        let chw = c.w * u
+                        box { from: chx, chy; size: chw, 30 * u; corner: 15 * u; color: ink; opacity: if(c.sel > 0.5, 0%, 8% + 8% * st_ch_z.hover) }
+                        group {
+                            show: c.sel > 0.5
+                            PThumb(x: chx + chw / 2, y: chy + 15 * u, w: chw, h: 30 * u, rad: 15 * u, th: 30 * u, a: 1)
+                        }
+                        text c.label { at: chx + chw / 2, chy + 15 * u; anchor: center; size: 12; weight: 700; width: chw - 10 * u; lines: 1; align: center; color: if(c.sel > 0.5, onmint, mix(ink, mint, st_ch_z.hover)); family: "Space Grotesk" }
+                        zone box st_ch_z { from: chx, chy; size: chw, 30 * u; corner: 15 * u; cursor: pointer; active: st_k > 0.9; label: "{c.label}"; role: tab; selected: c.sel > 0.5 }
+                        on press st_ch_z { emit st_chip(c.index) }
+                    }
+                    //  the icons to choose from: the pencil's and the add-on's own
+                    for c in st_icons {
+                        let icx = 14 * u + c.x * u
+                        let icy = c.y * u
+                        box { from: icx, icy; size: 44 * u, 44 * u; corner: 12 * u; color: if(c.sel > 0.5, mint, ink); opacity: if(c.sel > 0.5, 18%, 6% + 8% * st_ic_z.hover) }
+                        group {
+                            show: c.sel > 0.5
+                            PRound(x: icx + 1.5 * u, y: icy + 1.5 * u, w: 41 * u, h: 41 * u, r: 10.5 * u, s: 1000 + c.index, wd: 1.4 * u, c: mint, a: 0.8, f: 0)
+                        }
+                        group {
+                            show: c.pk >= 0
+                            PIcon(k: max(c.pk, 0), cx: icx + 22 * u, cy: icy + 22 * u, lit: 0, c: if(c.sel > 0.5, mint, ink), a: 1, s: 1100 + c.index * 7, f: if(st_ic_z.hover > 0.5, fr, 0), z: 0.8)
+                        }
+                        group {
+                            show: c.dk >= 0
+                            HDev(k: max(c.dk, 0), cx: icx + 22 * u, cy: icy + 22 * u, c: if(c.sel > 0.5, mint, ink), a: 1, s: 1200 + c.index * 7, f: if(st_ic_z.hover > 0.5, fr, 0), z: 0.95)
+                        }
+                        zone box st_ic_z { from: icx, icy; size: 44 * u, 44 * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; role: tab; selected: c.sel > 0.5 }
+                        on press st_ic_z { emit st_icon(c.index) }
+                    }
+                    //  the entities' list: a room's head, and its tiles (each opened to edit with a click)
+                    for e in st_ents {
+                        let ey = e.y * u
+                        group {
+                            show: e.kind == 0
+                            text e.name { at: 16 * u, ey + 17 * u; anchor: left center; size: 14.5; weight: 700; width: stw - 60 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                            text e.sub { at: 16 * u, ey + 33 * u; anchor: left center; size: 10.5; weight: 500; width: stw - 60 * u; lines: 1; color: faint; family: "Space Grotesk" }
+                        }
+                        group {
+                            show: e.kind == 1
+                            box { from: 14 * u, ey; size: stw, 48 * u; corner: 12 * u; color: ink; opacity: 6% + 6% * st_en_z.hover }
+                            PIcon(k: max(e.pk, 0), cx: 38 * u, cy: ey + 24 * u, lit: 0, c: mix(ink, mint, st_en_z.hover), a: 1, s: 1300 + e.index * 7, f: if(st_en_z.hover > 0.5, fr, 0), z: 0.72)
+                            text e.name { at: 62 * u, ey + 16 * u; anchor: left center; size: 13; weight: 700; width: stw - 100 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                            text e.sub { at: 62 * u, ey + 33 * u; anchor: left center; size: 10.5; weight: 500; width: stw - 100 * u; lines: 1; color: faint; family: "Space Grotesk" }
+                        }
+                        let chy2 = ey + if(e.kind == 0, 21, 24) * u
+                        PLn(ax: W - 38 * u, ay: chy2 - 6 * u, bx: W - 32 * u, by: chy2, s: 1400 + e.index, wd: 1.8 * u, c: mix(faint, mint, st_en_z.hover), a: 1, f: if(st_en_z.hover > 0.5, fr, 0))
+                        PLn(ax: W - 32 * u, ay: chy2, bx: W - 38 * u, by: chy2 + 6 * u, s: 1450 + e.index, wd: 1.8 * u, c: mix(faint, mint, st_en_z.hover), a: 1, f: if(st_en_z.hover > 0.5, fr, 0))
+                        zone box st_en_z { from: 14 * u, ey; size: stw, if(e.kind == 0, 42, 48) * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; label: "{e.name}" }
+                        on press st_en_z { emit st_ent(e.index) }
+                    }
+                  }
+                }
             }
             //  ── the brightness slider: a card over the panel, which a click outside it, its X or a right click shuts ──
             group {

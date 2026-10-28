@@ -121,6 +121,25 @@ local STR = {
         pr_ends = "Termina %s", pr_ended = "Terminó %s", pause = "Pausar", resume = "Continuar", stop = "Detener", stop_sure = "¿Detener?",
         camera = "Cámara", live = "EN DIRECTO", open_cam = "Abrir la cámara",
         -- an Apple TV's card
+        -- the settings (the gear)
+        st_settings = "Ajustes", st_entities = "Entidades", st_back = "Volver", st_sec_ha = "HOME ASSISTANT", st_sec_panel = "PANEL",
+        st_url = "Dirección", st_token = "Token de acceso", st_token_ph = "Pega aquí un token de larga duración",
+        st_token_note = "En Home Assistant: tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token. Se guarda solo en tu carpeta privada.",
+        st_lang = "Idioma", st_insecure = "Certificado propio (https)", st_artwork = "Buscar carátulas en internet", st_open_json = "Abrir config.json en el editor",
+        st_add_ent = "+ Entidad", st_add_room = "+ Habitación", st_no_room = "Sin habitación", st_n_tile = "%d ficha", st_n_tiles = "%d fichas",
+        st_new_ent = "Nueva entidad", st_edit_ent = "Editar entidad", st_new_room = "Nueva habitación", st_edit_room = "Editar habitación",
+        st_entity = "Entidad de Home Assistant", st_entity_ph = "Escribe para buscar: salón, light.…", st_name = "Nombre", st_name_ph = "Cómo se llama en el panel",
+        st_type = "Tipo", st_light = "Luz", st_toggle = "Interruptor", st_room = "Habitación", st_icon = "Icono",
+        st_own_icon = "Usa un icono propio (%s): elige otro aquí para cambiarlo.",
+        st_color = "Cambiar el color desde su tarjeta", st_tint = "Ficha del color de la luz", st_tv = "Tarjeta de reproductor y mando (Apple TV)",
+        st_remote = "Mando (entidad remote.…)", st_printer = "Tarjeta de impresora 3D", st_printer_pick = "Impresora (Bambu Lab) encontrada en Home Assistant:",
+        st_printer_keep = "Mantiene la impresora que ya tenía configurada.", st_printer_none = "No encuentro una impresora Bambu Lab en Home Assistant: su bloque \"printer\" se escribe a mano en config.json.",
+        st_on_text = "Texto encendido (opcional)", st_off_text = "Texto apagado (opcional)",
+        st_save = "Guardar", st_add = "Añadir", st_cancel = "Cancelar", st_delete = "Eliminar", st_up = "Subir", st_down = "Bajar",
+        st_delete_room_sure = "¿Eliminar con sus %d fichas?", st_room_name = "Nombre de la habitación", st_room_name_ph = "Salón, Dormitorio…",
+        st_temp = "Sensor de temperatura (opcional)", st_hum = "Sensor de humedad (opcional)",
+        st_need_entity = "Falta la entidad, o no es válida (dominio.nombre, p. ej. light.salon).", st_need_name = "Falta el nombre de la habitación.",
+        st_broken = "config.json tiene un error y no se puede leer aquí: ábrelo en el editor para arreglarlo.",
         demo = "Demostración", demo_title = "Modo demostración: todavía sin conectar",
         demo_hint = "Pon el token y la url de tu Home Assistant y tus entidades en config.json (el engranaje lo abre). Esto es un ejemplo para probar.",
         demo_task = "Barco de prueba", demo_tv = "Una película de ejemplo",
@@ -154,6 +173,25 @@ local STR = {
         pr_ends = "Ends %s", pr_ended = "Ended %s", pause = "Pause", resume = "Resume", stop = "Stop", stop_sure = "Stop?",
         camera = "Camera", live = "LIVE", open_cam = "Open the camera",
         -- an Apple TV's card
+        -- the settings (the gear)
+        st_settings = "Settings", st_entities = "Entities", st_back = "Back", st_sec_ha = "HOME ASSISTANT", st_sec_panel = "PANEL",
+        st_url = "Address", st_token = "Access token", st_token_ph = "Paste a long-lived access token",
+        st_token_note = "In Home Assistant: your profile > Security > Long-lived access tokens > Create token. It is kept only in your private folder.",
+        st_lang = "Language", st_insecure = "Self-signed certificate (https)", st_artwork = "Look up artwork online", st_open_json = "Open config.json in the editor",
+        st_add_ent = "+ Entity", st_add_room = "+ Room", st_no_room = "No room", st_n_tile = "%d tile", st_n_tiles = "%d tiles",
+        st_new_ent = "New entity", st_edit_ent = "Edit entity", st_new_room = "New room", st_edit_room = "Edit room",
+        st_entity = "Home Assistant entity", st_entity_ph = "Type to search: living, light.…", st_name = "Name", st_name_ph = "What the panel calls it",
+        st_type = "Kind", st_light = "Light", st_toggle = "Switch", st_room = "Room", st_icon = "Icon",
+        st_own_icon = "Uses an icon of its own (%s): pick another here to change it.",
+        st_color = "Change its colour from its card", st_tint = "Tile in the light's colour", st_tv = "Player card and remote (Apple TV)",
+        st_remote = "Remote (remote.… entity)", st_printer = "3D printer card", st_printer_pick = "Printer (Bambu Lab) found in Home Assistant:",
+        st_printer_keep = "Keeps the printer it already had.", st_printer_none = "No Bambu Lab printer found in Home Assistant: its \"printer\" block is written by hand in config.json.",
+        st_on_text = "Text when on (optional)", st_off_text = "Text when off (optional)",
+        st_save = "Save", st_add = "Add", st_cancel = "Cancel", st_delete = "Delete", st_up = "Move up", st_down = "Move down",
+        st_delete_room_sure = "Delete with its %d tiles?", st_room_name = "Room name", st_room_name_ph = "Living room, Bedroom…",
+        st_temp = "Temperature sensor (optional)", st_hum = "Humidity sensor (optional)",
+        st_need_entity = "The entity is missing, or not valid (domain.name, e.g. light.living_room).", st_need_name = "The room needs a name.",
+        st_broken = "config.json has an error and can't be read here: open it in the editor to fix it.",
         demo = "Demo", demo_title = "Demo mode: not connected yet",
         demo_hint = "Put your Home Assistant's token and url, and your entities, in config.json (the gear opens it). This is an example to try.",
         demo_task = "Test boat", demo_tv = "An example film",
@@ -228,6 +266,62 @@ local WORDS = {
     "camera",
     "live",
     "open_cam",
+    "st_settings",
+    "st_entities",
+    "st_back",
+    "st_sec_ha",
+    "st_sec_panel",
+    "st_url",
+    "st_token",
+    "st_token_ph",
+    "st_token_note",
+    "st_lang",
+    "st_insecure",
+    "st_artwork",
+    "st_open_json",
+    "st_add_ent",
+    "st_add_room",
+    "st_no_room",
+    "st_n_tile",
+    "st_n_tiles",
+    "st_new_ent",
+    "st_edit_ent",
+    "st_new_room",
+    "st_edit_room",
+    "st_entity",
+    "st_entity_ph",
+    "st_name",
+    "st_name_ph",
+    "st_type",
+    "st_light",
+    "st_toggle",
+    "st_room",
+    "st_icon",
+    "st_own_icon",
+    "st_color",
+    "st_tint",
+    "st_tv",
+    "st_remote",
+    "st_printer",
+    "st_printer_pick",
+    "st_printer_keep",
+    "st_printer_none",
+    "st_on_text",
+    "st_off_text",
+    "st_save",
+    "st_add",
+    "st_cancel",
+    "st_delete",
+    "st_up",
+    "st_down",
+    "st_delete_room_sure",
+    "st_room_name",
+    "st_room_name_ph",
+    "st_temp",
+    "st_hum",
+    "st_need_entity",
+    "st_need_name",
+    "st_broken",
     "demo",
     "demo_title",
     "demo_hint",
@@ -562,6 +656,7 @@ local function pr_fill()
 end
 
 local show, call          -- (both further down; the Apple TV's poll, here, uses them)
+local st                  -- the settings page (settings.luau), once it is loaded
 -- An Apple TV (or any media player given "apple_tv"): what it plays, asked in a template of its own (a few more attributes than the tiles' one), when it is
 -- polled. Its position is counted on here between answers (`at`: the tick it came at), so the bar moves every second without asking.
 local tvs = {}              -- by media player: { st, title, artist, series, app, dur, pos, el, pic, at }
@@ -1356,7 +1451,7 @@ local function own_editor(path)
         if code ~= 0 then run("xdg-open", { path }, function() end) end
     end)
 end
-on("hl_edit", function()
+local function edit_json()
     local path = folder .. "/" .. CONFIG
     run("vitreus-edit", { path }, function(_, code)
         if code == 3 then
@@ -1372,7 +1467,8 @@ on("hl_edit", function()
             own_editor(path)
         end
     end)
-end)
+end
+on("hl_edit", edit_json)
 
 -- The panel resized: as many columns as now fit
 local last_w = -1
@@ -1381,6 +1477,7 @@ on("fact:slot_w", function(v)
     last_w = tonumber(v) or -1
     layout()
     show()
+    if st then st.width_changed() end
 end)
 
 -- Which monitor the panel is on: Vitreus sends its name (`slot_mon`) before `slot_open`, and the copy of this scene whose monitor has that name
@@ -1405,6 +1502,7 @@ on("fact:slot_open", function(v)
     find_monitor()
     if open and not was then
         poll()
+        if st then st.reopen() end          -- (the shell forgets a field when the panel shuts: the settings' one is placed again)
     elseif not open and was then
         fact.hl_editing = false          -- (edit mode ends with the panel)
         fact.rz_i = -1
@@ -1413,9 +1511,15 @@ on("fact:slot_open", function(v)
 end)
 
 -- config.json saved: read it again
-lang_reload = function() load() end
+-- The settings page (the gear): settings.luau
+st = require("settings")({
+    T = T, call = function(...) return call(...) end, folder = function() return folder end, cfg = function() return cfg end,
+    edit_json = edit_json, PENCIL = PENCIL, DEV = DEV, ALIAS = ALIAS, lang = function() return lang end,
+})
+
+lang_reload = function() load(); if st then st.refresh() end end
 sys.watch("files:" .. CONFIG, function()
-    after(150, load)
+    after(150, function() load(); if st then st.refresh() end end)
 end)
 
 every(1000, function()

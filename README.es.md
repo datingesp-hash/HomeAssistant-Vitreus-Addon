@@ -37,6 +37,19 @@ Necesita un Vitreus con add-ons, y `curl`.
 
 ## Configurar
 
+### En el panel
+
+El engranaje abre los **ajustes**, sobre las fichas, en dos pestañas:
+
+- **Ajustes**: la dirección y el token de Home Assistant, el idioma del panel (cualquier archivo de idioma que encuentre) y los interruptores del certificado propio y de la búsqueda de carátulas. Cada cosa se guarda en cuanto se escribe (Intro, o al pasar a otro campo) o se cambia.
+- **Entidades**: las habitaciones y sus fichas. **+ Entidad** y **+ Habitación** añaden una; un clic en una ficha o en una habitación la abre. Una entidad se busca escribiendo (las sugerencias son las entidades de tu Home Assistant, por id o por nombre); después, su nombre, su tipo (luz o interruptor), su habitación, su icono (los de lápiz y los propios del addon) y lo que le corresponda: el selector de color y el tinte en una luz, la tarjeta de reproductor y mando en un reproductor (el mando se encuentra por su nombre), la tarjeta de impresora 3D (encuentra una impresora Bambu Lab en Home Assistant y rellena sus entidades) y los textos de encendido y apagado. Una habitación tiene su nombre, sus sensores de temperatura y humedad (también sugeridos), y se puede subir, bajar o eliminar.
+
+Los campos se escriben a través de Vitreus, como los suyos: el ratón encima de un campo lo prepara, y un clic en él empieza a escribir. Todo se guarda en `config.json` (en un orden fijo, con sus notas), que se puede seguir editando a mano: **Abrir config.json en el editor**, al final de los ajustes.
+
+![Los ajustes, las entidades y una entidad editándose](docs/es/settings.png)
+
+### A mano
+
 La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre en tu editor con `vitreus-edit`, de Vitreus (`$VISUAL` o `$EDITOR`, el editor de textos del escritorio, o los habituales; si no hay ninguno, el panel lo avisa unos segundos y copia la ruta del archivo; con un Vitreus antiguo sin él, usa `$VISUAL`, `$EDITOR` o `nvim` en una terminal), y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
 
 Mientras no tenga token, el panel es una **demostración**: un aviso arriba dice qué poner en `config.json`, y las habitaciones de debajo (las del ejemplo, o las tuyas) se pueden probar, aunque nada llega a Home Assistant.

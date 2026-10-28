@@ -38,6 +38,19 @@ It needs a Vitreus with add-ons, and `curl`.
 
 ## Set it up
 
+### On the panel
+
+The gear opens the **settings**, over the tiles, in two tabs:
+
+- **Settings**: Home Assistant's address and token, the panel's language (any language file it finds), and the switches for a self-signed certificate and for looking up artwork. Each is saved as soon as it is written (Enter, or moving to another field) or flipped.
+- **Entities**: the rooms and their tiles. **+ Entity** and **+ Room** add one; a click on a tile or a room opens it. An entity is found by typing (the suggestions are Home Assistant's own entities, by id or by name); then its name, its kind (light or switch), its room, its icon (the pencil's and the add-on's own), and what fits it: the colour picker and the tint for a light, the player card and remote for a media player (the remote is found by its name), the 3D printer's card (a Bambu Lab printer is found in Home Assistant and its entities filled in), and the texts for on and off. A room has its name, its temperature and humidity sensors (suggested too), and can be moved up or down or deleted.
+
+The fields are typed through Vitreus, as its own are: the pointer over a field puts it there, and a click on it starts typing. Everything is written to `config.json` (in a fixed order, its notes kept), which can still be edited by hand: **Open config.json in the editor**, at the foot of the settings.
+
+![The settings, the entities, and an entity being edited](docs/en/settings.png)
+
+### By hand
+
 The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor, through Vitreus's `vitreus-edit` (`$VISUAL` or `$EDITOR`, the desktop's text editor, or the usual ones; with no editor at all the panel says so for a few seconds and copies the file's path; an older Vitreus without it uses `$VISUAL`, `$EDITOR` or `nvim` in a terminal), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
 
 Until it has a token, the panel is a **demo**: a banner at the top says what to put in `config.json`, and the rooms below (the example's, or yours) can be tried out, though nothing reaches Home Assistant.
