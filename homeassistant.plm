@@ -104,9 +104,13 @@ scene HomeAssistant {
     text st_title = ""                                // the page's title, while one is being edited
     fact st_content = 0                               // how tall the list is, unscaled
     fact st_sc = 0
-    on change st_list.scroll { st_sc = st_list.scroll }
-    on change st_page { st_list.scroll: 0 }          // (a page opens at its top)
-    on change st_tab { st_list.scroll: 0 }
+    //  The page's list scrolls by itself (`st_sp`), as the tiles' does, and not as a `view:` layout: a named layout is a zone as big as itself, and a zone of the
+    //  add-on's over the shell's field keeps the click from it (the field seemed dead). Its zones under the rows take the wheel everywhere but over the placed
+    //  field, where nothing of the add-on's is left.
+    prop st_sp = 0 ~quick
+    on change st_sp { st_sc = st_sp }
+    on change st_page { st_sp: 0 }                   // (a page opens at its top)
+    on change st_tab { st_sp: 0 }
     model st_rows max 30 { kind: number; label: text; val: text; ph: text; sub: text; x: number; y: number; w: number; h: number; on: number; tone: number }
     model st_sws max 8 { label: text; y: number; on: number }      // the switches (their own model: a switch is a heavy drawing, and few rows are one)
     //  kind: 0 a section's title · 1 a field (label, value or placeholder; `on` 1: it has a value) · 4 a note · 5 a suggestion (label, sub) · 6 a button (`tone`: 0 plain,
@@ -599,12 +603,19 @@ scene HomeAssistant {
                 }
                 //  the page: one list that scrolls, everything in it placed by the logic
                 let stv = max(H - 104 * u - 10 * u, 1)
-                column st_list ~quick {
-                  at: 0, 104 * u
-                  view: W, stv
-                  step: 60 * u
+                let st_most = max(0, st_content * u - stv)
+                //  (above the placed field, and below it: the field itself is left to the shell)
+                let fld_t = clamp(104 * u + (st_fy + 18) * u - st_sp, 104 * u, 104 * u + stv)
+                let fld_b = clamp(fld_t + 38 * u, 104 * u, 104 * u + stv)
+                zone box st_view_z { from: 0, 104 * u; size: W, if(st_fa >= 0, fld_t - 104 * u, stv) }
+                zone box st_view_b { from: 0, fld_b; size: W, 104 * u + stv - fld_b; active: st_fa >= 0 }
+                on scroll st_view_z { st_sp: clamp(st_sp - wheel * 60 * u, 0, st_most) }
+                on scroll st_view_b { st_sp: clamp(st_sp - wheel * 60 * u, 0, st_most) }
+                box { from: W - 7 * u, 104 * u + st_sp / max(st_content * u, 1) * stv; size: 3 * u, stv * stv / max(st_content * u, stv); corner: 1.5 * u; color: ink; opacity: if(st_most > 0.5, 25%, 0%) }
+                group {
+                  clip box { from: 0, 104 * u; size: W, stv }
                   group {
-                    size: W, max(st_content * u, stv)
+                    move: 0, 104 * u - st_sp
                     //  the rows
                     for r in st_rows {
                         let rx = 14 * u + r.x * u
@@ -625,7 +636,9 @@ scene HomeAssistant {
                             text r.val { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: ink; show: act < 0.5 and r.on > 0.5; family: "Space Grotesk" }
                             text r.ph { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: faint; opacity: 60%; show: r.on < 0.5 and (act < 0.5 or not st_fvon); family: "Space Grotesk" }
                         }
-                        zone box st_fz { from: rx, ry + 18 * u; size: rw, 38 * u; corner: 12 * u; cursor: pointer; active: r.kind == 1 and act < 0.5 and st_k > 0.9; label: "{r.label}" }
+                        //  (the field's label and a margin round it too: the shell's field is put there while the pointer is still on its way, so it is already the shell's
+                        //  when the pointer reaches the box and stops; a compositor only finds what is under a pointer when it moves)
+                        zone box st_fz { from: rx - 6 * u, ry - 3 * u; size: rw + 12 * u, 62 * u; corner: 12 * u; cursor: pointer; active: r.kind == 1 and act < 0.5 and st_k > 0.9; label: "{r.label}" }
                         on enter st_fz while not field_kb { emit st_fld(r.index) }
                         on press st_fz { emit st_fld(r.index) }
                         //  a suggestion under a field: what Home Assistant calls it, and its id
