@@ -98,7 +98,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number }      // `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: its own svg, or a Material Symbols name (config.json's "icons": "material") · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number }      // `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: its own svg, or a Material Symbols name (config.json's "icons": "material") · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -129,6 +129,7 @@ scene HomeAssistant {
     fact sl_custom = false                            // the light's icon is an svg of its own (drawn from its record, below)
     //  its colour, for a light that has one: a hue and a saturation, 0 to 1 (Home Assistant's hs_color), chosen on a rainbow or among a few made ones
     fact sl_col = 0                                   // 1: this light's colour is chosen here
+    fact sl_tint = 0                                  // 1: the card is drawn in the light's colour (its tile is too), not the accent
     fact sl_ck = 0                                    // 1: its colour is known (until then the card and the tile keep the accent)
     fact sl_h = 0
     fact sl_s = 0
@@ -396,7 +397,7 @@ scene HomeAssistant {
                     let live = if(sl_open and sl_i == r.index and sl_ck > 0.5, 1, 0)
                     let kh = if(live > 0.5, sl_hs, r.hu)
                     let ks = if(live > 0.5, sl_ss, r.sa)
-                    let kk = if(r.cc > 0.5 and (r.hk > 0.5 or live > 0.5), 1, 0)
+                    let kk = if(r.ct > 0.5 and (r.hk > 0.5 or live > 0.5), 1, 0)
                     //  (the colours are drawn a little softer than the light's, as the shell's accents are; a dark one takes a light icon)
                     let kdark = if(kk > 0.5 and 0.3 * (1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))) < 0.6, 1, 0)
                     let lit = r.on * r.avail
@@ -409,7 +410,7 @@ scene HomeAssistant {
                         opacity: if(r.avail > 0.5, 100%, 45%)
                         zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { emit hl_tap(r.index) }
-                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
+                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
                         on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
                         on press right hl_tile_z while r.tvr > 0.5 { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
@@ -526,7 +527,7 @@ scene HomeAssistant {
                 let tw2 = cw - 44 * u
                 let ty = ct + 98 * u
                 let kx = tl + 17 * u + (tw2 - 34 * u) * sl_vs
-                let lk = if(sl_col > 0.5 and sl_ck > 0.5, 1, 0)       // the light's own colour, known: the disc and the track take it
+                let lk = if(sl_tint > 0.5 and sl_ck > 0.5, 1, 0)      // the light's own colour, known, and asked for ("tint"): the disc and the track take it
                 let ldark = if(lk > 0.5 and 0.3 * (1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))) < 0.6, 1, 0)
                 //  first the veil over the tiles, which shuts it (declared before the card, so the card's zones win over it)
                 //  (over all of Vitreus's glass, not only the content: past it by the glass's margin at the sides and the foot (14) and the title bar on top (38),
@@ -609,8 +610,8 @@ scene HomeAssistant {
                     }
                     //  in pencil, as the sliders: a crooked outline round it, and a ring for a knob around the hue (faded while the colour is a white, which has none)
                     PRound(x: tl, y: hy - 11 * u, w: tw2, h: 22 * u, r: 11 * u, s: 87, wd: 1.5 * u, c: ink, a: 0.55, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
-                    PCir(cx: hx, cy: hy, rad: 13 * u, s: 89, wd: 1.6 * u, c: ink, a: if(lk > 0.5 and sl_s > 0.05, 0.95, 0.45), gapk: -1, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
-                    ellipse { at: hx, hy; radius: 8 * u; color: rgb(0.15 + 0.85 * clamp(abs(sl_hs * 6 - 3) - 1, 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 2), 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 4), 0, 1)); opacity: if(lk > 0.5 and sl_s > 0.05, 100%, 40%) }
+                    PCir(cx: hx, cy: hy, rad: 13 * u, s: 89, wd: 1.6 * u, c: ink, a: if(sl_ck > 0.5 and sl_s > 0.05, 0.95, 0.45), gapk: -1, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
+                    ellipse { at: hx, hy; radius: 8 * u; color: rgb(0.15 + 0.85 * clamp(abs(sl_hs * 6 - 3) - 1, 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 2), 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 4), 0, 1)); opacity: if(sl_ck > 0.5 and sl_s > 0.05, 100%, 40%) }
                     zone box sl_hue_z { from: tl - 6 * u, hy - 18 * u; size: tw2 + 12 * u, 36 * u; corner: 18 * u; cursor: pointer; label: "{t_color}: {sl_name}"; role: slider; value: "{sl_hs * 360}" }
                     on press sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); sl_cdirty = true }
                     on drag sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_cdirty = true }
@@ -624,7 +625,7 @@ scene HomeAssistant {
                         let sy = ct + 270 * u
                         let ph = pick(i, 0, 0.09, 0, 0.07, 0.14, 0.33, 0.5, 0.64, 0.76, 0.89)
                         let ps = pick(i, 0, 0.5, 1, 1, 1, 1, 1, 1, 1, 1)
-                        let here = lk > 0.5 and abs(sl_s - ps) < 0.02 and (ps < 0.01 or abs(sl_h - ph) < 0.01)
+                        let here = sl_ck > 0.5 and abs(sl_s - ps) < 0.02 and (ps < 0.01 or abs(sl_h - ph) < 0.01)
                         zone box sl_sw_z.$i { at: sx, sy; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: "{t_color} {i + 1}" }
                         on press sl_sw_z.$i { sl_h = ph; sl_s = ps; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); emit hl_color(round(ph * 360) * 1000 + round(ps * 100)); sl_cdirty = false }
                         box { at: sx, sy; size: 34 * u, 34 * u; corner: 17 * u; stroke: 2 * u; color: ink; opacity: if(here, 90%, 12% * sl_sw_z.$i.hover) }

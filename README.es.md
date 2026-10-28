@@ -8,7 +8,7 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 
 - **Habitaciones**, cada una con su nombre y, si le pones sensores, su temperatura y humedad.
 - **Clic** en una ficha: enciende o apaga. **Clic derecho** en una luz: abre el control de brillo (arrastra, usa la rueda o pulsa Apagar / 25 / 50 / 75 / 100 %).
-- **Colores**: una luz con `"color": true` tiene además en ese control un arcoíris y una fila de colores hechos, y su ficha brilla del color que tiene.
+- **Colores**: una luz con `"color": true` tiene además en ese control un arcoíris y una fila de colores hechos; con `"tint": true` su ficha y su control se dibujan del color que tiene.
 - **Apple TV**: un clic derecho en su ficha abre una tarjeta con lo que se está reproduciendo (carátula, título, progreso, controles y volumen) y un mando como el Siri Remote, que también se maneja con el teclado.
 - **Impresoras 3D**: un clic derecho en la ficha de una impresora abre una tarjeta con la portada o la cámara, el progreso, los tiempos y sus botones.
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
@@ -59,16 +59,17 @@ Mientras no tenga token, el panel es una **demostración**: un aviso arriba dice
     - `entity`: la entidad, p. ej. `light.salon`.
     - `apple_tv` (opcional): `{ "remote": "remote.salon" }` en la ficha de un Apple TV le da su tarjeta y su mando (abajo).
     - `color` (opcional, solo luces): `true` en una luz que cambia de color (una bombilla RGB, una tira LED). Su control del clic derecho muestra también los colores.
+    - `tint` (opcional, solo luces): `true` dibuja la ficha y el control de la luz en su propio color (el que dice Home Assistant) en vez del color de acento del tema. Sin él, la luz se ve como las demás fichas.
     - `on_text`, `off_text` (opcionales): el texto de debajo cuando está encendido o apagado.
 
 Un `items` suelto fuera de `rooms` también vale: sale arriba, sin título.
 
 ### Colores
 
-Ponle `"color": true` a una luz y su control del clic derecho muestra, debajo del brillo, un arcoíris para arrastrar y diez colores hechos: dos blancos y después la vuelta a la rueda. El círculo y la barra del control toman el color mientras lo eliges, y la ficha también (su círculo, su brillo y su barra), en directo. Elegir un color en una luz apagada la enciende al máximo. El color se manda como `hs_color` de Home Assistant, así que la luz tiene que admitir color (modos `hs`, `rgb`, `rgbw`, `rgbww` o `xy`).
+Ponle `"color": true` a una luz y su control del clic derecho muestra, debajo del brillo, un arcoíris para arrastrar y diez colores hechos: dos blancos y después la vuelta a la rueda. Si además tiene `"tint": true`, el círculo y la barra del control toman el color mientras lo eliges, y la ficha también (su círculo, su brillo y su barra), en directo; sin él se quedan con el color de acento del tema, como las demás fichas. Elegir un color en una luz apagada la enciende al máximo. El color se manda como `hs_color` de Home Assistant, así que la luz tiene que admitir color (modos `hs`, `rgb`, `rgbw`, `rgbww` o `xy`).
 
 ```json
-{ "type": "light", "name": "Tira LED", "icon": "tira-led.svg", "entity": "light.tira_led", "color": true }
+{ "type": "light", "name": "Tira LED", "icon": "tira-led.svg", "entity": "light.tira_led", "color": true, "tint": true }
 ```
 
 ![Los colores](docs/es/color.png)

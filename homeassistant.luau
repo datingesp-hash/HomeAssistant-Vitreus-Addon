@@ -71,7 +71,7 @@ local EXAMPLE = [[{
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
   "_icons": "\"pencil\" (the default): tiles are drawn with Vitreus's pencil icons (lightbulb, floor_lamp, power, bedtime, mode_fan, tv, power_outlet, door_front, home; anything else as a bulb or a power sign). \"material\": any Material Symbols name. An .svg of your own works either way.",
   "icons": "pencil",
-  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. tint: true draws that light's tile and card in its own colour instead of the accent. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
       "name": "Living room",
@@ -890,7 +890,7 @@ show = function()
             end
             rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = own_pic(it) and 1 or 0, dk = dev_k(it), sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
-                cc = it.color and 1 or 0, hk = (it.color and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
+                cc = it.color and 1 or 0, ct = it.tint and 1 or 0, hk = ((it.color or it.tint) and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
                 tvr = it.tv and 1 or 0, pk = pencil_k(it) }
         end
         for k, room in ipairs(cfg.rooms) do
@@ -998,7 +998,7 @@ local function poll()
                 if it.kind == 0 then s.bri = s.on and math.max(0.01, e.bri / 255) or 0 end
                 -- its colour, when it says one (a light that is off says none: the last one is kept)
                 local hs = e.hs
-                if it.color and type(hs) == "table" and tonumber(hs[1]) and tonumber(hs[2]) then
+                if (it.color or it.tint) and type(hs) == "table" and tonumber(hs[1]) and tonumber(hs[2]) then
                     s.hs = { h = (tonumber(hs[1]) % 360) / 360, s = math.max(0, math.min(1, tonumber(hs[2]) / 100)) }
                 end
                 state[i] = s
@@ -1092,6 +1092,7 @@ local function load()
                     bad = not valid(entity),
                     printer = parse_printer(it.printer),
                     color = kind == 0 and it.color == true,          -- its colour is chosen in the card too
+                    tint = kind == 0 and it.tint == true,            -- its tile and card are drawn in its own colour, not the accent
                     tv = parse_tv(it.apple_tv, entity),
                     room = k,
                 }
@@ -1119,7 +1120,7 @@ local function load()
         -- The demo: config.json's own rooms (the example's, the first time), every tile working here and nowhere else: lights on and off at different levels, a colour
         -- on the ones that have one, a print half way, and something playing on a player.
         for i, it in ipairs(items) do
-            state[i] = { known = true, avail = true, on = i % 3 ~= 0 or it.tv ~= nil, bri = 0.35 + 0.15 * (i % 4), hs = it.color and { h = 0.76, s = 0.8 } or nil }
+            state[i] = { known = true, avail = true, on = i % 3 ~= 0 or it.tv ~= nil, bri = 0.35 + 0.15 * (i % 4), hs = (it.color or it.tint) and { h = 0.76, s = 0.8 } or nil }
             if not state[i].on then state[i].bri = 0 end
             if it.printer then
                 local P = it.printer

@@ -8,7 +8,7 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 
 - **Rooms**, each with its name and, if you give it sensors, its temperature and humidity.
 - **A click** turns a tile on or off. **A right click** on a light opens a brightness slider (drag it, use the wheel, or pick off / 25 / 50 / 75 / 100 %).
-- **Colours**: a light with `"color": true` also gets a rainbow and a row of ready colours in that card, and its tile glows in the colour it has.
+- **Colours**: a light with `"color": true` also gets a rainbow and a row of ready colours in that card; with `"tint": true` its tile and card are drawn in the colour it has.
 - **Apple TV**: a right click on its tile opens a card with what is playing (artwork, title, progress, transport and volume) and a remote like the Siri Remote's, which the keyboard drives too.
 - **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
@@ -60,16 +60,17 @@ Until it has a token, the panel is a **demo**: a banner at the top says what to 
     - `entity`: the entity id, e.g. `light.living_room`.
     - `apple_tv` (optional): `{ "remote": "remote.living_room" }` on an Apple TV's tile gives it its card and remote (below).
     - `color` (optional, lights only): `true` for a light whose colour can change (an RGB bulb, an LED strip). Its right click card then shows the colours too.
+    - `tint` (optional, lights only): `true` draws the light's tile and card in its own colour (read from Home Assistant) instead of the theme's accent. Without it the light looks like every other tile.
     - `on_text`, `off_text` (optional): the line under the name when it is on or off.
 
 A plain `items` list at the top level (without rooms) works too: it is shown first, with no title.
 
 ### Colours
 
-Give a light `"color": true` and its right click card shows, below the brightness, a rainbow to drag along and ten ready colours: two whites, then around the wheel. The card's disc and track take the colour as you choose it, and so does the tile (its disc, its glow and its brightness bar), live. Choosing a colour on a light that is off turns it on at full brightness. The colour is sent as Home Assistant's `hs_color`, so the light has to support colour (`hs`, `rgb`, `rgbw`, `rgbww` or `xy` colour modes).
+Give a light `"color": true` and its right click card shows, below the brightness, a rainbow to drag along and ten ready colours: two whites, then around the wheel. With `"tint": true` too, the card's disc and track take the colour as you choose it, and so does the tile (its disc, its glow and its brightness bar), live; without it they keep the theme's accent, like the other tiles. Choosing a colour on a light that is off turns it on at full brightness. The colour is sent as Home Assistant's `hs_color`, so the light has to support colour (`hs`, `rgb`, `rgbw`, `rgbww` or `xy` colour modes).
 
 ```json
-{ "type": "light", "name": "LED strip", "icon": "led-strip.svg", "entity": "light.led_strip", "color": true }
+{ "type": "light", "name": "LED strip", "icon": "led-strip.svg", "entity": "light.led_strip", "color": true, "tint": true }
 ```
 
 ![The colours](docs/en/color.png)
