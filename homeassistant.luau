@@ -113,7 +113,7 @@ local STR = {
         room = "Habitación %d",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
         hint = "Arrastra la esquina de una ficha", ed_start = "Cambiar el tamaño de las fichas", ed_done = "Terminar", refresh = "Actualizar",
-        edit_cfg = "Editar la configuración", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
+        edit_cfg = "Editar la configuración", no_editor = "No hay editor de texto: instala uno o define $EDITOR. Ruta copiada: %s", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
         title_setup = "Configura Home Assistant", empty = "Aún no hay nada aquí",
         empty_hint = "Añade luces e interruptores en config.json: el engranaje de arriba lo abre.", brightness = "Brillo", close = "Cerrar",
         off_btn = "Apagar", resize = "Cambiar el tamaño de", color = "Color",
@@ -146,7 +146,7 @@ local STR = {
         room = "Room %d",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
         hint = "Drag a tile's corner", ed_start = "Resize the tiles", ed_done = "Done", refresh = "Refresh",
-        edit_cfg = "Edit the settings", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
+        edit_cfg = "Edit the settings", no_editor = "No text editor found: install one or set $EDITOR. Path copied: %s", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
         title_setup = "Set up Home Assistant", empty = "Nothing here yet",
         empty_hint = "Add lights and switches in config.json: the gear above opens it.", brightness = "Brightness", close = "Close",
         off_btn = "Off", resize = "Resize", color = "Colour",
@@ -200,6 +200,7 @@ local WORDS = {
     "ed_done",
     "refresh",
     "edit_cfg",
+    "no_editor",
     "connecting_ha",
     "title_offline",
     "title_setup",
@@ -1341,10 +1342,12 @@ on("hl_refresh", function()
     load()
 end)
 
--- The gear: config.json in the user's editor ($VISUAL, then $EDITOR, then nvim), in a terminal so that one that lives in a terminal works; if that fails,
--- whatever the desktop opens a .json with. A variable with arguments ("code -w") is split on its spaces.
-on("hl_edit", function()
-    local path = folder .. "/" .. CONFIG
+-- The gear: config.json in the user's editor. Vitreus's `vitreus-edit` finds it the same way for every add-on ($VISUAL / $EDITOR, the desktop's
+-- text editor, the usual ones, a terminal one in a terminal) and exits with 3 when there is none: then the head says so for a few seconds, and the
+-- file's path goes to the clipboard, so the gear never seems to do nothing. A Vitreus too old to have it (the command is not found) gets the
+-- add-on's own way below.
+local noed_gen = 0
+local function own_editor(path)
     local editor = "nvim"
     for _, v in ipairs({ "VISUAL", "EDITOR" }) do
         local ok, val = pcall(sys.ask, "env", v)
@@ -1356,6 +1359,22 @@ on("hl_edit", function()
     run("xdg-terminal-exec", args, function(_, code)
         if code ~= 0 then run("xdg-open", { path }, function() end) end
     end)
+end
+on("hl_edit", function()
+    local path = folder .. "/" .. CONFIG
+    local ok = pcall(run, "vitreus-edit", { path }, function(_, code)
+        if code == 3 then
+            noed_gen = noed_gen + 1
+            local mine = noed_gen
+            pcall(run, "wl-copy", { path }, function() end)
+            text.t_noed = T("no_editor", path)
+            fact.hl_noed = true
+            after(8000, function() if mine == noed_gen then fact.hl_noed = false end end)
+        elseif code ~= 0 then
+            own_editor(path)
+        end
+    end)
+    if not ok then own_editor(path) end
 end)
 
 -- The panel resized: as many columns as now fit
