@@ -13,7 +13,8 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 - **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
 - **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
-- **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them.
+- **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them; its switches, sliders and icons are the Control Center's pencil (from Vitreus's add-on template), and the content arrives as the Control Center's does.
+- **A demo** until it is set up: with no token in `config.json` the panel says so in a banner and lets you play with the example's rooms.
 - **Any language**: English by default, Spanish included, and any other from a JSON file you add (French.json, say): `"language"` in its settings picks it.
 - Lights use `light.toggle` / `light.turn_on`; anything else (`input_boolean`, `switch`, `media_player`, scripts…) uses `homeassistant.toggle`.
 
@@ -39,10 +40,15 @@ It needs a Vitreus with add-ons, and `curl`.
 
 The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.json` with an example; the gear in the panel opens it in your editor (`$VISUAL`, then `$EDITOR`, then `nvim`), and the panel reloads when you save it. [`config.example.json`](config.example.json) is the same example.
 
+Until it has a token, the panel is a **demo**: a banner at the top says what to put in `config.json`, and the rooms below (the example's, or yours) can be tried out, though nothing reaches Home Assistant.
+
+![The demo](docs/en/demo.png)
+
 - `language`: the language file to use, by its name: `"English"` (the default, also when it is left out), `"Spanish"`, or one you add (`"French"` for `French.json`). See [Translations](#translations).
 - `url`: your Home Assistant's address, e.g. `http://homeassistant.local:8123`.
 - `token`: a long-lived access token. In Home Assistant: your profile > Security > Long-lived access tokens > Create token.
 - `insecure`: `true` only for https with a self-signed certificate.
+- `icons` (optional): `"pencil"` (the default) draws the tiles with Vitreus's pencil icons, chosen by the icon's name: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (and a few close names); any other name is a bulb for a light and a power sign for a switch. `"material"` draws any [Material Symbols](https://fonts.google.com/icons) name instead. An `.svg` of your own is drawn as it is either way.
 - `artwork_search` (optional): `false` to not look up artwork online for an Apple TV (see its card, below).
 - `rooms`: the rooms, in order. Each has:
   - `name`: shown as its title.
@@ -50,7 +56,7 @@ The first time it runs it writes `~/.local/share/pleamar/homeassistant/config.js
   - `items`: its tiles. Each has:
     - `type`: `"light"` (with brightness) or `"toggle"`.
     - `name`: what the tile says.
-    - `icon`: a [Material Symbols](https://fonts.google.com/icons) name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
+    - `icon`: an icon's name (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: see `icons` above), or one of the add-on's own icons below, or any white `.svg` you put in `~/.local/share/pleamar/homeassistant/`.
     - `entity`: the entity id, e.g. `light.living_room`.
     - `apple_tv` (optional): `{ "remote": "remote.living_room" }` on an Apple TV's tile gives it its card and remote (below).
     - `color` (optional, lights only): `true` for a light whose colour can change (an RGB bulb, an LED strip). Its right click card then shows the colours too.

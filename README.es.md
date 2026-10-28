@@ -13,7 +13,8 @@ Un addon de [Vitreus](https://github.com/natepayn3/Vitreus) que pone tus luces e
 - **Impresoras 3D**: un clic derecho en la ficha de una impresora abre una tarjeta con la portada o la cámara, el progreso, los tiempos y sus botones.
 - **Fichas del tamaño que quieras**: el lápiz pone el panel en modo edición, y el tirador de la esquina de cada ficha la hace más ancha (hasta 4 columnas) o más alta (hasta 3 filas). Los tamaños se guardan.
 - **En la isla**: arrastra la pieza de add-ons a la barra (Ajustes > Bar > Island layout) y el panel se despliega desde la barra como los paneles de la shell.
-- **Estética de Vitreus**: toma la paleta y el tema de la shell, y cambia con ellos.
+- **Estética de Vitreus**: toma la paleta y el tema de la shell, y cambia con ellos; sus interruptores, sliders e iconos son los del Centro de control, a lápiz (de la plantilla de add-ons de Vitreus), y el contenido entra como el del Centro de control.
+- **Una demostración** hasta que lo configuras: sin token en `config.json` el panel lo avisa arriba y deja probar las habitaciones del ejemplo.
 - **En cualquier idioma**: inglés por defecto, español incluido, y cualquier otro con un archivo JSON que añadas (French.json, por ejemplo): `"language"` en su configuración lo elige.
 
 | El panel | Modo edición | Brillo |
@@ -38,10 +39,15 @@ Necesita un Vitreus con add-ons, y `curl`.
 
 La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ejemplo. El engranaje del panel lo abre en tu editor (`$VISUAL`, si no `$EDITOR`, si no `nvim`), y al guardarlo el panel se actualiza solo. [`config.example.json`](config.example.json) es el mismo ejemplo.
 
+Mientras no tenga token, el panel es una **demostración**: un aviso arriba dice qué poner en `config.json`, y las habitaciones de debajo (las del ejemplo, o las tuyas) se pueden probar, aunque nada llega a Home Assistant.
+
+![La demostración](docs/es/demo.png)
+
 - `language`: el archivo de idioma que usar, por su nombre: `"English"` (por defecto, también si no lo pones), `"Spanish"`, o uno que añadas (`"French"` para `French.json`). Ver [Traducciones](#traducciones).
 - `url`: la dirección de tu Home Assistant, p. ej. `http://homeassistant.local:8123`.
 - `token`: un token de larga duración. En Home Assistant: tu perfil > Seguridad > Tokens de acceso de larga duración > Crear token.
 - `insecure`: `true` solo si usas https con un certificado propio.
+- `icons` (opcional): `"pencil"` (por defecto) dibuja las fichas con los iconos a lápiz de Vitreus, elegidos por el nombre del icono: `lightbulb`, `floor_lamp`, `power`, `bedtime`, `mode_fan`, `tv`, `power_outlet`, `door_front`, `home` (y algunos nombres parecidos); cualquier otro sale como una bombilla en una luz y como un símbolo de encendido en un interruptor. `"material"` dibuja cualquier nombre de [Material Symbols](https://fonts.google.com/icons). Un `.svg` propio se dibuja tal cual en los dos casos.
 - `artwork_search` (opcional): `false` para no buscar carátulas en internet para un Apple TV (ver su tarjeta, abajo).
 - `rooms`: las habitaciones, en orden. Cada una lleva:
   - `name`: su nombre, que sale como título.
@@ -49,7 +55,7 @@ La primera vez crea `~/.local/share/pleamar/homeassistant/config.json` con un ej
   - `items`: sus fichas. Cada ficha lleva:
     - `type`: `"light"` (con brillo) o `"toggle"`.
     - `name`: el nombre de la ficha.
-    - `icon`: un nombre de [Material Symbols](https://fonts.google.com/icons) (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…), uno de los iconos propios del addon (abajo), o cualquier `.svg` blanco que pongas en `~/.local/share/pleamar/homeassistant/`.
+    - `icon`: el nombre de un icono (`lightbulb`, `floor_lamp`, `tv`, `bedtime`, `mode_fan`…: ver `icons` arriba), uno de los iconos propios del addon (abajo), o cualquier `.svg` blanco que pongas en `~/.local/share/pleamar/homeassistant/`.
     - `entity`: la entidad, p. ej. `light.salon`.
     - `apple_tv` (opcional): `{ "remote": "remote.salon" }` en la ficha de un Apple TV le da su tarjeta y su mando (abajo).
     - `color` (opcional, solo luces): `true` en una luz que cambia de color (una bombilla RGB, una tira LED). Su control del clic derecho muestra también los colores.

@@ -1,0 +1,35 @@
+language 0.1
+
+//  The theme's own pieces, for an add-on's panel. Import this next to addon-palette.plm and addon-pencil.plm; STYLE.md ("Themes") says when to use them.
+//
+//  What it expects of the scene that imports it (it reads them as the scene's own names, like the palette's colours):
+//    let u = 1.1                  // the panel's unit
+//    fact look = 0                // the theme's shape, which Vitreus sets on the scene: 0 Glass, 1 Retro, 2 UwU, 3 Cyber, 4 Milkbox, 5 Proxy
+//
+//    PThumb   the lit piece of a "pick one of several" control (the News / Weather tabs, the equalizer's presets): a glowing pill on every theme but Proxy, where it is the HUD's
+//             slanted slab, a little taller than its track. Draw the track, the dividers and the labels yourself; this is only what slides under the chosen label.
+
+library Theme {
+    //  `x`, `y`: the middle of the thumb; `w`, `h`: its box in the usual look; `rad`: that look's corner; `th`: how tall the track is (the Proxy slab stands 4 * u taller than it);
+    //  `a`: how visible (0 to 1, the control's own fade).
+    component PThumb(x: number, y: number, w: number, h: number, rad: number, th: number, a: number) {
+        let pxl = if(look == 5, 1, 0)
+        body {
+            color: mint
+            shadow: 0, 0, 10 * u, 44% * a, mint
+            rim: 16%
+            opacity: (1 - pxl) * a
+            box { at: x, y; size: w, h; corner: rad }
+        }
+        //  The Proxy's: a slanted slab (a polygon pulled in by 2 * u and stroked 4 * u wide, so every corner is round), the way the shell's own selectors are.
+        group {
+            show: pxl > 0.5
+            opacity: pxl * a
+            let sw = w + 12 * u
+            let sh = th + 4 * u
+            let sk = 9 * u * sh / (38 * u)
+            path { at: x - sw / 2 + 2 * u, y - sh / 2 + 2 * u; color: mint; move sk, 0; line sw - 4 * u, 0; line sw - 4 * u - sk, sh - 4 * u; line 0, sh - 4 * u; close }
+            path { at: x - sw / 2 + 2 * u, y - sh / 2 + 2 * u; stroke: 4 * u; color: mint; move sk, 0; line sw - 4 * u, 0; line sw - 4 * u - sk, sh - 4 * u; line 0, sh - 4 * u; line sk, 0 }
+        }
+    }
+}

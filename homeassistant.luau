@@ -69,6 +69,8 @@ local EXAMPLE = [[{
   "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
+  "_icons": "\"pencil\" (the default): tiles are drawn with Vitreus's pencil icons (lightbulb, floor_lamp, power, bedtime, mode_fan, tv, power_outlet, door_front, home; anything else as a bulb or a power sign). \"material\": any Material Symbols name. An .svg of your own works either way.",
+  "icons": "pencil",
   "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
@@ -121,6 +123,9 @@ local STR = {
         pr_ends = "Termina %s", pr_ended = "Terminó %s", pause = "Pausar", resume = "Continuar", stop = "Detener", stop_sure = "¿Detener?",
         camera = "Cámara", live = "EN DIRECTO", open_cam = "Abrir la cámara",
         -- an Apple TV's card
+        demo = "Demostración", demo_title = "Modo demostración: todavía sin conectar",
+        demo_hint = "Pon el token y la url de tu Home Assistant y tus entidades en config.json (el engranaje lo abre). Esto es un ejemplo para probar.",
+        demo_task = "Barco de prueba", demo_tv = "Una película de ejemplo",
         tv_off = "Apagado", tv_on = "Encendido", tv_playing = "Reproduciendo", tv_paused = "En pausa", tv_nothing = "No se está reproduciendo nada",
         tab_media = "Reproducción", tab_remote = "Mando", kb_hint = "Teclado: flechas, Intro, Retroceso (atrás) y Espacio (reproducir/pausa)",
         power = "Encender o apagar", up = "Arriba", down = "Abajo", left = "Izquierda", right = "Derecha", select = "Seleccionar", back = "Atrás",
@@ -151,6 +156,9 @@ local STR = {
         pr_ends = "Ends %s", pr_ended = "Ended %s", pause = "Pause", resume = "Resume", stop = "Stop", stop_sure = "Stop?",
         camera = "Camera", live = "LIVE", open_cam = "Open the camera",
         -- an Apple TV's card
+        demo = "Demo", demo_title = "Demo mode: not connected yet",
+        demo_hint = "Put your Home Assistant's token and url, and your entities, in config.json (the gear opens it). This is an example to try.",
+        demo_task = "Test boat", demo_tv = "An example film",
         tv_off = "Off", tv_on = "On", tv_playing = "Playing", tv_paused = "Paused", tv_nothing = "Nothing playing",
         tab_media = "Now playing", tab_remote = "Remote", kb_hint = "Keyboard: arrows, Return, BackSpace (back) and Space (play/pause)",
         power = "Power", up = "Up", down = "Down", left = "Left", right = "Right", select = "Select", back = "Back",
@@ -221,6 +229,11 @@ local WORDS = {
     "camera",
     "live",
     "open_cam",
+    "demo",
+    "demo_title",
+    "demo_hint",
+    "demo_task",
+    "demo_tv",
     "tv_off",
     "tv_on",
     "tv_playing",
@@ -321,6 +334,25 @@ local ALIAS = {
 }
 
 
+-- The icons. By default a tile is drawn with the pencil's icons (addon-pencil.plm's PIcon, as Vitreus's own add-ons are), chosen by the Material Symbols name its
+-- "icon" gives: these names, and anything else as a bulb (a light) or a power sign (a switch). An .svg or .png of its own is drawn as it is. With "icons": "material"
+-- in config.json the names are drawn from the Material Symbols font instead, so any of its icons can be had.
+local PENCIL = {
+    lightbulb = 0, light = 0, bulb = 0, emoji_objects = 0, wb_incandescent = 0, light_group = 0, highlight = 0,
+    desk = 1, floor_lamp = 1, table_lamp = 1, lamp = 1, wall_lamp = 1, lamps = 1,
+    power = 2, power_settings_new = 2, toggle_on = 2, bolt = 2, settings_power = 2,
+    bedtime = 3, nightlight = 3, dark_mode = 3, moon = 3, mode_night = 3,
+    mode_fan = 4, fan = 4, toys_fan = 4, air = 4, heat = 4, ac_unit = 4, mode_heat = 4,
+    tv = 5, desktop_windows = 5, monitor = 5, computer = 5, live_tv = 5, connected_tv = 5, tv_gen = 5, laptop = 5, cast = 5, print = 5,
+    power_outlet = 6, outlet = 6, plug = 6, electrical_services = 6, outlet_power = 6, charger = 6,
+    door_front = 7, door = 7, garage = 7, door_back = 7, door_sliding = 7, garage_home = 7,
+    house = 8, home = 8, cottage = 8, home_iot_device = 8, cabin = 8,
+}
+local function pencil_k(it)
+    if it.file or (cfg and cfg.material) then return -1 end
+    return PENCIL[it.icon] or (it.kind == 0 and 0 or 2)
+end
+
 local function set_state(n, status, msg)
     fact.hl_state = n
     text.hl_status = status
@@ -352,6 +384,8 @@ local function scene_words()
     text.t_open_cam = T("open_cam")
     text.t_b1 = fact.pr_arm == true and T("stop_sure") or T("stop")
     text.t_b2 = T("camera")
+    text.t_demo_title = T("demo_title")
+    text.t_demo_hint = T("demo_hint")
     text.t_tab0 = T("tab_media")
     text.t_tab1 = T("tab_remote")
     text.t_kb = T("kb_hint")
@@ -784,7 +818,7 @@ local function tv_fill()
     end)
 end
 local function tv_poll()
-    if tv_busy or not cfg then return end
+    if tv_busy or not cfg or cfg.demo then return end
     local ids, seen = {}, {}
     for _, it in ipairs(cfg.items) do
         local m = it.tv and it.tv.media
@@ -849,7 +883,7 @@ show = function()
             rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = it.file and 1 or 0, sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
                 cc = it.color and 1 or 0, hk = (it.color and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
-                tvr = it.tv and 1 or 0 }
+                tvr = it.tv and 1 or 0, pk = pencil_k(it) }
         end
         for k, room in ipairs(cfg.rooms) do
             if room.name ~= "" then
@@ -878,6 +912,7 @@ end
 -- curl, with the token from auth.curl. `body`: a JSON text to POST (on curl's input), or nil for a GET. `done(ok, out, err)`.
 call = function(path, body, done)
     if not cfg then return end
+    if cfg.demo then done(true, "[]", nil) return end          -- (the demo asks nothing of anybody: what was pressed has already changed here)
     local args = { "-s", "-K", folder .. "/" .. AUTH, "--max-time", "6", "-w", "\n%{http_code}" }
     if cfg.insecure then args[#args + 1] = "-k" end
     local opts = nil
@@ -904,6 +939,7 @@ end
 
 local function poll()
     if busy or not cfg then return end
+    if cfg.demo then set_state(1, T("demo")); show(); return end
     -- every entity once: the tiles' and the rooms' sensors
     local ids, seen = {}, {}
     local function want(e)
@@ -1017,12 +1053,15 @@ local function load()
     end
     local url = type(c.url) == "string" and c.url:gsub("/+$", "") or ""
     local token = type(c.token) == "string" and c.token or ""
-    if not url:match("^https?://.+") then
+    local demo = token == "" or token == "PEGA_AQUI_TU_TOKEN" or token == "PASTE_YOUR_TOKEN_HERE"
+    fact.hl_demo = demo
+    fact.hl_mat = c.icons == "material"
+    if not demo and not url:match("^https?://.+") then
         set_state(3, T("not_set"), T("need_url"))
         show()
         return
     end
-    if token == "" or token == "PEGA_AQUI_TU_TOKEN" or token == "PASTE_YOUR_TOKEN_HERE" or not token:match("^[%w%._%-]+$") then
+    if not demo and not token:match("^[%w%._%-]+$") then
         set_state(3, T("not_set"), T("need_token"))
         show()
         return
@@ -1067,7 +1106,31 @@ local function load()
             add_items(r.items, k)
         end
     end
-    cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false }
+    cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false and not demo, material = c.icons == "material", demo = demo }
+    if demo then
+        -- The demo: config.json's own rooms (the example's, the first time), every tile working here and nowhere else: lights on and off at different levels, a colour
+        -- on the ones that have one, a print half way, and something playing on a player.
+        for i, it in ipairs(items) do
+            state[i] = { known = true, avail = true, on = i % 3 ~= 0 or it.tv ~= nil, bri = 0.35 + 0.15 * (i % 4), hs = it.color and { h = 0.76, s = 0.8 } or nil }
+            if not state[i].on then state[i].bri = 0 end
+            if it.printer then
+                local P = it.printer
+                if P.status then est[P.status] = { st = "running", unit = "", pic = "", tm = "" } end
+                if P.progress then est[P.progress] = { st = "62", unit = "%", pic = "", tm = "" } end
+                if P.remaining then est[P.remaining] = { st = "83", unit = "min", pic = "", tm = "" } end
+                if P.task then est[P.task] = { st = T("demo_task"), unit = "", pic = "", tm = "" } end
+                if P.start then est[P.start] = { st = "", unit = "", pic = "", tm = "14:02" } end
+                if P["end"] then est[P["end"]] = { st = "", unit = "", pic = "", tm = "16:30" } end
+            end
+            if it.tv and it.tv.media then
+                tvs[it.tv.media] = { st = "playing", title = T("demo_tv"), artist = "", series = "", app = "TV", dur = 5400, pos = 1500, el = 0, pic = "", vol = 0.5, ctype = "movie", at = tick }
+            end
+        end
+        set_state(1, T("demo"))
+        layout()
+        show()
+        return
+    end
     local wrote = pcall(sys.call, "files.write", AUTH, 'header = "Authorization: Bearer ' .. token .. '"\n')
     if not wrote then
         set_state(2, T("offline"), T("no_auth"))
