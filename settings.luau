@@ -793,8 +793,35 @@ return function(api)
         after(120, function() busy_place = false; if fa >= 0 then place() end end)
     end)
 
+    -- A tile carried to another place in edit mode (homeassistant.luau finds where): out of its room's list, into the other's, before the tile it was dropped on
+    -- (in its own list, it takes that tile's place), or at the end. `room` 0 is the top level's items.
+    local function move_item(fr, fi, tr, ti)
+        local c = read_cfg()
+        if not c then return end
+        local function list_of(room)
+            if room == 0 then return type(c.items) == "table" and c.items or nil end
+            local r = type(c.rooms) == "table" and c.rooms[room] or nil
+            if type(r) ~= "table" then return nil end
+            r.items = type(r.items) == "table" and r.items or {}
+            return r.items
+        end
+        local src, dst = list_of(fr), list_of(tr)
+        if not src or not dst or type(src[fi]) ~= "table" then return end
+        if src == dst and ti == fi then return end
+        local it = table.remove(src, fi)
+        if ti then
+            ti = math.max(1, math.min(#dst + 1, ti))
+            table.insert(dst, ti, it)
+        else
+            dst[#dst + 1] = it
+        end
+        if type(c.items) == "table" and #c.items == 0 then c.items = nil end
+        write_cfg(c)
+    end
+
     -- after config.json was read again (saved here or by hand): the page shows it, and the field stays where it is
     return {
+        move_item = move_item,
         refresh = function()
             if fact.st_open ~= true then return end
             local keep = fa

@@ -294,7 +294,19 @@ scene HomeAssistant {
     follow sl_vs = sl_v
 
     fact hl_sc = 0                                    // how far the list has scrolled, for what is inside it (a layout cannot read its own `scroll` from within)
-    on change hl_list.scroll { hl_sc = hl_list.scroll }
+    //  The tiles' list scrolls by itself (`hl_sp`): the wheel, and a drag that starts on it, except in edit mode, where a drag pulls a tile's corner or carries a
+    //  tile (a layout with `view:` scrolls with any drag that starts on it, so pulling a corner scrolled the list).
+    prop hl_sp = 0 ~quick
+    fact hl_grab = 0
+    on change hl_sp { hl_sc = hl_sp }
+    //  Edit mode: a tile carried to another place (`mv_i`), how far it has gone, and where its middle is now (the tile under it is where it lands)
+    fact mv_i = -1
+    fact mv_dx = 0
+    fact mv_dy = 0
+    fact mv_cx = 0
+    fact mv_cy = 0
+    event hl_move ->                                  // dropped: its place × 10 000 000 + where its middle is, x × 10 000 + y (unscaled, from the list's top left)
+    text t_rz = ""                                    // the size a tile being pulled would take ("½ × 1", "2 × 1"…)
     prop hl_spin = 0
     spin hl_spin by if(hl_state == 0, 1, 0)
 
@@ -320,10 +332,12 @@ scene HomeAssistant {
     let gap = 10 * u
     let cols = max(1, hl_cols)
     let tw = (W - 2 * gx - (cols - 1) * gap) / cols
+    let hw = (tw - gap) / 2                            // half a column: the grid is laid out in halves (a tile takes one, an icon only, or two or more)
     let th = 74 * u
     let vh = max(H - gtop - 12 * u, 1)
     let content = hl_content * u
     let most = max(0, content - vh)
+    on change most while hl_sp > most { hl_sp: most }
 
 
     group {
@@ -384,14 +398,17 @@ scene HomeAssistant {
             opacity: en2 * (1 - st_k)
             move: 0, (1 - en2) * 12 * u
             //  ── the rooms and their tiles ──
-            //  One list that scrolls as the shell's own do (the wheel, a drag, the layout's spring): what it holds is laid out by the logic, in a single piece
-            //  as tall as all of it, so everything below is in that piece's own place, from its top (`hl_sc` is how far it has gone).
-            column hl_list ~quick {                  // (the spring the control centre's lists glide with: without one a list jumps a notch at a time)
-              at: 0, gtop
-              view: W, vh
-              step: if(sl_open, 0, 80 * u)          // most of a row of tiles a notch (none while the slider is over it: the wheel is the slider's then)
+            //  One list that scrolls as the shell's own do (the wheel, a drag, the spring they glide with): what it holds is laid out by the logic, in a single piece
+            //  as tall as all of it, so everything below is in that piece's own place, from its top (`hl_sc` is how far it has gone). Under the tiles, a zone the
+            //  size of the view takes the wheel and the drag; a drag that starts on a tile reaches it too (any zone under the press does), but not in edit mode.
+            zone box hl_view_z { from: 0, gtop; size: W, vh }
+            on scroll hl_view_z while not sl_open and not st_open { hl_sp: clamp(hl_sp - wheel * 80 * u, 0, most) }
+            on press hl_view_z { hl_grab = hl_sp }
+            on drag hl_view_z while not hl_editing and mv_i < 0 and rz_i < 0 { hl_sp: clamp(hl_grab - drag.dy, 0, most) }
+            group {
+              clip box { from: 0, gtop; size: W, vh }
               group {
-                size: W, max(content, vh)
+                move: 0, gtop - hl_sp
                 //  a room's head: its name, and after it the temperature and the humidity, each with its sign, when the room has a sensor for them
                 for rm in hl_rooms {
                     let hy = rm.yu * u
@@ -413,9 +430,10 @@ scene HomeAssistant {
                     let held = rz_i == r.index
                     let tcs = if(held, rz_w, r.cs)
                     let trs = if(held, rz_h, r.rs)
-                    let cx0 = gx + r.col * (tw + gap)
+                    let cx0 = gx + r.col * (hw + gap)
                     let cy0 = r.yu * u
-                    let tww = tcs * tw + (tcs - 1) * gap        // the tile's own size: as many cells as it takes, and the gaps between them
+                    let tww = tcs * hw + (tcs - 1) * gap        // the tile's own size: as many half columns as it takes, and the gaps between them
+                    let small = if(tcs <= 1.5, 1, 0)            // half a column: the icon alone, in the middle
                     let thh = trs * th + (trs - 1) * gap
                     let tall = if(trs >= 2, 1, 0)               // two rows or more: the disc at the top, the name and the rest along the bottom
                     let seen = cy0 - hl_sc > -thh and cy0 - hl_sc < vh
@@ -429,22 +447,26 @@ scene HomeAssistant {
                     //  (the colours are drawn a little softer than the light's, as the shell's accents are; a dark one takes a light icon)
                     let kdark = if(kk > 0.5 and 0.3 * (1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))) < 0.6, 1, 0)
                     let lit = r.on * r.avail
-                    let dx = cx0 + mix(33, 36, tall) * u          // the disc's middle
-                    let dy = mix(cy0 + thh / 2, cy0 + 36 * u, tall)
+                    let dx = if(small > 0.5, cx0 + tww / 2, cx0 + mix(33, 36, tall) * u)          // the disc's middle
+                    let dy = if(small > 0.5, cy0 + thh / 2, mix(cy0 + thh / 2, cy0 + 36 * u, tall))
+                    let carried = if(mv_i == r.index, 1, 0)
+                    let under = if(mv_i >= 0 and carried < 0.5 and mv_cx > cx0 and mv_cx < cx0 + tww and mv_cy > cy0 and mv_cy < cy0 + thh, 1, 0)
                     let tx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)                   // where the name starts, and how wide it may be
                     let tmax = tww - mix(if(r.kind == 1, 112, 72), 36, tall) * u
                     let ny = mix(cy0 + thh / 2 - 9 * u, cy0 + thh - if(r.kind == 0 and lit > 0.5, 46, 38) * u, tall)
                     group {
-                        opacity: if(r.avail > 0.5, 100%, 45%)
+                        opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.15 * carried)
+                        move: mv_dx * carried, mv_dy * carried
                         zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
-                        on press hl_tile_z { emit hl_tap(r.index) }
+                        on press hl_tile_z { hl_grab = hl_sp; emit hl_tap(r.index) }
                         on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
                         on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
                         on press right hl_tile_z while r.tvr > 0.5 { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held, mint, ink); opacity: hl_ed * if(held, 90%, 22%) }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held or carried > 0.5 or under > 0.5, mint, ink); opacity: hl_ed * if(held or carried > 0.5 or under > 0.5, 90%, 22%) }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 12% * under }
                         //  the disc: hollow when off, lit and glowing when on (a little larger in a tall tile)
                         body {
                             color: mix(off, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), lit)
@@ -465,11 +487,11 @@ scene HomeAssistant {
                             HDev(k: max(r.dk, 0), cx: dx, cy: dy, c: mix(ink, if(kdark > 0.5, ink, onmint), lit), a: 1, s: 5 + r.index * 13, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0), z: 0.92 + 0.15 * tall)
                         }
                         //  the name and how it is
-                        text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; family: "Space Grotesk" }
-                        text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; color: if(lit > 0.5, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), faint); family: "Space Grotesk" }
+                        text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; show: small < 0.5; family: "Space Grotesk" }
+                        text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; show: small < 0.5; color: if(lit > 0.5, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), faint); family: "Space Grotesk" }
                         //  a light: how bright, along the bottom
                         group {
-                            show: r.kind == 0 and lit > 0.5
+                            show: r.kind == 0 and lit > 0.5 and small < 0.5
                             let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
                             let bw = mix(tww - 76 * u, tww - 36 * u, tall)
                             //  (the Control Center's little slider, at the foot of a lit light, as the add-on template has it; it boils under the pointer)
@@ -477,7 +499,7 @@ scene HomeAssistant {
                         }
                         //  a printer: the print's progress along the bottom, while one runs
                         group {
-                            show: r.prn > 0.5 and r.pp >= 0 and not (r.kind == 0 and lit > 0.5)
+                            show: r.prn > 0.5 and r.pp >= 0 and not (r.kind == 0 and lit > 0.5) and small < 0.5
                             let px0 = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
                             let pw0 = mix(tww - if(r.kind == 1, 116, 76) * u, tww - 36 * u, tall)
                             box { from: px0, cy0 + thh - 13 * u; size: pw0, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
@@ -486,7 +508,7 @@ scene HomeAssistant {
                         //  a switch: the Control Center's (addon-pencil.plm's PSwitch: grey and hollow off, lit and wider on, the knob stretching as it travels), top right in
                         //  a tall tile; its pencil outline boils while it is on or under the pointer, as the shell's
                         group {
-                            show: r.kind == 1
+                            show: r.kind == 1 and small < 0.5
                             let sy = mix(cy0 + thh / 2, cy0 + 30 * u, tall)
                             PSwitch(sx: cx0 + tww - 36 * u, sy: sy, on: lit, av: 1, s: 7 + r.index, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0))
                         }
@@ -497,18 +519,23 @@ scene HomeAssistant {
                             ellipse { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; radius: 11 * u; color: mint; opacity: if(held, 100%, 80% + 20% * hl_grip_z.hover) }
                             HUi(k: 6, cx: cx0 + tww - 15 * u, cy: cy0 + thh - 15 * u, c: onmint, a: 1, s: 451, f: 0, z: 0.5)
                             box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
-                            text "{rz_w} × {rz_h}" { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
+                            text t_rz { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
                         }
+                        //  edit mode: the tile itself is carried to another place (it follows the pointer; the tile under its middle lights, and it lands there)
+                        zone box hl_mv_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and seen and rz_i < 0 and (mv_i < 0 or carried > 0.5); label: "{r.name}" }
+                        on press hl_mv_z { mv_i = r.index; mv_dx = 0; mv_dy = 0; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2 }
+                        on drag hl_mv_z while mv_i == r.index { mv_dx = drag.dx; mv_dy = drag.dy; mv_cx = cx0 + tww / 2 + drag.dx; mv_cy = cy0 + thh / 2 + drag.dy }
+                        on release hl_mv_z while mv_i == r.index { emit hl_move(r.index * 10000000 + clamp(round(mv_cx / u), 0, 999) * 10000 + clamp(round(mv_cy / u), 0, 9999)); mv_i = -1; mv_dx = 0; mv_dy = 0 }
                         zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "{t_resize} {r.name}" }
                         on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
-                        on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (tw + gap)), 1, cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
+                        on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (hw + gap)), 1, 2 * cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
                         on release hl_grip_z { rz_i = -1 }
                     }
                 }
               }
             }
             //  how far down the list is, when it does not all fit
-            box { from: W - 7 * u, gtop + hl_list.scroll / max(content, 1) * vh; size: 3 * u, vh * vh / max(content, vh); corner: 1.5 * u; color: ink; opacity: if(most > 0.5, 25%, 0%) }
+            box { from: W - 7 * u, gtop + hl_sp / max(content, 1) * vh; size: 3 * u, vh * vh / max(content, vh); corner: 1.5 * u; color: ink; opacity: if(most > 0.5, 25%, 0%) }
 
             }
             group {

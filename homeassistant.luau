@@ -110,7 +110,7 @@ local STR = {
         bad = "Entidad no válida: %s", unavailable = "No disponible", light_on = "Encendida", light_off = "Apagada", on = "Activado", off = "Desactivado",
         room = "Habitación %d",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
-        hint = "Arrastra la esquina de una ficha", ed_start = "Cambiar el tamaño de las fichas", ed_done = "Terminar", refresh = "Actualizar",
+        hint = "Arrastra una ficha para moverla, o su esquina para cambiar su tamaño", ed_start = "Cambiar el tamaño de las fichas", ed_done = "Terminar", refresh = "Actualizar",
         edit_cfg = "Editar la configuración", no_editor = "No hay editor de texto: instala uno o define $EDITOR. Ruta copiada: %s", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
         title_setup = "Configura Home Assistant", empty = "Aún no hay nada aquí",
         empty_hint = "Añade luces e interruptores en config.json: el engranaje de arriba lo abre.", brightness = "Brillo", close = "Cerrar",
@@ -162,7 +162,7 @@ local STR = {
         bad = "Invalid entity: %s", unavailable = "Unavailable", light_on = "On", light_off = "Off", on = "On", off = "Off",
         room = "Room %d",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
-        hint = "Drag a tile's corner", ed_start = "Resize the tiles", ed_done = "Done", refresh = "Refresh",
+        hint = "Drag a tile to move it, or its corner to resize it", ed_start = "Resize the tiles", ed_done = "Done", refresh = "Refresh",
         edit_cfg = "Edit the settings", no_editor = "No text editor found: install one or set $EDITOR. Path copied: %s", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
         title_setup = "Set up Home Assistant", empty = "Nothing here yet",
         empty_hint = "Add lights and switches in config.json: the gear above opens it.", brightness = "Brightness", close = "Close",
@@ -535,14 +535,15 @@ local function layout()
             return true
         end
         local rows = 0
+        local halves = cols * 2          -- (in half columns: a tile takes one, the icon alone, or two, a column, or more; its size is kept in columns, 0.5 for a half)
         for i, it in ipairs(cfg.items) do
             if it.room == k then
                 local sz = sizes[it.entity] or {}
-                local cs = math.max(1, math.min(cols, tonumber(sz[1]) or 1))
+                local cs = math.max(1, math.min(halves, math.floor((tonumber(sz[1]) or 1) * 2 + 0.5)))
                 local rs = math.max(1, math.min(3, tonumber(sz[2]) or 1))
                 local r, done = 0, false
                 while not done do
-                    for c = 0, cols - cs do
+                    for c = 0, halves - cs do
                         if free(r, c, cs, rs) then
                             for rr = r, r + rs - 1 do
                                 occ[rr] = occ[rr] or {}
@@ -1167,8 +1168,8 @@ local function load()
         return
     end
     local rooms, items = {}, {}
-    local function add_items(list, k)
-        for _, it in ipairs(type(list) == "table" and list or {}) do
+    local function add_items(list, k, croom)
+        for n, it in ipairs(type(list) == "table" and list or {}) do
             if type(it) == "table" and type(it.entity) == "string" and #items < MAX_ITEMS then
                 local entity = it.entity
                 local kind = (it.type == "light" or (it.type == nil and entity:match("^light%."))) and 0 or 1
@@ -1187,24 +1188,26 @@ local function load()
                     tint = kind == 0 and it.tint == true,            -- its tile and card are drawn in its own colour, not the accent
                     tv = parse_tv(it.apple_tv, entity),
                     room = k,
+                    croom = croom, cidx = n,         -- where it is in config.json: the room there (0: the top level's items) and its place in it
                 }
             end
         end
     end
     -- the tiles at the top level (a config.json from before rooms, or tiles that belong to none): a room with no name, first
     if type(c.items) == "table" and #c.items > 0 then
-        rooms[1] = { name = "" }
-        add_items(c.items, 1)
+        rooms[1] = { name = "", croom = 0 }
+        add_items(c.items, 1, 0)
     end
-    for _, r in ipairs(type(c.rooms) == "table" and c.rooms or {}) do
+    for cr, r in ipairs(type(c.rooms) == "table" and c.rooms or {}) do
         if type(r) == "table" and #rooms < MAX_ROOMS then
             local k = #rooms + 1
             rooms[k] = {
                 name = type(r.name) == "string" and r.name or T("room", k),
                 temp = valid(r.temperature) and r.temperature or nil,
                 hum = valid(r.humidity) and r.humidity or nil,
+                croom = cr,
             }
-            add_items(r.items, k)
+            add_items(r.items, k, cr)
         end
     end
     cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false and not demo, demo = demo }
@@ -1302,14 +1305,59 @@ on("hl_color", function(v)
     end)
 end)
 
+-- A size as it is shown while it is pulled: columns (½ for half of one) × rows
+function size_words(hs, rs)
+    local whole, half = math.floor(hs / 2), hs % 2 == 1
+    return ((whole > 0 and tostring(whole) or "") .. (half and "½" or "")) .. " × " .. tostring(rs)
+end
+on("fact:rz_i", function(v)
+    local i = (tonumber(v) or -1) + 1
+    local p = place[i]
+    if p then text.t_rz = size_words(p.cs, p.rs) end
+end)
+
+-- A tile carried to another place in edit mode: it takes the place of the tile it was dropped on (into that one's room), or goes to the end of the room it
+-- was dropped in. config.json is written (settings.luau keeps it in order) and read again.
+on("hl_move", function(code)
+    code = math.floor(tonumber(code) or -1)
+    if code < 0 or not cfg then return end
+    local i = math.floor(code / 10000000) + 1
+    local px, py = math.floor(code % 10000000 / 10000), code % 10000
+    local it = cfg.items[i]
+    if not it or not st then return end
+    local cols = columns()
+    local W = (tonumber(fact.slot_w) or 520) / 1.1
+    local tw = (W - 28 - (cols - 1) * GAP) / cols
+    local hw = (tw - GAP) / 2
+    local target = nil
+    for j, p in pairs(place) do
+        local x0, y0 = 14 + p.col * (hw + GAP), p.yu
+        local w, h = p.cs * hw + (p.cs - 1) * GAP, p.rs * TH + (p.rs - 1) * GAP
+        if j ~= i and px >= x0 and px <= x0 + w and py >= y0 and py <= y0 + h then target = j; break end
+    end
+    if target then
+        local to = cfg.items[target]
+        st.move_item(it.croom, it.cidx, to.croom, to.cidx)
+        return
+    end
+    -- no tile there: the room it was dropped in (the last whose head is above it)
+    local room = nil
+    for k = 1, #cfg.rooms do
+        local top = room_yu[k] or 0
+        if py >= top then room = k end
+    end
+    if room and cfg.rooms[room] then st.move_item(it.croom, it.cidx, cfg.rooms[room].croom, nil) end
+end)
+
 -- A tile pulled to a new size in edit mode: the others make room at once, and it is kept
 local save_due = false
 on("hl_resize", function(k)
     local it = cfg and cfg.items[(tonumber(k) or -1) + 1]
     if not it then return end
-    local cs = math.max(1, math.min(4, math.floor((tonumber(fact.rz_w) or 1) + 0.5)))
+    local hs = math.max(1, math.min(8, math.floor((tonumber(fact.rz_w) or 2) + 0.5)))       -- in half columns
     local rs = math.max(1, math.min(3, math.floor((tonumber(fact.rz_h) or 1) + 0.5)))
-    sizes[it.entity] = { cs, rs }
+    sizes[it.entity] = { hs / 2, rs }
+    text.t_rz = size_words(hs, rs)
     layout()
     show()
     if not save_due then

@@ -11,7 +11,7 @@ A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that puts your Home Ass
 - **Colours**: a light with `"color": true` also gets a rainbow and a row of ready colours in that card; with `"tint": true` its tile and card are drawn in the colour it has.
 - **Apple TV**: a right click on its tile opens a card with what is playing (artwork, title, progress, transport and volume) and a remote like the Siri Remote's, which the keyboard drives too.
 - **3D printers**: a right click on a printer's tile opens a card with the print's cover or camera, its progress and times, and its buttons.
-- **Tiles of any size**: the pencil puts the panel in edit mode, and the handle in each tile's corner pulls it wider (up to 4 columns) or taller (up to 3 rows). Sizes are kept.
+- **Tiles of any size, anywhere**: the pencil puts the panel in edit mode. The handle in each tile's corner pulls it wider or narrower in half columns (half a column shows the icon alone; up to 4 columns) or taller (up to 3 rows), and a tile dragged by its middle goes where it is dropped: in the place of the tile under it, or at the end of another room. Sizes and order are kept.
 - **On the Island**: drag the add-ons piece onto the bar (Settings > Bar > Island layout) and the panel drops from the bar like the shell's own panels.
 - **Vitreus's look**: it takes the palette and the theme from the shell, and changes with them; its switches, sliders and icons are the Control Center's pencil (from Vitreus's add-on template), and the content arrives as the Control Center's does.
 - **A demo** until it is set up: with no token in `config.json` the panel says so in a banner and lets you play with the example's rooms.
