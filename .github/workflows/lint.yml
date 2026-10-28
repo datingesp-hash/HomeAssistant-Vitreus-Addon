@@ -1,0 +1,16 @@
+# Checks the add-on against Vitreus's add-on style on every push and pull request, with the same check Vitreus runs on its bundled add-ons
+# (bin/vitreus-sync-addons lint, from Vitreus's main branch). It does not compile the scene (pleamar is not installed here): run `pleamar --check` locally for that.
+name: Vitreus lint
+on:
+  push:
+  pull_request:
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: addon }
+      - uses: actions/checkout@v4
+        with: { repository: natepayn3/Vitreus, path: vitreus }
+      - name: Lint against STYLE.md
+        run: python3 vitreus/bin/vitreus-sync-addons lint addon
