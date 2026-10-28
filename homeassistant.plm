@@ -18,7 +18,7 @@ scene HomeAssistant {
 
     permissions {
         services: "files", "files.write", "env"
-        run: "curl", "xdg-terminal-exec", "xdg-open"
+        run: "curl", "xdg-terminal-exec", "xdg-open", "vitreus-edit", "wl-copy"
     }
 
     fact pal_ink_r = 0.9608
@@ -88,6 +88,10 @@ scene HomeAssistant {
     text t_hint = ""                                  // edit mode's hint, in the head
     text t_ed = ""                                    // the pencil's name: what pressing it does now
     text t_refresh = ""
+    text t_noed = ""                                  // the gear found no text editor: what to do, for a few seconds in the head (`hl_noed`)
+    fact hl_noed = false
+    prop hl_ne = 0 ~calm
+    follow hl_ne = if(hl_noed, 1, 0)
     text t_edit_cfg = ""                              // the gear's name, and the button of the panel that is not set up
     text t_connecting = ""
     text t_title = ""                                 // the empty panel's title: it cannot connect, or it is not set up
@@ -316,7 +320,8 @@ scene HomeAssistant {
             //  ── the head: how it is, and the refresh arrow and the gear ──
             ellipse { at: 24 * u, 28 * u; radius: 4 * u; color: pick(hl_state, faint, mint, alert, faint) }
             ellipse { at: 24 * u, 28 * u; radius: 8 * u; color: mint; opacity: if(hl_state == 1, 18%, 0%) }
-            text hl_status { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: faint; opacity: 1 - hl_ed; family: "Space Grotesk" }
+            text hl_status { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: faint; opacity: (1 - hl_ed) * (1 - hl_ne); family: "Space Grotesk" }
+            text t_noed { at: 38 * u, 28 * u; anchor: left center; size: 11.5; weight: 600; width: W - 190 * u; lines: 2; color: alert; opacity: hl_ne * (1 - hl_ed); family: "Space Grotesk" }
             text t_hint { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: mint; opacity: hl_ed; family: "Space Grotesk" }
 
             //  the pencil: edit mode (lit, a tick, while it is on)
