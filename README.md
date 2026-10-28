@@ -129,7 +129,7 @@ These are the [Bambu Lab integration](https://github.com/greghesp/ha-bambulab)'s
 
 ### The add-on's own icons
 
-For what Material Symbols has no good icon for. They are drawn on Material's grid and tinted the same way. Each has an English and a Spanish name, and either works in `icon`:
+For what Material Symbols has no good icon for. With the default `"icons": "pencil"` they are drawn in Vitreus's pencil like the rest (they boil under the pointer); with `"material"` they are the white `.svg` files below, tinted the same way. All of the panel's own icons (its buttons, the cards, the remote) are pencil drawings too, from `ha-icons.plm`, which `tools/icons.py` writes from a table of strokes. Each has an English and a Spanish name, and either works in `icon`:
 
 ![The add-on's icons](docs/en/icons.png)
 

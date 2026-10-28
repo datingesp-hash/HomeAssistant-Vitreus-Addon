@@ -1,6 +1,7 @@
 language 0.1
 import "addon-palette.plm"
 import "addon-theme.plm"                          // the theme's own pieces (PThumb: the lit tab under the Apple TV card's chosen tab)
+import "ha-icons.plm"                             // the add-on's own icons in the same pencil (HUi: the buttons; HDev: its device icons), made by tools/icons.py
 import "addon-pencil.plm"                         // Vitreus's pencil (its add-on template): the sliders are drawn with it, as the Control Center's
 
 //  Home Assistant, as a Vitreus add-on with a panel: the rooms listed in config.json (the scene's data folder, ~/.local/share/pleamar/homeassistant/),
@@ -74,6 +75,9 @@ scene HomeAssistant {
     text t_demo_title = ""
     text t_demo_hint = ""
     fact hl_mat = false                               // config.json's "icons": "material": icons are Material Symbols names instead of the pencil's
+    fact sl_dk = -1                                   // (the same for the add-on's own icons)
+    fact pr_dk = -1
+    fact tv_dk = -1
     fact sl_pk = 0                                    // the cards' pencil icons (from the tile that opened them)
     fact pr_pk = 6
     fact tv_pk = 5
@@ -94,7 +98,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number }      // `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: its own svg, or a Material Symbols name (config.json's "icons": "material") · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number }      // `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: its own svg, or a Material Symbols name (config.json's "icons": "material") · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -321,17 +325,17 @@ scene HomeAssistant {
                 shadow: 0, 0, 10 * u * hl_ed, 35% * hl_ed, mint
                 ellipse { at: W - 121 * u, 28 * u; radius: 16 * u }
             }
-            text pick(if(hl_editing, 1, 0), "edit", "check") { at: W - 121 * u, 28 * u; anchor: center; size: 19; color: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed); family: "Material Symbols Outlined" }
+            HUi(k: if(hl_editing, 1, 0), cx: W - 121 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed), a: 1, s: 401, f: if(hl_ed_z.hover > 0.5, fr, 0), z: 0.73)
             zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_ed }
             on press hl_ed_z { toggle hl_editing; rz_i = -1 }
 
             ellipse { at: W - 37 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_rf_z.hover }
-            text "refresh" { at: W - 37 * u, 28 * u; anchor: center; size: 20; color: mix(ink, mint, hl_rf_z.hover); family: "Material Symbols Outlined" }
+            HUi(k: 2, cx: W - 37 * u, cy: 28 * u, c: mix(ink, mint, hl_rf_z.hover), a: 1, s: 411, f: if(hl_rf_z.hover > 0.5, fr, 0), z: 0.75)
             zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_refresh }
             on press hl_rf_z { emit hl_refresh }
 
             ellipse { at: W - 79 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_gear_z.hover }
-            text "settings" { at: W - 79 * u, 28 * u; anchor: center; size: 20; color: mix(ink, mint, hl_gear_z.hover); family: "Material Symbols Outlined" }
+            HUi(k: 3, cx: W - 79 * u, cy: 28 * u, c: mix(ink, mint, hl_gear_z.hover), a: 1, s: 421, f: if(hl_gear_z.hover > 0.5, fr, 0), z: 0.7)
             zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_edit_cfg }
             on press hl_gear_z { emit hl_edit }
 
@@ -369,10 +373,10 @@ scene HomeAssistant {
                         show: hy - hl_sc > -40 * u and hy - hl_sc < vh
                         text rm.name { size: 15; weight: 700; color: ink; family: "Space Grotesk" }
                         space 4 * u
-                        text "device_thermostat" { size: 16; color: faint; show: rm.has_t > 0.5; family: "Material Symbols Outlined" }
+                        group { size: 16 * u, 16 * u; show: rm.has_t > 0.5; HUi(k: 4, cx: 8 * u, cy: 8 * u, c: faint, a: 1, s: 431, f: 0, z: 0.62) }
                         text rm.temp { size: 12.5; weight: 600; color: faint; show: rm.has_t > 0.5; family: "Space Grotesk" }
                         space 2 * u
-                        text "water_drop" { size: 15; color: faint; show: rm.has_h > 0.5; family: "Material Symbols Outlined" }
+                        group { size: 15 * u, 16 * u; show: rm.has_h > 0.5; HUi(k: 5, cx: 7.5 * u, cy: 8 * u, c: faint, a: 1, s: 441, f: 0, z: 0.58) }
                         text rm.hum { size: 12.5; weight: 600; color: faint; show: rm.has_h > 0.5; family: "Space Grotesk" }
                     }
                 }
@@ -405,9 +409,9 @@ scene HomeAssistant {
                         opacity: if(r.avail > 0.5, 100%, 45%)
                         zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { emit hl_tap(r.index) }
-                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
-                        on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_pk = r.pk; pr_open = true }
-                        on press right hl_tile_z while r.tvr > 0.5 { tv_i = r.index; tv_pk = r.pk; tv_tab = 0; tv_open = true }
+                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
+                        on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
+                        on press right hl_tile_z while r.tvr > 0.5 { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
@@ -427,6 +431,11 @@ scene HomeAssistant {
                         }
                         //  an icon of its own: a white svg, tinted as the Material ones are
                         image r.img { at: dx - (11 + 2 * tall) * u, dy - (11 + 2 * tall) * u; size: (22 + 4 * tall) * u, (22 + 4 * tall) * u; tint: mix(ink, if(kdark > 0.5, ink, onmint), lit); show: r.custom > 0.5 }
+                        //  the add-on's own icons, in pencil (tira-led.svg and the rest): still unless the tile is on or under the pointer
+                        group {
+                            show: r.dk >= 0
+                            HDev(k: max(r.dk, 0), cx: dx, cy: dy, c: mix(ink, if(kdark > 0.5, ink, onmint), lit), a: 1, s: 5 + r.index * 13, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0), z: 0.92 + 0.15 * tall)
+                        }
                         //  the name and how it is
                         text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; family: "Space Grotesk" }
                         text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; color: if(lit > 0.5, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), faint); family: "Space Grotesk" }
@@ -458,7 +467,7 @@ scene HomeAssistant {
                         group {
                             opacity: hl_ed
                             ellipse { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; radius: 11 * u; color: mint; opacity: if(held, 100%, 80% + 20% * hl_grip_z.hover) }
-                            text "open_in_full" { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; anchor: center; size: 13; color: onmint; family: "Material Symbols Outlined" }
+                            HUi(k: 6, cx: cx0 + tww - 15 * u, cy: cy0 + thh - 15 * u, c: onmint, a: 1, s: 451, f: 0, z: 0.5)
                             box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
                             text "{rz_w} × {rz_h}" { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
                         }
@@ -485,7 +494,7 @@ scene HomeAssistant {
             }
             group {
                 show: hl_state >= 2 and hl_items.count == 0
-                text pick(hl_state - 2, "cloud_off", "home_iot_device") { at: W / 2, H / 2 - 52 * u; anchor: center; size: 40; color: if(hl_state == 2, alert, mint); family: "Material Symbols Outlined" }
+                HUi(k: if(hl_state == 2, 7, 8), cx: W / 2, cy: H / 2 - 52 * u, c: if(hl_state == 2, alert, mint), a: 1, s: 461, f: fr, z: 1.45)
                 text t_title { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
                 text hl_msg { at: W / 2, H / 2 + 4 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
                 zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: t_edit_cfg }
@@ -500,7 +509,7 @@ scene HomeAssistant {
             }
             group {
                 show: hl_state == 1 and hl_items.count == 0
-                text "add_home" { at: W / 2, H / 2 - 40 * u; anchor: center; size: 40; color: mint; family: "Material Symbols Outlined" }
+                HUi(k: 9, cx: W / 2, cy: H / 2 - 40 * u, c: mint, a: 1, s: 471, f: fr, z: 1.45)
                 text t_empty { at: W / 2, H / 2 - 4 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
                 text t_empty_hint { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
             }
@@ -552,11 +561,15 @@ scene HomeAssistant {
                 for r in hl_items {
                     image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink); show: sl_custom and r.index == sl_i }
                 }
+                group {
+                    show: sl_dk >= 0
+                    HDev(k: max(sl_dk, 0), cx: cl + 42 * u, cy: ct + 42 * u, c: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink), a: 1, s: 481, f: fr, z: 0.92)
+                }
                 text sl_name { at: cl + 72 * u, ct + 34 * u; anchor: left center; size: 15; weight: 700; width: cw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
                 text t_brightness { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
                 text number(sl_vs * 100, 0, " %") { at: cl + cw - 58 * u, ct + 42 * u; anchor: right center; size: 24; weight: 700; color: ink; family: "Space Grotesk" }
                 ellipse { at: cl + cw - 30 * u, ct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * sl_x_z.hover }
-                text "close" { at: cl + cw - 30 * u, ct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, sl_x_z.hover); family: "Material Symbols Outlined" }
+                HUi(k: 10, cx: cl + cw - 30 * u, cy: ct + 28 * u, c: mix(faint, ink, sl_x_z.hover), a: 1, s: 491, f: if(sl_x_z.hover > 0.5, fr, 0), z: 0.62)
                 zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
                 on press sl_x_z { sl_open = false }
                 //  the track: the Control Center's slider, coloured in with the accent (or the light's colour); it boils under the pointer and while it is dragged
@@ -664,6 +677,10 @@ scene HomeAssistant {
                 for r in hl_items {
                     image r.img { at: pcl + 31 * u, pct + 31 * u; size: 22 * u, 22 * u; tint: mix(ink, onmint, plit); show: pr_custom and r.index == pr_i }
                 }
+                group {
+                    show: pr_dk >= 0
+                    HDev(k: max(pr_dk, 0), cx: pcl + 42 * u, cy: pct + 42 * u, c: mix(ink, onmint, plit), a: 1, s: 501, f: fr * plit, z: 0.92)
+                }
                 text pr_task { at: pcl + 72 * u, pct + 33 * u; anchor: left center; size: 15; weight: 700; width: pcw - 130 * u; lines: 1; color: ink; family: "Space Grotesk" }
                 row {
                     at: pcl + 72 * u, pct + 46 * u
@@ -673,7 +690,7 @@ scene HomeAssistant {
                     text pr_status { size: 11.5; weight: 600; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert); family: "Space Grotesk" }
                 }
                 ellipse { at: pcl + pcw - 30 * u, pct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * pr_x_z.hover }
-                text "close" { at: pcl + pcw - 30 * u, pct + 28 * u; anchor: center; size: 17; color: mix(faint, ink, pr_x_z.hover); family: "Material Symbols Outlined" }
+                HUi(k: 10, cx: pcl + pcw - 30 * u, cy: pct + 28 * u, c: mix(faint, ink, pr_x_z.hover), a: 1, s: 511, f: if(pr_x_z.hover > 0.5, fr, 0), z: 0.62)
                 zone box pr_x_z { at: pcl + pcw - 30 * u, pct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
                 on press pr_x_z { pr_open = false }
                 //  the picture: the model's cover, or the camera (live, a frame every two seconds; a click on it opens it full size in the browser)
@@ -681,7 +698,7 @@ scene HomeAssistant {
                 let pix = pcl + 20 * u
                 let piy = pct + 84 * u
                 box { from: pix, piy; size: pis, pis; corner: 14 * u; color: ink; opacity: 6% }
-                text "deployed_code" { at: pix + pis / 2, piy + pis / 2; anchor: center; size: 40; color: faint; opacity: if(pr_has_pic, 0%, 60%); family: "Material Symbols Outlined" }
+                HUi(k: 11, cx: pix + pis / 2, cy: piy + pis / 2, c: faint, a: if(pr_has_pic, 0, 0.6), s: 521, f: 0, z: 1.45)
                 group {
                     clip box { from: pix, piy; size: pis, pis; corner: 14 * u }
                     for p in pr_pic { image p.img { at: pix, piy; size: pis, pis; fit: cover; show: pr_has_pic } }
@@ -692,7 +709,7 @@ scene HomeAssistant {
                     ellipse { at: pix + 20 * u, piy + pis - 19 * u; radius: 3.5 * u; color: alert }
                     text t_live { at: pix + 29 * u, piy + pis - 19 * u; anchor: left center; size: 10; weight: 700; color: ink; family: "Space Grotesk" }
                     ellipse { at: pix + pis - 19 * u, piy + 19 * u; radius: 12 * u; color: deep; opacity: 60% + 20% * pr_pic_z.hover }
-                    text "open_in_new" { at: pix + pis - 19 * u, piy + 19 * u; anchor: center; size: 14; color: ink; family: "Material Symbols Outlined" }
+                    HUi(k: 12, cx: pix + pis - 19 * u, cy: piy + 19 * u, c: ink, a: 1, s: 531, f: if(pr_pic_z.hover > 0.5, fr, 0), z: 0.52)
                 }
                 zone box pr_pic_z { from: pix, piy; size: pis, pis; corner: 14 * u; cursor: pointer; active: pr_cam and pr_has_pic; label: t_open_cam }
                 on press pr_pic_z { emit pr_act(4) }
@@ -707,11 +724,11 @@ scene HomeAssistant {
                     shadow: 0, 0, 8 * u * plit, 30%, mint
                     box { from: prx, piy + 58 * u; size: max(6 * u, prw * pr_progs), 6 * u; corner: 3 * u }
                 }
-                text "schedule" { at: prx + 8 * u, piy + 90 * u; anchor: center; size: 16; color: faint; family: "Material Symbols Outlined" }
+                HUi(k: 13, cx: prx + 8 * u, cy: piy + 90 * u, c: faint, a: 1, s: 541, f: 0, z: 0.6)
                 text pr_left { at: prx + 24 * u, piy + 90 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                text "play_circle" { at: prx + 8 * u, piy + 114 * u; anchor: center; size: 16; color: faint; family: "Material Symbols Outlined" }
+                HUi(k: 14, cx: prx + 8 * u, cy: piy + 114 * u, c: faint, a: 1, s: 551, f: 0, z: 0.6)
                 text pr_start { at: prx + 24 * u, piy + 114 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                text "flag" { at: prx + 8 * u, piy + 138 * u; anchor: center; size: 16; color: faint; family: "Material Symbols Outlined" }
+                HUi(k: 15, cx: prx + 8 * u, cy: piy + 138 * u, c: faint, a: 1, s: 561, f: 0, z: 0.6)
                 text pr_end { at: prx + 24 * u, piy + 138 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
                 //  the buttons: pause or resume, stop (pressed twice: the first asks), and the camera
                 let pbw = (pcw - 40 * u - 2 * 8 * u) / 3
@@ -730,7 +747,7 @@ scene HomeAssistant {
                         //  glyph, and the pair came out low), and side by side centred as one: the word's width is measured
                         let lw = pbm.$i.width
                         let gx0 = bx + pbw / 2 - (lw + 23 * u) / 2
-                        text pick(i + 3 * if(pr_st == 2, 1, 0), "pause", "stop", "videocam", "play_arrow", "stop", "videocam") { at: gx0 + 8.5 * u, pby + 18 * u; anchor: center; size: 17; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); family: "Material Symbols Outlined" }
+                        HUi(k: pick(i + 3 * if(pr_st == 2, 1, 0), 16, 17, 18, 19, 17, 18), cx: gx0 + 8.5 * u, cy: pby + 18 * u, c: if(hot > 0.5, onmint, if(i == 1, alert, ink)), a: 1, s: 571 + i * 10, f: if(pr_b_z.$i.hover > 0.5, fr, 0), z: 0.62)
                         text pick(i, t_b0, t_b1, t_b2) { at: gx0 + 23 * u, pby + 18 * u; anchor: left center; size: 12.5; weight: 700; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); measure: pbm.$i; family: "Space Grotesk" }
                         zone box pr_b_z.$i { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; cursor: pointer; active: on > 0.5; label: pick(i, "{t_pause} / {t_resume}", "{t_stop}", "{t_camera}") }
                     }
@@ -783,6 +800,10 @@ scene HomeAssistant {
                 for r in hl_items {
                     image r.img { at: tcl + 31 * v, tct + 31 * v; size: 22 * v, 22 * v; tint: mix(ink, onmint, tlit); show: tv_custom and r.index == tv_i }
                 }
+                group {
+                    show: tv_dk >= 0
+                    HDev(k: max(tv_dk, 0), cx: tcl + 42 * v, cy: tct + 42 * v, c: mix(ink, onmint, tlit), a: 1, s: 601, f: fr * tlit, z: 0.92 * tsc)
+                }
                 text tv_name { at: tcl + 72 * v, tct + 33 * v; anchor: left center; size: 15 * tsc; weight: 700; width: tcw - 170 * v; lines: 1; color: ink; family: "Space Grotesk" }
                 row {
                     at: tcl + 72 * v, tct + 46 * v
@@ -796,11 +817,11 @@ scene HomeAssistant {
                     opacity: if(tv_st > 0, 90%, 8% + 10% * tv_pw_z.hover)
                     ellipse { at: tcl + tcw - 64 * v, tct + 28 * v; radius: 13 * v }
                 }
-                text "power_settings_new" { at: tcl + tcw - 64 * v, tct + 28 * v; anchor: center; size: 16 * tsc; color: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)); family: "Material Symbols Outlined" }
+                HUi(k: 20, cx: tcl + tcw - 64 * v, cy: tct + 28 * v, c: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)), a: 1, s: 611, f: if(tv_pw_z.hover > 0.5, fr, 0), z: 0.6 * tsc)
                 zone box tv_pw_z { at: tcl + tcw - 64 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
                 on press tv_pw_z { emit tv_cmd(10) }
                 ellipse { at: tcl + tcw - 30 * v, tct + 28 * v; radius: 13 * v; color: ink; opacity: 8% + 10% * tv_x_z.hover }
-                text "close" { at: tcl + tcw - 30 * v, tct + 28 * v; anchor: center; size: 17 * tsc; color: mix(faint, ink, tv_x_z.hover); family: "Material Symbols Outlined" }
+                HUi(k: 10, cx: tcl + tcw - 30 * v, cy: tct + 28 * v, c: mix(faint, ink, tv_x_z.hover), a: 1, s: 621, f: if(tv_x_z.hover > 0.5, fr, 0), z: 0.62 * tsc)
                 zone box tv_x_z { at: tcl + tcw - 30 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_close }
                 on press tv_x_z { tv_open = false }
                 on key Escape while tv_open { tv_open = false }
@@ -812,7 +833,7 @@ scene HomeAssistant {
                     //  the lit piece under the chosen tab: the theme's (a glowing pill, or the Proxy theme's slanted slab), sliding between the two
                     PThumb(x: tcl + 20 * v + tbw / 2 + tv_tk * tbw, y: tct + 94 * v, w: tbw - 6 * v, h: 26 * v, rad: 13 * v, th: 32 * v, a: 1)
                     repeat i in 0..2 {
-                        text pick(i, "play_circle", "settings_remote") { at: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 - 2 * v, tct + 94 * v; anchor: center; size: 16 * tsc; color: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)); family: "Material Symbols Outlined" }
+                        HUi(k: pick(i, 14, 21), cx: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 - 2 * v, cy: tct + 94 * v, c: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)), a: 1, s: 631 + i * 10, f: 0, z: 0.58 * tsc)
                         text pick(i, t_tab0, t_tab1) { at: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 + 10 * v, tct + 94 * v; anchor: left center; size: 12.5 * tsc; weight: 700; color: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)); measure: tbm.$i; family: "Space Grotesk" }
                         zone box tv_tab_z.$i { from: tcl + 20 * v + i * tbw, tct + 78 * v; size: tbw, 32 * v; corner: 16 * v; cursor: pointer; label: pick(i, t_tab0, t_tab1); role: tab; selected: tv_tab == i }
                     }
@@ -835,7 +856,7 @@ scene HomeAssistant {
                             rim: 10%
                             box { from: ax, cy0; size: as, as; corner: 14 * v }
                         }
-                        text "live_tv" { at: ax + as / 2, cy0 + as / 2 - if(tv_app_on, 14, 0) * v; anchor: center; size: 30 * tsc; color: mint; opacity: 85%; show: not tv_has_appic; family: "Material Symbols Outlined" }
+                        HUi(k: 22, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_has_appic, 0, 0.85), s: 651, f: 0, z: 1.1 * tsc)
                         //  the app's icon, rounded as on the Apple TV's home screen
                         group {
                             show: tv_has_appic
@@ -880,7 +901,7 @@ scene HomeAssistant {
                                 opacity: big
                                 ellipse { at: bx, ty0; radius: (27 + if(tv_fl == 7, -2, 1) * tv_m_z.$i.hover) * v }
                             }
-                            text pick(i + if(i == 2 and tv_st == 2, 3, 0), "volume_down", "skip_previous", "play_arrow", "skip_next", "volume_up", "pause") { at: bx, ty0; anchor: center; size: (22 + 8 * big) * tsc; color: if(big > 0.5, onmint, ink); family: "Material Symbols Outlined" }
+                            HUi(k: pick(i + if(i == 2 and tv_st == 2, 3, 0), 23, 24, 19, 25, 26, 16), cx: bx, cy: ty0, c: if(big > 0.5, onmint, ink), a: 1, s: 661 + i * 10, f: if(tv_m_z.$i.hover > 0.5, fr, 0), z: (22 + 8 * big) / 26 * tsc)
                             zone box tv_m_z.$i { at: bx, ty0; size: (44 + 12 * big) * v, (44 + 12 * big) * v; corner: (22 + 6 * big) * v; cursor: pointer; active: live > 0.5 and tv_tk < 0.5; label: pick(i, t_voldown, t_prev, t_playpause, t_next, t_volup) }
                         }
                         on press tv_m_z.$i { emit tv_cmd(code); tv_fl = code }
@@ -936,7 +957,7 @@ scene HomeAssistant {
                         let by = qy + pick(i, -54, -54, 0, 54) * v
                         let code = pick(i, 5, 6, 7, 17)
                         ellipse { at: bx, by; radius: 22 * v; color: ink; opacity: if(tv_fl == code or (i == 1 and tv_fl == 16), 26%, 10% + 8% * tv_r_z.$i.hover) }
-                        text pick(i, "chevron_left", "tv", "play_pause", "volume_off") { at: bx, by; anchor: center; size: 22 * tsc; color: ink; family: "Material Symbols Outlined" }
+                        HUi(k: pick(i, 27, 28, 29, 30), cx: bx, cy: by, c: ink, a: 1, s: 711 + i * 10, f: if(tv_r_z.$i.hover > 0.5, fr, 0), z: 0.82 * tsc)
                         zone box tv_r_z.$i { at: bx, by; size: 44 * v, 44 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_back, t_home, t_playpause, t_mute) }
                     }
                     on press tv_r_z.0 { emit tv_cmd(5); tv_fl = 5 }
@@ -949,7 +970,7 @@ scene HomeAssistant {
                     repeat i in 0..2 {
                         let code = pick(i, 8, 9)
                         box { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; color: ink; opacity: if(tv_fl == code, 18%, 8% * tv_v_z.$i.hover) }
-                        text pick(i, "add", "remove") { at: cb, qy + i * 54 * v; anchor: center; size: 20 * tsc; color: ink; family: "Material Symbols Outlined" }
+                        HUi(k: pick(i, 31, 32), cx: cb, cy: qy + i * 54 * v, c: ink, a: 1, s: 761 + i * 10, f: if(tv_v_z.$i.hover > 0.5, fr, 0), z: 0.75 * tsc)
                         zone box tv_v_z.$i { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_volup, t_voldown) }
                         on press tv_v_z.$i { emit tv_cmd(code); tv_fl = code }
                     }

@@ -128,7 +128,7 @@ Son las entidades de la [integración de Bambu Lab](https://github.com/greghesp/
 
 ### Los iconos propios del addon
 
-Para lo que Material Symbols no tiene un buen icono. Están dibujados sobre la cuadrícula de Material y se tiñen igual. Cada uno tiene un nombre en español y otro en inglés, y los dos valen en `icon`:
+Para lo que Material Symbols no tiene un buen icono. Con `"icons": "pencil"` (por defecto) se dibujan a lápiz como el resto (se mueven bajo el ratón); con `"material"` son los `.svg` blancos de abajo, teñidos igual. Todos los iconos propios del panel (sus botones, las tarjetas, el mando) son también dibujos a lápiz, de `ha-icons.plm`, que `tools/icons.py` escribe a partir de una tabla de trazos. Cada uno tiene un nombre en español y otro en inglés, y los dos valen en `icon`:
 
 ![Los iconos del addon](docs/es/icons.png)
 

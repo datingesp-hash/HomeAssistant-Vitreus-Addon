@@ -348,6 +348,14 @@ local PENCIL = {
     door_front = 7, door = 7, garage = 7, door_back = 7, door_sliding = 7, garage_home = 7,
     house = 8, home = 8, cottage = 8, home_iot_device = 8, cabin = 8,
 }
+-- The add-on's own icons (its .svg files) are drawn in pencil too, from ha-icons.plm's HDev, unless "icons" is "material"; any other .svg or .png is drawn as it is.
+local DEV = { ["tira-led.svg"] = 0, ["farol-pared.svg"] = 1, ["lampara-pergola.svg"] = 2, ["lampara-pie.svg"] = 3, ["impresora-3d.svg"] = 4,
+    ["reproductor.svg"] = 5, ["terrario.svg"] = 6, ["calefactor.svg"] = 7 }
+local function dev_k(it)
+    if not it.file or (cfg and cfg.material) then return -1 end
+    return DEV[it.file] or -1
+end
+local function own_pic(it) return it.file ~= nil and dev_k(it) < 0 end      -- a picture of its own, drawn as it is
 local function pencil_k(it)
     if it.file or (cfg and cfg.material) then return -1 end
     return PENCIL[it.icon] or (it.kind == 0 and 0 or 2)
@@ -529,7 +537,7 @@ local function pr_fill()
     local P = it.printer
     local pr = pr_read(it)
     text.pr_icon = it.file and "" or it.icon
-    fact.pr_custom = it.file ~= nil
+    fact.pr_custom = own_pic(it)
     text.pr_task = pr.task ~= "" and pr.task or it.name
     fact.pr_st = pr.code
     text.t_b0 = pr.code == 2 and T("resume") or T("pause")
@@ -775,7 +783,7 @@ local function tv_fill()
     local code = tv_code(t)
     text.tv_name = it.name
     text.tv_icon = it.file and "" or it.icon
-    fact.tv_custom = it.file ~= nil
+    fact.tv_custom = own_pic(it)
     fact.tv_has_rm = it.tv.remote ~= nil
     fact.tv_st = code
     local app = t and t.app or ""
@@ -880,7 +888,7 @@ show = function()
                     sub = T(TV_LABEL[code]) .. (what ~= "" and (" · " .. what) or "")
                 end
             end
-            rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = it.file and 1 or 0, sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
+            rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = own_pic(it) and 1 or 0, dk = dev_k(it), sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
                 cc = it.color and 1 or 0, hk = (it.color and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
                 tvr = it.tv and 1 or 0, pk = pencil_k(it) }
@@ -1324,7 +1332,7 @@ on("fact:sl_i", function(v)
     if it then
         text.sl_name = it.name
         text.sl_icon = it.file and "" or it.icon
-        fact.sl_custom = it.file ~= nil
+        fact.sl_custom = own_pic(it)
     end
 end)
 
