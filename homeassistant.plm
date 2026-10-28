@@ -11,7 +11,8 @@ import "addon-pencil.plm"                         // Vitreus's pencil (its add-o
 //  a remote. The pencil puts the tiles in edit mode: each gets a handle in its corner that pulls it wider or taller, cell by cell.
 //  homeassistant.luau talks to Home Assistant's REST API with curl (the token goes in a file curl reads, never in its arguments), lays the tiles out
 //  (`col`, `cs`, `rs`, `yu`: where each goes and how big, in cells and unscaled pixels) and fills `hl_items` and `hl_rooms`.
-//  Icons are Material Symbols names ("lightbulb", "tv", "bedtime"…): the font is the one the lock screen uses.
+//  Every icon is drawn in Vitreus's pencil: a tile's "icon" names one by its Material Symbols name ("lightbulb", "tv", "bedtime"…), which picks the closest of the
+//  pencil's (addon-pencil.plm's PIcon) or of the add-on's own (ha-icons.plm's HDev); the buttons are ha-icons.plm's HUi.
 
 scene HomeAssistant {
     surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4; keyboard: exclusive while tv_open and tv_tab == 1 and shown > 0.5 }
@@ -74,7 +75,6 @@ scene HomeAssistant {
     fact hl_demo = false                              // no token in config.json yet: the example's rooms, played with here, and a banner on how to set it up
     text t_demo_title = ""
     text t_demo_hint = ""
-    fact hl_mat = false                               // config.json's "icons": "material": icons are Material Symbols names instead of the pencil's
     fact sl_dk = -1                                   // (the same for the add-on's own icons)
     fact pr_dk = -1
     fact tv_dk = -1
@@ -102,7 +102,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number }      // `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: its own svg, or a Material Symbols name (config.json's "icons": "material") · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number }      // `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -265,35 +265,6 @@ scene HomeAssistant {
     on change shown while shown < 0.5 { wk: 0 ~80ms; en1: 0 ~80ms; en2: 0 ~80ms; en3: 0 ~80ms; en1: 0 ~80ms after 205ms; en2: 0 ~80ms after 205ms; en3: 0 ~80ms after 205ms }
     every 500ms while shown > 0.5 and en1 < 0.002 { en1: 1 after 200ms; en2: 1 after 200ms; en3: 1 after 200ms }
 
-    //  The Control Center's sliders (addon-pencil.plm's PSlider and PSliderMini), with the level coloured in `c` rather than always the accent: a light with a colour
-    //  of its own is coloured in with it. A pill track in a crooked double outline, the level in tight pencil columns, a ring for a knob; it rests unless `f` is the
-    //  scene's frame (under the pointer, or being dragged), and then it boils.
-    component HSlider(x0: number, y: number, w: number, lv: number, h: number, f: number, c: color) {
-        let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
-        let xs = x0 + h * 0.5
-        let xe = max(x0 + w * lv - h * 0.1, xs)
-        let sp = max(2.5 * u, (w - h) / 39)
-        PRound(x: x0, y: y - h / 2, w: w, h: h, r: h / 2, s: 81, wd: 1.5 * u, c: ink, a: 0.65, f: f)
-        repeat i in 0..40 {
-            let cxi = xs + i * sp
-            PLn(ax: cxi + h * 0.1, ay: y - h * 0.38, bx: cxi - h * 0.1, by: y + h * 0.38, s: 200 + i, wd: 1.1 * u, c: c, a: if(cxi < xe, 0.62, 0), f: f)
-        }
-        ellipse { at: kx, y; radius: h * 0.85; color: ink; opacity: 14% }
-        PCir(cx: kx, cy: y, rad: h * 0.85, s: 83, wd: 1.5 * u, c: ink, a: 0.9, gapk: -1, f: f)
-    }
-    component HSliderMini(x0: number, y: number, w: number, lv: number, h: number, f: number, c: color) {
-        let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
-        let xs = x0 + h * 0.5
-        let xe = max(x0 + w * lv - h * 0.1, xs)
-        let sp = (w - h) / 15
-        PRound(x: x0, y: y - h / 2, w: w, h: h, r: h / 2, s: 85, wd: 1.3 * u, c: ink, a: 0.6, f: f)
-        repeat i in 0..16 {
-            let cxi = xs + i * sp
-            PLn(ax: cxi + h * 0.1, ay: y - h * 0.36, bx: cxi - h * 0.1, by: y + h * 0.36, s: 300 + i, wd: 1 * u, c: c, a: if(cxi < xe, 0.6, 0), f: f, j: 0.6)
-        }
-        ellipse { at: kx, y; radius: h * 0.85; color: ink; opacity: 14% }
-        ellipse { at: kx, y; radius: h * 0.85; stroke: 1.3 * u; color: ink; opacity: 90% }
-    }
     let W = max(slot_w, 1)
     let H = max(slot_h, 1)
 
@@ -429,7 +400,6 @@ scene HomeAssistant {
                             rim: 16% * lit
                             ellipse { at: dx, dy; radius: mix(19, 22, tall) * u }
                         }
-                        text r.icon { at: dx, dy; anchor: center; size: 22 + 4 * tall; color: mix(ink, if(kdark > 0.5, ink, onmint), lit); show: r.custom < 0.5 and r.pk < 0; family: "Material Symbols Outlined" }
                         //  the pencil's icon (the default): drawn in strokes, still unless the tile is on or under the pointer
                         group {
                             show: r.custom < 0.5 and r.pk >= 0
@@ -451,7 +421,7 @@ scene HomeAssistant {
                             let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
                             let bw = mix(tww - 76 * u, tww - 36 * u, tall)
                             //  (the Control Center's little slider, at the foot of a lit light, as the add-on template has it; it boils under the pointer)
-                            HSliderMini(x0: bx, y: cy0 + thh - 13 * u, w: bw, lv: bv, h: 8 * u, f: if(hl_tile_z.hover > 0.5 or (sl_open and sl_i == r.index), fr, 0), c: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk))
+                            PSliderMiniTint(x0: bx, y: cy0 + thh - 13 * u, w: bw, lv: bv, h: 8 * u, f: if(hl_tile_z.hover > 0.5 or (sl_open and sl_i == r.index), fr, 0), c: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk))
                         }
                         //  a printer: the print's progress along the bottom, while one runs
                         group {
@@ -559,7 +529,6 @@ scene HomeAssistant {
                     rim: 16%
                     ellipse { at: cl + 42 * u, ct + 42 * u; radius: 20 * u }
                 }
-                text sl_icon { at: cl + 42 * u, ct + 42 * u; anchor: center; size: 22; color: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink); show: not sl_custom and sl_pk < 0; family: "Material Symbols Outlined" }
                 group {
                     show: not sl_custom and sl_pk >= 0
                     PIcon(k: max(sl_pk, 0), cx: cl + 42 * u, cy: ct + 42 * u, lit: 0, c: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink), a: 1, s: 21, f: fr, z: 0.8)
@@ -579,7 +548,7 @@ scene HomeAssistant {
                 zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
                 on press sl_x_z { sl_open = false }
                 //  the track: the Control Center's slider, coloured in with the accent (or the light's colour); it boils under the pointer and while it is dragged
-                HSlider(x0: tl, y: ty, w: tw2, lv: sl_vs, h: 18 * u, f: if(sl_tr_z.hover > 0.5 or sl_dirty, fr, 0), c: mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk))
+                PSliderTint(x0: tl, y: ty, w: tw2, lv: sl_vs, h: 18 * u, f: if(sl_tr_z.hover > 0.5 or sl_dirty, fr, 0), c: mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk))
                 zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: "{t_brightness}: {sl_name}"; role: slider; value: "{sl_vs * 100} %" }
                 on press sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
                 on drag sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
@@ -609,7 +578,7 @@ scene HomeAssistant {
                     let hy = ct + 230 * u
                     let hx = tl + 11 * u + (tw2 - 22 * u) * sl_hs
                     body {
-                        gradient: tl, hy to tl + tw2, hy, #ff2626, #ffff26, #26ff26, #26ffff, #2626ff, #ff26ff, #ff2626
+                        gradient: tl, hy to tl + tw2, hy, #ff2626, #ffff26, #26ff26, #26ffff, #2626ff, #ff26ff, #ff2626          // lint: colour the hue bar: the colours a light can be, to pick one from
                         rim: 16%
                         box { from: tl, hy - 11 * u; size: tw2, 22 * u; corner: 11 * u }
                     }
@@ -675,7 +644,6 @@ scene HomeAssistant {
                     rim: 16%
                     ellipse { at: pcl + 42 * u, pct + 42 * u; radius: 20 * u }
                 }
-                text pr_icon { at: pcl + 42 * u, pct + 42 * u; anchor: center; size: 22; color: mix(ink, onmint, plit); show: not pr_custom and pr_pk < 0; family: "Material Symbols Outlined" }
                 group {
                     show: not pr_custom and pr_pk >= 0
                     PIcon(k: max(pr_pk, 0), cx: pcl + 42 * u, cy: pct + 42 * u, lit: 0, c: mix(ink, onmint, plit), a: 1, s: 23, f: fr * plit, z: 0.8)
@@ -798,7 +766,6 @@ scene HomeAssistant {
                     rim: 16%
                     ellipse { at: tcl + 42 * v, tct + 42 * v; radius: 20 * v }
                 }
-                text tv_icon { at: tcl + 42 * v, tct + 42 * v; anchor: center; size: 22 * tsc; color: mix(ink, onmint, tlit); show: not tv_custom and tv_pk < 0; family: "Material Symbols Outlined" }
                 group {
                     show: not tv_custom and tv_pk >= 0
                     PIcon(k: max(tv_pk, 0), cx: tcl + 42 * v, cy: tct + 42 * v, lit: 0, c: mix(ink, onmint, tlit), a: 1, s: 25, f: fr * tlit, z: 0.8 * tsc)

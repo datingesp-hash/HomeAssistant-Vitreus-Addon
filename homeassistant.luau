@@ -69,9 +69,7 @@ local EXAMPLE = [[{
   "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
-  "_icons": "\"pencil\" (the default): tiles are drawn with Vitreus's pencil icons (lightbulb, floor_lamp, power, bedtime, mode_fan, tv, power_outlet, door_front, home; anything else as a bulb or a power sign). \"material\": any Material Symbols name. An .svg of your own works either way.",
-  "icons": "pencil",
-  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: a Material Symbols name (fonts.google.com/icons), e.g. lightbulb, light_group, floor_lamp, tv, power, bedtime, mode_fan, door_front, garage, or one of the add-on's own (see its README). color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. tint: true draws that light's tile and card in its own colour instead of the accent. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: drawn in Vitreus's pencil, by name: lightbulb, floor_lamp, power, bedtime, mode_fan, tv, power_outlet, door_front, home (anything else is a bulb for a light, a power sign for a switch), or one of the add-on's own (led-strip.svg and the rest, see its README), or an .svg of yours. color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. tint: true draws that light's tile and card in its own colour instead of the accent. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
       "name": "Living room",
@@ -335,9 +333,8 @@ local ALIAS = {
 }
 
 
--- The icons. By default a tile is drawn with the pencil's icons (addon-pencil.plm's PIcon, as Vitreus's own add-ons are), chosen by the Material Symbols name its
--- "icon" gives: these names, and anything else as a bulb (a light) or a power sign (a switch). An .svg or .png of its own is drawn as it is. With "icons": "material"
--- in config.json the names are drawn from the Material Symbols font instead, so any of its icons can be had.
+-- The icons. A tile is drawn with the pencil's icons (addon-pencil.plm's PIcon, as Vitreus's own add-ons are), chosen by the Material Symbols name its "icon"
+-- gives: these names, and anything else as a bulb (a light) or a power sign (a switch). An .svg or .png of its own is drawn as it is (the add-on's own, in pencil).
 local PENCIL = {
     lightbulb = 0, light = 0, bulb = 0, emoji_objects = 0, wb_incandescent = 0, light_group = 0, highlight = 0,
     desk = 1, floor_lamp = 1, table_lamp = 1, lamp = 1, wall_lamp = 1, lamps = 1,
@@ -349,16 +346,16 @@ local PENCIL = {
     door_front = 7, door = 7, garage = 7, door_back = 7, door_sliding = 7, garage_home = 7,
     house = 8, home = 8, cottage = 8, home_iot_device = 8, cabin = 8,
 }
--- The add-on's own icons (its .svg files) are drawn in pencil too, from ha-icons.plm's HDev, unless "icons" is "material"; any other .svg or .png is drawn as it is.
+-- The add-on's own icons (its .svg files) are drawn in pencil too, from ha-icons.plm's HDev; any other .svg or .png is drawn as it is.
 local DEV = { ["tira-led.svg"] = 0, ["farol-pared.svg"] = 1, ["lampara-pergola.svg"] = 2, ["lampara-pie.svg"] = 3, ["impresora-3d.svg"] = 4,
     ["reproductor.svg"] = 5, ["terrario.svg"] = 6, ["calefactor.svg"] = 7 }
 local function dev_k(it)
-    if not it.file or (cfg and cfg.material) then return -1 end
+    if not it.file then return -1 end
     return DEV[it.file] or -1
 end
 local function own_pic(it) return it.file ~= nil and dev_k(it) < 0 end      -- a picture of its own, drawn as it is
 local function pencil_k(it)
-    if it.file or (cfg and cfg.material) then return -1 end
+    if it.file then return -1 end
     return PENCIL[it.icon] or (it.kind == 0 and 0 or 2)
 end
 
@@ -1064,7 +1061,6 @@ local function load()
     local token = type(c.token) == "string" and c.token or ""
     local demo = token == "" or token == "PEGA_AQUI_TU_TOKEN" or token == "PASTE_YOUR_TOKEN_HERE"
     fact.hl_demo = demo
-    fact.hl_mat = c.icons == "material"
     if not demo and not url:match("^https?://.+") then
         set_state(3, T("not_set"), T("need_url"))
         show()
@@ -1116,7 +1112,7 @@ local function load()
             add_items(r.items, k)
         end
     end
-    cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false and not demo, material = c.icons == "material", demo = demo }
+    cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false and not demo, demo = demo }
     if demo then
         -- The demo: config.json's own rooms (the example's, the first time), every tile working here and nowhere else: lights on and off at different levels, a colour
         -- on the ones that have one, a print half way, and something playing on a player.
@@ -1362,19 +1358,20 @@ local function own_editor(path)
 end
 on("hl_edit", function()
     local path = folder .. "/" .. CONFIG
-    local ok = pcall(run, "vitreus-edit", { path }, function(_, code)
+    run("vitreus-edit", { path }, function(_, code)
         if code == 3 then
             noed_gen = noed_gen + 1
             local mine = noed_gen
-            pcall(run, "wl-copy", { path }, function() end)
-            text.t_noed = T("no_editor", path)
+            run("wl-copy", { path }, function() end)
+            local home = (select(2, pcall(sys.ask, "env", "HOME"))) or ""
+            local short = (type(home) == "string" and home ~= "" and path:sub(1, #home) == home) and ("~" .. path:sub(#home + 1)) or path
+            text.t_noed = T("no_editor", short)
             fact.hl_noed = true
             after(8000, function() if mine == noed_gen then fact.hl_noed = false end end)
         elseif code ~= 0 then
             own_editor(path)
         end
     end)
-    if not ok then own_editor(path) end
 end)
 
 -- The panel resized: as many columns as now fit
