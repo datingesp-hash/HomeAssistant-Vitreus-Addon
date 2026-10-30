@@ -84,7 +84,8 @@ scene HomeAssistant {
     fact dw_px = 0
     fact dw_py = 0
     model dw_w max 8 { name: text; sub: text; on: number; kind: number; bri: number; avail: number; pk: number; dk: number; custom: number; img: image 48, 48; gx: number; gy: number; gw: number; gh: number; mon: number; fresh: number }
-    model dw_ents max 24 { name: text; on: bool }
+    model dw_ents max 32 { name: text; on: bool; head: bool; k: number; col: number; row: number }      // the list, by room: a room's name (`head`), then its entities (`k` their place in the configuration), each on its line and column
+    fact dw_mrows = 1
     event dw_tap ->                                   // a card's click, by its place
     event dw_bri ->                                   // a light's brightness from the wheel: its place × 1000 + the new percentage
     event dw_move ->                                  // let go of: its place × 10 000 + gx × 100 + gy
@@ -1369,8 +1370,7 @@ scene HomeAssistant {
         }
         //  The list of entities, over the editor's shelf, from its tile (`widget_menu`): a tick puts a card on the desktop, another takes it off
         let mn.w = 470
-        let mn.rows = max(ceil(dw_ents.count / 2), 1)
-        let mn.h = 74 + mn.rows * 36
+        let mn.h = 74 + dw_mrows * 36
         let mn.x = clamp(widget_mx - mn.w / 2, 12, dk.sw - mn.w - 12)
         let mn.y = max(widget_my - 14 - mn.h, 12) + 10 * (1 - dmn)
         group {
@@ -1385,11 +1385,17 @@ scene HomeAssistant {
             HUi(k: 10, cx: mn.x + mn.w - 28, cy: mn.y + 28, c: ink, a: 1, s: 2341, f: 0, z: 0.5)
             zone ellipse dw_mx { at: mn.x + mn.w - 28, mn.y + 28; radius: 14; cursor: pointer; active: dw_menu and widget_edit; label: "Close" }
             on press dw_mx { dw_menu = false }
-            repeat e in 0..24 {
-                let ex = mn.x + 14 + mod(e, 2) * 224
-                let ey = mn.y + 66 + floor(e / 2) * 36
+            repeat e in 0..32 {
+                let ex = mn.x + 14 + dw_ents.$e.col * 224
+                let ey = mn.y + 66 + dw_ents.$e.row * 36
+                //  a room: its name, small, over a hairline
                 group {
-                    show: e < dw_ents.count
+                    show: e < dw_ents.count and dw_ents.$e.head
+                    text dw_ents.$e.name { at: ex + 6, ey + 18; anchor: left center; size: 11; weight: 700; width: mn.w - 40; lines: 1; color: mint; family: "Space Grotesk" }
+                    box { from: ex + 6, ey + 30; size: mn.w - 40, 1; color: mint; opacity: 22% }
+                }
+                group {
+                    show: e < dw_ents.count and not dw_ents.$e.head
                     box { from: ex, ey; size: 218, 30; corner: 15; color: if(dw_ents.$e.on, mint, ink); opacity: if(dw_ents.$e.on, 20%, 6%) + 8% * dw_e.$e.hover }
                     box { from: ex, ey; size: 218, 30; corner: 15; stroke: 1.2; color: mint; opacity: if(dw_ents.$e.on, 70%, 0%) }
                     text dw_ents.$e.name { at: ex + 14, ey + 15; anchor: left center; size: 13; weight: 600; width: 166; lines: 1; color: ink; family: "Space Grotesk" }
@@ -1397,8 +1403,8 @@ scene HomeAssistant {
                     ellipse { at: ex + 200, ey + 15; radius: 9; stroke: 1.3; color: mint }
                     text if(dw_ents.$e.on, "✓", "+") { at: ex + 200, ey + 15; anchor: center; size: if(dw_ents.$e.on, 11, 13); weight: 700; color: if(dw_ents.$e.on, onmint, mint); family: "Space Grotesk" }
                 }
-                zone box dw_e.$e { from: ex, ey; size: 218, 30; corner: 15; cursor: pointer; active: e < dw_ents.count and dw_menu and widget_edit and screen.index == dw_mmon; label: "{dw_ents.$e.name}" }
-                on press dw_e.$e { emit dw_ent(e) }
+                zone box dw_e.$e { from: ex, ey; size: 218, 30; corner: 15; cursor: pointer; active: e < dw_ents.count and not dw_ents.$e.head and dw_menu and widget_edit and screen.index == dw_mmon; label: "{dw_ents.$e.name}" }
+                on press dw_e.$e { emit dw_ent(dw_ents.$e.k) }
             }
         }
         on change widget_edit while not widget_edit { dw_menu = false; dw_di = -1; dw_ri = -1 }

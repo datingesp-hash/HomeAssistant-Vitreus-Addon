@@ -16,6 +16,7 @@
 return function(api)
     local FILE = "widget.json"
     local GX, GY, MAX = 28, 16, 8
+    local MAXL = 32                -- the list's lines: rooms' names and entities
     local cards = {}
     local function clampi(v, lo, hi) return math.max(lo, math.min(hi, math.floor((tonumber(v) or lo) + 0.5))) end
     local function valid(e) return type(e) == "string" and e:match("^[%a_]+%.[%w_]+$") ~= nil end
@@ -72,13 +73,25 @@ return function(api)
             row.fresh = fresh[c] and 1 or 0
             out[k] = row
         end
-        local ents = {}
+        -- the list, by room: the room's name on a line of its own, then its entities two to a line (in config.json's order, which is the panel's)
+        local ents, row, col, room = {}, -1, 1, nil
+        local rooms = cfg and cfg.rooms or {}
         for i, it in ipairs(items) do
-            if i > 24 then break end
+            if it.room ~= room then
+                if #ents >= MAXL - 1 then break end
+                room = it.room
+                local r = rooms[room]
+                row = row + 1
+                ents[#ents + 1] = { name = ((r and r.name ~= "") and r.name or api.T("st_no_room")):upper(), on = false, head = true, k = -1, col = 0, row = row }
+                col = 1
+            end
+            if #ents >= MAXL then break end
+            if col == 1 then row = row + 1; col = 0 else col = 1 end
             local on = false
             for _, c in ipairs(cards) do if c.entity == it.entity then on = true end end
-            ents[#ents + 1] = { name = it.name, on = on }
+            ents[#ents + 1] = { name = it.name, on = on, head = false, k = i - 1, col = col, row = row }
         end
+        fact.dw_mrows = row + 1
         by_card = map
         local sig = json.encode({ out, ents })
         if sig == last then return end
