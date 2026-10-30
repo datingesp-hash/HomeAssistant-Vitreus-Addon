@@ -76,7 +76,7 @@ scene HomeAssistant {
     fact dw_menu = false                              // the list of entities is out, over the editor's shelf, on that copy
     fact dw_mmon = 0
     //  A card being carried (`dw_di`) or its corner pulled (`dw_ri`): where it started and the cell (or size) it would land on now, which it goes to a cell at a time
-    //  on a spring, as the shell's widgets do. The logic lets go of it (back to -1) once the card's own place is the new one, so it never jumps back on the way.
+    //  on a spring, as the shell's widgets do. It is let go of (back to -1) once the card's own place is the new one, so it never jumps back on the way.
     fact dw_di = -1
     fact dw_ri = -1
     fact dw_ox = 0
@@ -1282,6 +1282,8 @@ scene HomeAssistant {
             follow wsy.$i = dw_w.$i.gy
             prop wvis.$i = 0 ~calm
             follow wvis.$i = if(i < dw_w.count, 1, 0)
+            prop whl.$i = 0 ~calm                                    // held (carried or pulled): its outline and wash fade in and out, not flick
+            follow whl.$i = if(dw_di == i or dw_ri == i, 1, 0)
             let here = if(screen.index == dw_w.$i.mon and i < dw_w.count, 1, 0)
             let sp = dep * (1 - dw_w.$i.fresh)                       // (a card just added starts where it is, not from a spring at 0)
             let ex = mix(mix(dw_w.$i.gx, wqx.$i, sp), wsx.$i, dgl)
@@ -1295,7 +1297,7 @@ scene HomeAssistant {
             let lit = if(dw_w.$i.on > 0.5 and dw_w.$i.avail > 0.5, 1, 0)
             let hot = dw_t.$i.hover * (1 - dep)
             let tl = if(h > 108, 1, 0)                                // tall enough for the icon above the name
-            let held = if(dw_di == i or dw_ri == i, 1, 0)
+            let held = whl.$i
             group {
                 show: here > 0.5 and wvis.$i > 0.01
                 opacity: wvis.$i * if(dw_w.$i.avail > 0.5, 100%, 55%)
@@ -1362,10 +1364,15 @@ scene HomeAssistant {
             on press dw_mv.$i { dw_ri = -1; dw_ox = dw_w.$i.gx; dw_oy = dw_w.$i.gy; dw_px = dw_w.$i.gx; dw_py = dw_w.$i.gy; dw_di = i }
             on drag dw_mv.$i while dw_di == i { dw_px = clamp(dw_ox + round(drag.dx / dk.cw), 0, 28 - dw_w.$i.gw); dw_py = clamp(dw_oy + round(drag.dy / dk.ch), 0, 16 - dw_w.$i.gh) }
             on release dw_mv.$i while dw_di == i { emit dw_move(i * 10000 + dw_px * 100 + dw_py) }
+            //  let go of only once its own place is the new one (the logic's answer), or at once when it was put back where it was: so it never springs back on the way
+            on release dw_mv.$i while dw_di == i and dw_px == dw_w.$i.gx and dw_py == dw_w.$i.gy { dw_di = -1 }
+            on change dw_w.$i.gx * 100 + dw_w.$i.gy while dw_di == i { dw_di = -1 }
             zone box dw_rz.$i { at: x + w - 4, y + h - 4; size: 30, 30; corner: 15; cursor: nwse_resize; active: here > 0.5 and widget_edit; label: "Resize {dw_w.$i.name}" }
             on press dw_rz.$i { dw_di = -1; dw_ox = dw_w.$i.gw; dw_oy = dw_w.$i.gh; dw_px = dw_w.$i.gw; dw_py = dw_w.$i.gh; dw_ri = i }
             on drag dw_rz.$i while dw_ri == i { dw_px = clamp(dw_ox + round(drag.dx / dk.cw), 2, 28 - dw_w.$i.gx); dw_py = clamp(dw_oy + round(drag.dy / dk.ch), 2, 16 - dw_w.$i.gy) }
             on release dw_rz.$i while dw_ri == i { emit dw_size(i * 10000 + dw_px * 100 + dw_py) }
+            on release dw_rz.$i while dw_ri == i and dw_px == dw_w.$i.gw and dw_py == dw_w.$i.gh { dw_ri = -1 }
+            on change dw_w.$i.gw * 100 + dw_w.$i.gh while dw_ri == i { dw_ri = -1 }
             zone ellipse dw_x.$i { at: x + w - 2, y + 2; radius: 13; cursor: pointer; active: here > 0.5 and widget_edit; label: "Take {dw_w.$i.name} off the desktop" }
             on press dw_x.$i { emit dw_del(i) }
         }
