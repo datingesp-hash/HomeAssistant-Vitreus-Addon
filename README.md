@@ -11,7 +11,7 @@ It speaks English by default and ships with a Spanish translation already instal
 - [Features](#features)
 - [Install and update](#install-and-update)
 - [Setting it up](#setting-it-up)
-- [Using the panel](#using-the-panel) (and the desktop widget)
+- [Using the panel](#using-the-panel) (and the desktop widgets)
 - [Lights and colours](#lights-and-colours)
 - [Apple TV](#apple-tv)
 - [3D printer](#3d-printer)
@@ -30,7 +30,7 @@ It speaks English by default and ships with a Spanish translation already instal
 - **3D printer.** A card shows the print's cover or the live camera, its progress and times, and Pause / Resume / Stop buttons.
 - **Settings menu.** The gear opens a settings page where you set everything from the panel itself, with no JSON needed. Your entities are suggested as you type.
 - **Edit mode.** You can resize tiles in half columns, down to icon-only tiles, and drag them to rearrange.
-- **Desktop widget.** A card on the desktop with the entities you pick, placed and resized in Vitreus's desktop editor like its own widgets.
+- **Desktop widgets.** A card on the desktop for each entity you pick, placed and resized in Vitreus's desktop editor like its own widgets.
 - **Native look.** It uses Vitreus's palette, theme, pencil icons, switches and sliders, and follows the shell when its theme changes.
 - **Demo mode** until a token is set, so you can try the panel before connecting it.
 - **Translatable.** Every text lives in a JSON file. English and Spanish are included, and adding a language is just one more file.
@@ -110,17 +110,16 @@ The new order is saved to `config.json`, and sizes to `layout.json` beside it.
 
 ### On the desktop
 
-The add-on also has a **desktop widget**: a glass card on the desktop with the entities you choose, which behaves like Vitreus's own widgets (the clock, the system monitor). It needs a Vitreus whose desktop editor lists add-on widgets.
+The add-on also has **desktop widgets**: a glass card on the desktop for each entity you choose, which behaves like Vitreus's own widgets (the clock, the system monitor). They need a Vitreus whose desktop editor lists add-on widgets.
 
-1. Right-click the bare wallpaper to open the **desktop editor**. Home Assistant has a tile on its shelf: click it to put the widget on the desktop, or to take it off.
-2. While the editor is open:
-   - **drag the card** by its middle to move it, a cell at a time on the same grid as the other widgets;
-   - **drag its corner** to make it bigger or smaller;
-   - **Entities** opens a list of the entities in your configuration: tick the ones it shows (up to eight);
-   - **Monitor** sends it to the next monitor.
-3. Press **Done**. Out of the editor, a click on a tile switches it, and the mouse wheel over a light dims it.
+1. Right-click the bare wallpaper to open the **desktop editor**. Home Assistant has a tile on its shelf: click it and a list of your entities opens over the shelf.
+2. **Tick an entity** to put a card for it on the desktop; tick it again, or press the card's cross, to take it off. Up to eight cards.
+3. While the editor is open:
+   - **drag a card** by its middle to move it, a cell at a time on the same grid as the other widgets;
+   - **drag its corner** to make it bigger or smaller.
+4. Press **Done**. Out of the editor, a click on a card switches its entity, and the mouse wheel over a light dims it.
 
-Where it is and what it shows are kept in `widget.json`, in the add-on's data folder. **Settings > Theme > Pin widgets** keeps it with each theme, like the other widgets.
+The cards (their entities, places, sizes and monitors) are kept in `widget.json`, in the add-on's data folder. **Settings > Theme > Pin widgets** keeps them with each theme, like the other widgets.
 
 ### On the Island
 

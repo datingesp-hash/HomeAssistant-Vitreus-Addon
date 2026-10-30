@@ -109,7 +109,7 @@ local STR = {
         e404 = "Home Assistant no reconoce la dirección (404): revisa la url", ehttp = "Home Assistant ha respondido con un error (%s)",
         bad = "Entidad no válida: %s", unavailable = "No disponible", light_on = "Encendida", light_off = "Apagada", on = "Activado", off = "Desactivado",
         room = "Habitación %d",
-        wg_ents = "Entidades", wg_empty = "Elige sus entidades en el editor del escritorio", wg_monitor = "Monitor",
+        wg_title = "Widgets de Home Assistant", wg_hint = "Marca una entidad para ponerla en el escritorio; la cruz de la tarjeta la quita",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
         hint = "Arrastra una ficha para moverla, o su esquina para cambiar su tamaño", ed_start = "Cambiar el tamaño de las fichas", ed_done = "Terminar", refresh = "Actualizar",
         edit_cfg = "Editar la configuración", no_editor = "No hay editor de texto: instala uno o define $EDITOR. Ruta copiada: %s", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
@@ -162,7 +162,7 @@ local STR = {
         e404 = "Home Assistant doesn't know that address (404): check the url", ehttp = "Home Assistant answered with an error (%s)",
         bad = "Invalid entity: %s", unavailable = "Unavailable", light_on = "On", light_off = "Off", on = "On", off = "Off",
         room = "Room %d",
-        wg_ents = "Entities", wg_empty = "Choose its entities in the desktop editor", wg_monitor = "Monitor",
+        wg_title = "Home Assistant widgets", wg_hint = "Tick an entity to put it on the desktop; its card's cross takes it off",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
         hint = "Drag a tile to move it, or its corner to resize it", ed_start = "Resize the tiles", ed_done = "Done", refresh = "Refresh",
         edit_cfg = "Edit the settings", no_editor = "No text editor found: install one or set $EDITOR. Path copied: %s", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
@@ -351,9 +351,8 @@ local WORDS = {
     "mute",
     "prev",
     "next",
-    "wg_ents",
-    "wg_empty",
-    "wg_monitor",
+    "wg_title",
+    "wg_hint",
 }
 local LANGS = { English = STR.en, Spanish = STR.es }          -- the ones that come with it, by their file's name
 local lang = "en"            -- the language's code (its file's "_code"): which country's catalogue the Apple TV's artwork is looked up in
@@ -495,7 +494,7 @@ local function scene_words()
     text.t_tab1 = T("tab_remote")
     text.t_kb = T("kb_hint")
     text.t_power = T("power")
-    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next", "wg_ents", "wg_empty", "wg_monitor" }) do
+    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next", "wg_title", "wg_hint" }) do
         text["t_" .. k] = T(k)
     end
 end
