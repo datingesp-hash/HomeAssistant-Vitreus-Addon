@@ -156,12 +156,13 @@ return function(api)
     local armed = nil                                -- a delete pressed once: the row's key
     local errmsg = nil
     local function width() return math.max(200, (tonumber(fact.slot_w) or 520) / U - 28) end
+    local NOT_LANG = { config = true, layout = true, widget = true }      -- the add-on's own files in the data folder, which are not languages
     local function lang_names()
         local names, seen = {}, {}
         local ok, list = pcall(sys.ask, "files.list")
         for _, n in ipairs(ok and type(list) == "table" and list or {}) do
             local nm = tostring(n):match("^(.+)%.json$")
-            if nm and nm ~= "config" and nm ~= "layout" and not seen[nm] then seen[nm] = true; names[#names + 1] = nm end
+            if nm and not NOT_LANG[nm] and not seen[nm] then seen[nm] = true; names[#names + 1] = nm end
         end
         for _, nm in ipairs({ "English", "Spanish" }) do if not seen[nm] then seen[nm] = true; names[#names + 1] = nm end end
         table.sort(names)
