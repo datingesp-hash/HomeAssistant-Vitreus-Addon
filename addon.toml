@@ -14,3 +14,9 @@ icon  = "icon.svg"
 [drawer]
 width  = 520
 height = 600
+
+# Desktop widgets: a card for each entity, placed and resized in Vitreus's desktop editor like its own widgets. The editor's tile opens a list of the entities
+# over its shelf (menu), to put a card on the desktop or take it off (widget.luau).
+[widget]
+name = "Home Assistant"
+menu = true

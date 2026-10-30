@@ -57,6 +57,42 @@ scene HomeAssistant {
     fact pal_alert_b = 0.2667
     fact look = 0
 
+    //  ── The desktop widgets (`[widget]` in addon.toml, widget.luau) ──
+    //  A card on the desktop for each entity it is given, which Vitreus's desktop editor (a right press on the bare wallpaper) shows and places like the shell's own
+    //  widgets. Its tile there opens a list of the entities over the shelf (`widget_menu`): a tick puts a card on the desktop, another takes it off. What Vitreus tells it
+    //  and asks of it (`widget_shown`, `widget_edit`, `widget_place`, `glide`, the menu's place) is in Vitreus's addons/_template_drawer/addon.toml.
+    fact widget_shown = false
+    fact widget_edit = false
+    text widget_place = ""
+    fact glide = false
+    text widget_mon_name = ""                         // the editor's monitor, and the middle of the tile and the top of its shelf there, when the tile is pressed
+    fact widget_mx = 0
+    fact widget_my = 0
+    event widget_menu ->
+    fact room_t = 0                                   // the room the bar takes (Vitreus tells it): the grid starts 16 px inside it
+    fact room_r = 0
+    fact room_b = 0
+    fact room_l = 0
+    fact dw_menu = false                              // the list of entities is out, over the editor's shelf, on that copy
+    fact dw_mmon = 0
+    //  A card being carried (`dw_di`) or its corner pulled (`dw_ri`): where it started and the cell (or size) it would land on now, which it goes to a cell at a time
+    //  on a spring, as the shell's widgets do. The logic lets go of it (back to -1) once the card's own place is the new one, so it never jumps back on the way.
+    fact dw_di = -1
+    fact dw_ri = -1
+    fact dw_ox = 0
+    fact dw_oy = 0
+    fact dw_px = 0
+    fact dw_py = 0
+    model dw_w max 8 { name: text; sub: text; on: number; kind: number; bri: number; avail: number; pk: number; dk: number; custom: number; img: image 48, 48; gx: number; gy: number; gw: number; gh: number; mon: number; fresh: number }
+    model dw_ents max 32 { name: text; on: bool; head: bool; k: number; col: number; row: number }      // the list, by room: a room's name (`head`), then its entities (`k` their place in the configuration), each on its line and column
+    fact dw_mrows = 1
+    event dw_tap ->                                   // a card's click, by its place
+    event dw_bri ->                                   // a light's brightness from the wheel: its place × 1000 + the new percentage
+    event dw_move ->                                  // let go of: its place × 10 000 + gx × 100 + gy
+    event dw_size ->                                  // let go of its corner: its place × 10 000 + gw × 100 + gh
+    event dw_del ->                                   // its cross (Edit mode), by its place
+    event dw_ent ->                                   // an entity of the list ticked or unticked, by its place in the configuration
+
     fact slot_open = false
     fact slot_x = 0
     fact slot_y = 0
@@ -292,6 +328,8 @@ scene HomeAssistant {
     text t_mute = ""
     text t_prev = ""
     text t_next = ""
+    text t_wg_title = ""
+    text t_wg_hint = ""
     prop sl_k = 0 ~240ms
     follow sl_k = if(sl_open, 1, 0)
     prop sl_vs = 0 ~quick                             // the fill, a hair behind the finger
@@ -1209,5 +1247,167 @@ scene HomeAssistant {
                 on key space while tv_open and tv_tab == 1 { emit tv_cmd(7); tv_fl = 7 }
             }
         }
+    }
+
+    //  ── The desktop widgets' own surface: on the desktop, under the windows (over them while the desktop editor is open), each card on its own monitor ──
+    surface desk {
+        size: full, full; anchor: top_left; margin: 0; level: bottom, top while widget_edit; screens: each max 4; reserve: -1
+        open: dw_w.count > 0 or dw_menu                // (no cards and no list: no layer on the desktop at all)
+        prop dep = 0 ~calm
+        follow dep = if(widget_edit, 1, 0)
+        prop dmn = 0 ~calm
+        follow dmn = if(dw_menu and widget_edit, 1, 0)
+        prop dgl = 0 ~0ms
+        follow dgl = if(glide, 1, 0)
+        let dk.sw = max(screen.width, 800)
+        let dk.sh = max(screen.height, 600)
+        let dk.gl = 16 + room_l
+        let dk.gt = 16 + room_t
+        let dk.cw = (dk.sw - dk.gl - 16 - room_r) / 28
+        let dk.ch = (dk.sh - dk.gt - 16 - room_b) / 16
+        let dk.pl = if(look == 1 or look == 2, 1, 0)
+        repeat i in 0..8 {
+            //  where it goes: its cell; in Edit mode on a spring (to the cell it would land on while it is carried or pulled); while a theme puts it back, on a slower one
+            prop wqx.$i = 0 ~quick
+            prop wqy.$i = 0 ~quick
+            prop wqw.$i = 0 ~quick
+            prop wqh.$i = 0 ~quick
+            prop wsx.$i = 0 ~gentle
+            prop wsy.$i = 0 ~gentle
+            follow wqx.$i = if(dw_di == i, dw_px, dw_w.$i.gx)
+            follow wqy.$i = if(dw_di == i, dw_py, dw_w.$i.gy)
+            follow wqw.$i = if(dw_ri == i, dw_px, dw_w.$i.gw)
+            follow wqh.$i = if(dw_ri == i, dw_py, dw_w.$i.gh)
+            follow wsx.$i = dw_w.$i.gx
+            follow wsy.$i = dw_w.$i.gy
+            prop wvis.$i = 0 ~calm
+            follow wvis.$i = if(i < dw_w.count, 1, 0)
+            let here = if(screen.index == dw_w.$i.mon and i < dw_w.count, 1, 0)
+            let sp = dep * (1 - dw_w.$i.fresh)                       // (a card just added starts where it is, not from a spring at 0)
+            let ex = mix(mix(dw_w.$i.gx, wqx.$i, sp), wsx.$i, dgl)
+            let ey = mix(mix(dw_w.$i.gy, wqy.$i, sp), wsy.$i, dgl)
+            let ew = mix(dw_w.$i.gw, wqw.$i, sp)
+            let eh = mix(dw_w.$i.gh, wqh.$i, sp)
+            let x = dk.gl + ex * dk.cw + 3
+            let y = dk.gt + ey * dk.ch + 3
+            let w = ew * dk.cw - 6
+            let h = eh * dk.ch - 6
+            let lit = if(dw_w.$i.on > 0.5 and dw_w.$i.avail > 0.5, 1, 0)
+            let hot = dw_t.$i.hover * (1 - dep)
+            let tl = if(h > 108, 1, 0)                                // tall enough for the icon above the name
+            let held = if(dw_di == i or dw_ri == i, 1, 0)
+            group {
+                show: here > 0.5 and wvis.$i > 0.01
+                opacity: wvis.$i * if(dw_w.$i.avail > 0.5, 100%, 55%)
+                //  the glass, as the shell's desktop widgets have it (plastic on Retro and UwU)
+                body {
+                    color: tint
+                    glass: 1
+                    lens: false
+                    rim: 70%
+                    shine: 0, 0
+                    shadow: 0, 6, 18, 30%
+                    show: dk.pl < 0.5
+                    box { from: x, y; size: w, h; corner: 20 }
+                }
+                body {
+                    color: tint
+                    rim: 0%
+                    border: 2.6, deep
+                    shadow: 4, 5, 0, 60%, deep
+                    show: dk.pl > 0.5
+                    box { from: x, y; size: w, h; corner: 14 }
+                }
+                box { from: x, y; size: w, h; corner: 20; color: mint; opacity: 4% * hot + 12% * lit }
+                box { from: x, y; size: w, h; corner: 20; stroke: 1.2; color: mint; opacity: 45% * lit }
+                let ix = x + if(tl > 0.5, 28, 30)
+                let iy = y + if(tl > 0.5, 28, h / 2)
+                let z = if(tl > 0.5, 1, 0.9)
+                group {
+                    show: dw_w.$i.dk < 0 and dw_w.$i.custom < 0.5
+                    PIcon(k: max(dw_w.$i.pk, 0), cx: ix, cy: iy, lit: 0, c: mix(ink, mint, lit), a: 1, s: 2100 + i * 17, f: if(hot > 0.5, floor(time * 8), 0), z: z)
+                }
+                group {
+                    show: dw_w.$i.dk >= 0
+                    HDev(k: max(dw_w.$i.dk, 0), cx: ix, cy: iy, c: mix(ink, mint, lit), a: 1, s: 2200 + i * 13, f: if(hot > 0.5, floor(time * 8), 0), z: z)
+                }
+                image dw_w.$i.img { at: ix - 12, iy - 12; size: 24, 24; tint: mix(ink, mint, lit); show: dw_w.$i.custom > 0.5 }
+                let nx = if(tl > 0.5, x + 18, x + 56)
+                let ny = if(tl > 0.5, y + h - 40, y + h / 2 - 10)
+                text dw_w.$i.name { at: nx, ny; anchor: left center; size: 15; weight: 600; width: x + w - 14 - nx; lines: 1; color: ink; family: "Space Grotesk" }
+                text dw_w.$i.sub { at: nx, ny + 19; anchor: left center; size: 12; weight: 500; width: x + w - 14 - nx; lines: 1; color: if(lit > 0.5, mint, faint); family: "Space Grotesk" }
+                //  a light: how bright, along the foot of the card
+                box { from: x + 16, y + h - 9; size: w - 32, 3; corner: 1.5; color: ink; opacity: 12% * lit; show: dw_w.$i.kind == 0 }
+                box { from: x + 16, y + h - 9; size: (w - 32) * dw_w.$i.bri, 3; corner: 1.5; color: mint; opacity: lit; show: dw_w.$i.kind == 0 }
+                //  Edit mode: the cells it takes, outlined; its cross takes it off, its corner pulls it bigger or smaller
+                group {
+                    show: dep > 0.01
+                    opacity: dep
+                    box { from: x - 3, y - 3; size: w + 6, h + 6; corner: 22; color: mint; opacity: 7% + 9% * held }
+                    box { from: x - 3, y - 3; size: w + 6, h + 6; corner: 22; stroke: 1.6; color: mint; opacity: 55% + 45% * held }
+                    ellipse { at: x + w - 2, y + 2; radius: 11; color: deep; opacity: 90% }
+                    ellipse { at: x + w - 2, y + 2; radius: 11; stroke: 1.4; color: mint; opacity: 70% + 30% * dw_x.$i.hover }
+                    HUi(k: 10, cx: x + w - 2, cy: y + 2, c: mint, a: 1, s: 2311 + i, f: 0, z: 0.42)
+                    ellipse { at: x + w - 4, y + h - 4; radius: 12; color: mint; opacity: 85% + 15% * dw_rz.$i.hover }
+                    HUi(k: 6, cx: x + w - 4, cy: y + h - 4, c: onmint, a: 1, s: 2301 + i, f: 0, z: 0.5)
+                }
+            }
+            //  its zones, the card's own first: out of Edit mode a click switches it and the wheel dims a light; in it, the card is carried, its corner pulled,
+            //  its cross pressed (declared later, so they win the press)
+            zone box dw_t.$i { from: x, y; size: w, h; corner: 20; cursor: pointer; active: here > 0.5 and not widget_edit; label: "{dw_w.$i.name}" }
+            on press dw_t.$i { emit dw_tap(i) }
+            on scroll dw_t.$i while dw_w.$i.kind == 0 { emit dw_bri(i * 1000 + round(clamp(dw_w.$i.bri + wheel * 0.1, 0, 1) * 100)) }
+            zone box dw_mv.$i { from: x, y; size: w, h; corner: 20; cursor: if(dw_di == i, grabbing, grab); active: here > 0.5 and widget_edit; label: "Move {dw_w.$i.name}" }
+            on press right dw_mv.$i { }
+            on press dw_mv.$i { dw_ri = -1; dw_ox = dw_w.$i.gx; dw_oy = dw_w.$i.gy; dw_px = dw_w.$i.gx; dw_py = dw_w.$i.gy; dw_di = i }
+            on drag dw_mv.$i while dw_di == i { dw_px = clamp(dw_ox + round(drag.dx / dk.cw), 0, 28 - dw_w.$i.gw); dw_py = clamp(dw_oy + round(drag.dy / dk.ch), 0, 16 - dw_w.$i.gh) }
+            on release dw_mv.$i while dw_di == i { emit dw_move(i * 10000 + dw_px * 100 + dw_py) }
+            zone box dw_rz.$i { at: x + w - 4, y + h - 4; size: 30, 30; corner: 15; cursor: nwse_resize; active: here > 0.5 and widget_edit; label: "Resize {dw_w.$i.name}" }
+            on press dw_rz.$i { dw_di = -1; dw_ox = dw_w.$i.gw; dw_oy = dw_w.$i.gh; dw_px = dw_w.$i.gw; dw_py = dw_w.$i.gh; dw_ri = i }
+            on drag dw_rz.$i while dw_ri == i { dw_px = clamp(dw_ox + round(drag.dx / dk.cw), 2, 28 - dw_w.$i.gx); dw_py = clamp(dw_oy + round(drag.dy / dk.ch), 2, 16 - dw_w.$i.gy) }
+            on release dw_rz.$i while dw_ri == i { emit dw_size(i * 10000 + dw_px * 100 + dw_py) }
+            zone ellipse dw_x.$i { at: x + w - 2, y + 2; radius: 13; cursor: pointer; active: here > 0.5 and widget_edit; label: "Take {dw_w.$i.name} off the desktop" }
+            on press dw_x.$i { emit dw_del(i) }
+        }
+        //  The list of entities, over the editor's shelf, from its tile (`widget_menu`): a tick puts a card on the desktop, another takes it off
+        let mn.w = 470
+        let mn.h = 74 + dw_mrows * 36
+        let mn.x = clamp(widget_mx - mn.w / 2, 12, dk.sw - mn.w - 12)
+        let mn.y = max(widget_my - 14 - mn.h, 12) + 10 * (1 - dmn)
+        group {
+            show: dmn > 0.01 and screen.index == dw_mmon
+            opacity: dmn
+            body { color: tint; glass: 1; lens: false; rim: 70%; shine: 0, 0; shadow: 0, 10, 26, 36%; show: dk.pl < 0.5; box { from: mn.x, mn.y; size: mn.w, mn.h; corner: 22 } }
+            body { color: tint; rim: 0%; border: 2.6, deep; shadow: 4, 5, 0, 60%, deep; show: dk.pl > 0.5; box { from: mn.x, mn.y; size: mn.w, mn.h; corner: 16 } }
+            box { at: mn.x + 26, mn.y + 27; size: 10, 10; corner: 2; rotate: 45deg; color: mint }
+            text t_wg_title { at: mn.x + 42, mn.y + 27; anchor: left center; size: 14; weight: 700; color: ink; family: "Space Grotesk" }
+            text t_wg_hint { at: mn.x + 22, mn.y + 50; anchor: left center; size: 11.5; weight: 500; width: mn.w - 80; lines: 1; color: faint; family: "Space Grotesk" }
+            ellipse { at: mn.x + mn.w - 28, mn.y + 28; radius: 12; color: ink; opacity: 0.07 + 0.1 * dw_mx.hover }
+            HUi(k: 10, cx: mn.x + mn.w - 28, cy: mn.y + 28, c: ink, a: 1, s: 2341, f: 0, z: 0.5)
+            zone ellipse dw_mx { at: mn.x + mn.w - 28, mn.y + 28; radius: 14; cursor: pointer; active: dw_menu and widget_edit; label: "Close" }
+            on press dw_mx { dw_menu = false }
+            repeat e in 0..32 {
+                let ex = mn.x + 14 + dw_ents.$e.col * 224
+                let ey = mn.y + 66 + dw_ents.$e.row * 36
+                //  a room: its name, small, over a hairline
+                group {
+                    show: e < dw_ents.count and dw_ents.$e.head
+                    text dw_ents.$e.name { at: ex + 6, ey + 18; anchor: left center; size: 11; weight: 700; width: mn.w - 40; lines: 1; color: mint; family: "Space Grotesk" }
+                    box { from: ex + 6, ey + 30; size: mn.w - 40, 1; color: mint; opacity: 22% }
+                }
+                group {
+                    show: e < dw_ents.count and not dw_ents.$e.head
+                    box { from: ex, ey; size: 218, 30; corner: 15; color: if(dw_ents.$e.on, mint, ink); opacity: if(dw_ents.$e.on, 20%, 6%) + 8% * dw_e.$e.hover }
+                    box { from: ex, ey; size: 218, 30; corner: 15; stroke: 1.2; color: mint; opacity: if(dw_ents.$e.on, 70%, 0%) }
+                    text dw_ents.$e.name { at: ex + 14, ey + 15; anchor: left center; size: 13; weight: 600; width: 166; lines: 1; color: ink; family: "Space Grotesk" }
+                    ellipse { at: ex + 200, ey + 15; radius: 9; color: if(dw_ents.$e.on, mint, deep) }
+                    ellipse { at: ex + 200, ey + 15; radius: 9; stroke: 1.3; color: mint }
+                    text if(dw_ents.$e.on, "✓", "+") { at: ex + 200, ey + 15; anchor: center; size: if(dw_ents.$e.on, 11, 13); weight: 700; color: if(dw_ents.$e.on, onmint, mint); family: "Space Grotesk" }
+                }
+                zone box dw_e.$e { from: ex, ey; size: 218, 30; corner: 15; cursor: pointer; active: e < dw_ents.count and not dw_ents.$e.head and dw_menu and widget_edit and screen.index == dw_mmon; label: "{dw_ents.$e.name}" }
+                on press dw_e.$e { emit dw_ent(dw_ents.$e.k) }
+            }
+        }
+        on change widget_edit while not widget_edit { dw_menu = false; dw_di = -1; dw_ri = -1 }
     }
 }

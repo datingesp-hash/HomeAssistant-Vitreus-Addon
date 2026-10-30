@@ -109,6 +109,7 @@ local STR = {
         e404 = "Home Assistant no reconoce la dirección (404): revisa la url", ehttp = "Home Assistant ha respondido con un error (%s)",
         bad = "Entidad no válida: %s", unavailable = "No disponible", light_on = "Encendida", light_off = "Apagada", on = "Activado", off = "Desactivado",
         room = "Habitación %d",
+        wg_title = "Widgets de Home Assistant", wg_hint = "Marca una entidad para ponerla en el escritorio; la cruz de la tarjeta la quita",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
         hint = "Arrastra una ficha para moverla, o su esquina para cambiar su tamaño", ed_start = "Cambiar el tamaño de las fichas", ed_done = "Terminar", refresh = "Actualizar",
         edit_cfg = "Editar la configuración", no_editor = "No hay editor de texto: instala uno o define $EDITOR. Ruta copiada: %s", connecting_ha = "Conectando con Home Assistant…", title_offline = "Sin conexión",
@@ -161,6 +162,7 @@ local STR = {
         e404 = "Home Assistant doesn't know that address (404): check the url", ehttp = "Home Assistant answered with an error (%s)",
         bad = "Invalid entity: %s", unavailable = "Unavailable", light_on = "On", light_off = "Off", on = "On", off = "Off",
         room = "Room %d",
+        wg_title = "Home Assistant widgets", wg_hint = "Tick an entity to put it on the desktop; its card's cross takes it off",
         -- the scene's (homeassistant.plm takes them as the `t_*` texts)
         hint = "Drag a tile to move it, or its corner to resize it", ed_start = "Resize the tiles", ed_done = "Done", refresh = "Refresh",
         edit_cfg = "Edit the settings", no_editor = "No text editor found: install one or set $EDITOR. Path copied: %s", connecting_ha = "Connecting to Home Assistant…", title_offline = "Can't connect",
@@ -349,6 +351,8 @@ local WORDS = {
     "mute",
     "prev",
     "next",
+    "wg_title",
+    "wg_hint",
 }
 local LANGS = { English = STR.en, Spanish = STR.es }          -- the ones that come with it, by their file's name
 local lang = "en"            -- the language's code (its file's "_code"): which country's catalogue the Apple TV's artwork is looked up in
@@ -490,7 +494,7 @@ local function scene_words()
     text.t_tab1 = T("tab_remote")
     text.t_kb = T("kb_hint")
     text.t_power = T("power")
-    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next" }) do
+    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next", "wg_title", "wg_hint" }) do
         text["t_" .. k] = T(k)
     end
 end
@@ -658,6 +662,7 @@ end
 
 local show, call          -- (both further down; the Apple TV's poll, here, uses them)
 local st                  -- the settings page (settings.luau), once it is loaded
+local wg                  -- the desktop widgets (widget.luau), once they are loaded
 -- An Apple TV (or any media player given "apple_tv"): what it plays, asked in a template of its own (a few more attributes than the tiles' one), when it is
 -- polled. Its position is counted on here between answers (`at`: the tick it came at), so the bar moves every second without asking.
 local tvs = {}              -- by media player: { st, title, artist, series, app, dur, pos, el, pic, at }
@@ -1002,6 +1007,7 @@ show = function()
     end
     pr_fill()
     tv_fill()
+    if wg then wg.rows(rows) end
     -- (only what changed: the poll answers every few seconds, mostly with the same)
     local sig = json.encode({ rows, heads, content })
     if sig == last_sig then return end
@@ -1247,7 +1253,7 @@ local function load()
 end
 
 -- What the tiles and the slider ask for
-on("hl_tap", function(k)
+local function tap(k)
     local i = (tonumber(k) or -1) + 1
     local it = cfg and cfg.items[i]
     local s = state[i]
@@ -1262,10 +1268,11 @@ on("hl_tap", function(k)
         hold_until[i] = nil
         after(700, poll)
     end)
-end)
+end
+on("hl_tap", tap)
 
-on("hl_bri", function(v)
-    local i = (tonumber(fact.sl_i) or -1) + 1
+-- A light's brightness (0 to 1), from the card's slider or the desktop widget's wheel
+local function bri_to(i, v)
     local it = cfg and cfg.items[i]
     if not it or it.kind ~= 0 or it.bad then return end
     local pct = math.floor(math.max(0, math.min(1, tonumber(v) or 0)) * 100 + 0.5)
@@ -1281,7 +1288,8 @@ on("hl_bri", function(v)
         if not ok then set_state(2, T("offline"), err) end
         after(900, function() hold_until[i] = nil; poll() end)
     end)
-end)
+end
+on("hl_bri", function(v) bri_to((tonumber(fact.sl_i) or -1) + 1, v) end)
 
 -- A colour chosen in the card: hue in degrees times 1000 plus saturation in percent. Home Assistant takes it as hs_color; a light that is off is turned
 -- on with it, at full brightness.
@@ -1559,6 +1567,10 @@ on("fact:slot_open", function(v)
 end)
 
 -- config.json saved: read it again
+-- The desktop widgets (a card for each entity chosen in Vitreus's desktop editor): widget.luau
+wg = require("widget")({
+    T = T, cfg = function() return cfg end, tap = tap, bri = bri_to,
+})
 -- The settings page (the gear): settings.luau
 st = require("settings")({
     T = T, call = function(...) return call(...) end, folder = function() return folder end, cfg = function() return cfg end,
@@ -1572,7 +1584,7 @@ end)
 
 every(1000, function()
     tick = tick + 1
-    local period = open and 3 or 30
+    local period = open and 3 or ((wg and wg.shown()) and 5 or 30)          -- (the open panel every 3 s; the desktop widgets, while there are any, every 5)
     if fact.hl_state == 2 then period = 10 end
     if fact.hl_state == 3 then return end
     if tick % period == 0 then poll() end
