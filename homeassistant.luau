@@ -662,7 +662,7 @@ end
 
 local show, call          -- (both further down; the Apple TV's poll, here, uses them)
 local st                  -- the settings page (settings.luau), once it is loaded
-local wg                  -- the desktop widget (widget.luau), once it is loaded
+local wg                  -- the desktop widgets (widget.luau), once they are loaded
 -- An Apple TV (or any media player given "apple_tv"): what it plays, asked in a template of its own (a few more attributes than the tiles' one), when it is
 -- polled. Its position is counted on here between answers (`at`: the tick it came at), so the bar moves every second without asking.
 local tvs = {}              -- by media player: { st, title, artist, series, app, dur, pos, el, pic, at }
@@ -1567,11 +1567,11 @@ on("fact:slot_open", function(v)
 end)
 
 -- config.json saved: read it again
--- The settings page (the gear): settings.luau
--- The desktop widget (Vitreus's desktop editor shows, hides and places it): widget.luau
+-- The desktop widgets (a card for each entity chosen in Vitreus's desktop editor): widget.luau
 wg = require("widget")({
     T = T, cfg = function() return cfg end, tap = tap, bri = bri_to,
 })
+-- The settings page (the gear): settings.luau
 st = require("settings")({
     T = T, call = function(...) return call(...) end, folder = function() return folder end, cfg = function() return cfg end,
     edit_json = edit_json, PENCIL = PENCIL, DEV = DEV, ALIAS = ALIAS, lang = function() return lang end,
@@ -1584,7 +1584,7 @@ end)
 
 every(1000, function()
     tick = tick + 1
-    local period = (open or (wg and wg.shown())) and 3 or 30          -- (the desktop widget, while it is on the desktop, as often as the open panel)
+    local period = open and 3 or ((wg and wg.shown()) and 5 or 30)          -- (the open panel every 3 s; the desktop widgets, while there are any, every 5)
     if fact.hl_state == 2 then period = 10 end
     if fact.hl_state == 3 then return end
     if tick % period == 0 then poll() end

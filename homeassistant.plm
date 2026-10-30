@@ -1252,6 +1252,7 @@ scene HomeAssistant {
     //  ── The desktop widgets' own surface: on the desktop, under the windows (over them while the desktop editor is open), each card on its own monitor ──
     surface desk {
         size: full, full; anchor: top_left; margin: 0; level: bottom, top while widget_edit; screens: each max 4; reserve: -1
+        open: dw_w.count > 0 or dw_menu                // (no cards and no list: no layer on the desktop at all)
         prop dep = 0 ~calm
         follow dep = if(widget_edit, 1, 0)
         prop dmn = 0 ~calm
