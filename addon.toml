@@ -14,3 +14,7 @@ icon  = "icon.svg"
 [drawer]
 width  = 520
 height = 600
+
+# A card on the desktop with the entities it is given, which Vitreus's desktop editor shows, hides, places and resizes (widget.luau).
+[widget]
+name = "Home Assistant"

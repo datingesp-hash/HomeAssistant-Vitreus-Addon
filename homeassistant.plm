@@ -57,6 +57,36 @@ scene HomeAssistant {
     fact pal_alert_b = 0.2667
     fact look = 0
 
+    //  ── The desktop widget (`[widget]` in addon.toml, widget.luau) ──
+    //  A card on the desktop with the entities it is given, which Vitreus's desktop editor (a right press on the bare wallpaper) shows, hides, places and resizes like the
+    //  shell's own widgets: what it is told and answers (`widget_shown`, `widget_edit`, `widget_place`, `glide`) is in Vitreus's addons/_template_drawer/addon.toml.
+    fact widget_shown = false
+    fact widget_edit = false
+    text widget_place = ""
+    fact glide = false
+    fact room_t = 0                                   // the room the bar takes (Vitreus tells it): the grid starts 16 px inside it
+    fact room_r = 0
+    fact room_b = 0
+    fact room_l = 0
+    fact dw_gx = 1                                    // the cell of its top left corner on the desktop's 28 x 16 grid, and how many it takes
+    fact dw_gy = 1
+    fact dw_gw = 7
+    fact dw_gh = 4
+    fact dw_mon = 0                                   // which copy (monitor) shows it
+    fact dw_pick = false                              // the list of entities to choose from is out (Edit mode)
+    fact dw_drag = false                              // it is being carried, or its corner pulled (`dw_rs`): how far, `dw_dx`, `dw_dy`
+    fact dw_rs = false
+    fact dw_dx = 0
+    fact dw_dy = 0
+    model dw_items max 8 { name: text; sub: text; on: number; kind: number; bri: number; avail: number; pk: number; dk: number; custom: number; img: image 48, 48 }
+    model dw_ents max 24 { name: text; on: bool }
+    event dw_tap ->                                   // a tile, by its place
+    event dw_bri ->                                   // a light's brightness from the wheel: its place × 1000 + the new percentage
+    event dw_move ->                                  // dropped: gx × 100 + gy
+    event dw_size ->                                  // let go of the corner: gw × 100 + gh
+    event dw_ent ->                                   // an entity of the list ticked or unticked, by its place in the configuration
+    event dw_mon_next ->                              // to the next monitor
+
     fact slot_open = false
     fact slot_x = 0
     fact slot_y = 0
@@ -292,6 +322,9 @@ scene HomeAssistant {
     text t_mute = ""
     text t_prev = ""
     text t_next = ""
+    text t_wg_ents = ""
+    text t_wg_empty = ""
+    text t_wg_monitor = ""
     prop sl_k = 0 ~240ms
     follow sl_k = if(sl_open, 1, 0)
     prop sl_vs = 0 ~quick                             // the fill, a hair behind the finger
@@ -1209,5 +1242,167 @@ scene HomeAssistant {
                 on key space while tv_open and tv_tab == 1 { emit tv_cmd(7); tv_fl = 7 }
             }
         }
+    }
+
+    //  ── The desktop widget's own surface: on the desktop, under the windows (over them while the desktop editor is open), on the monitor it was put on ──
+    surface desk {
+        size: full, full; anchor: top_left; margin: 0; level: bottom, top while widget_edit; screens: each max 4; reserve: -1
+        prop dsh = 0 ~calm
+        follow dsh = if(widget_shown, 1, 0)
+        prop dep = 0 ~calm
+        follow dep = if(widget_edit, 1, 0)
+        prop dpk = 0 ~calm
+        follow dpk = if(dw_pick and widget_edit, 1, 0)
+        //  where it goes: at once (the cell), in Edit mode on a spring, and while a theme puts it back (`glide`) on a slower one
+        prop dqx = 0 ~quick
+        prop dqy = 0 ~quick
+        prop dqw = 0 ~quick
+        prop dqh = 0 ~quick
+        follow dqx = dw_gx
+        follow dqy = dw_gy
+        follow dqw = dw_gw
+        follow dqh = dw_gh
+        prop dsx = 0 ~gentle
+        prop dsy = 0 ~gentle
+        follow dsx = dw_gx
+        follow dsy = dw_gy
+        prop dgl = 0 ~0ms
+        follow dgl = if(glide, 1, 0)
+        let dk.here = if(screen.index == dw_mon, 1, 0)
+        let dk.vis = dsh * dk.here
+        let dk.sw = max(screen.width, 800)
+        let dk.sh = max(screen.height, 600)
+        let dk.gl = 16 + room_l
+        let dk.gt = 16 + room_t
+        let dk.cw = (dk.sw - dk.gl - 16 - room_r) / 28
+        let dk.ch = (dk.sh - dk.gt - 16 - room_b) / 16
+        let dk.ex = mix(mix(dw_gx, dqx, dep), dsx, dgl)
+        let dk.ey = mix(mix(dw_gy, dqy, dep), dsy, dgl)
+        let dk.ew = mix(dw_gw, dqw, dep)
+        let dk.eh = mix(dw_gh, dqh, dep)
+        //  the card, a little inside its cells; carried, it follows the pointer, and its corner pulled, it grows with it
+        let dk.x = dk.gl + dk.ex * dk.cw + 3 + if(dw_drag, dw_dx, 0)
+        let dk.y = dk.gt + dk.ey * dk.ch + 3 + if(dw_drag, dw_dy, 0)
+        let dk.w = max(dk.ew * dk.cw - 6 + if(dw_rs, dw_dx, 0), 3 * dk.cw - 6)
+        let dk.h = max(dk.eh * dk.ch - 6 + if(dw_rs, dw_dy, 0), 2 * dk.ch - 6)
+        let dk.pl = if(look == 1 or look == 2, 1, 0)
+        group {
+            show: dk.vis > 0.01
+            opacity: dk.vis
+            //  the glass, as the shell's desktop widgets have it (plastic on Retro and UwU)
+            body {
+                color: tint
+                glass: 1
+                lens: false
+                rim: 70%
+                shine: 0, 0
+                shadow: 0, 6, 18, 30%
+                show: dk.pl < 0.5
+                box { from: dk.x, dk.y; size: dk.w, dk.h; corner: 22 }
+            }
+            body {
+                color: tint
+                rim: 0%
+                border: 2.6, deep
+                shadow: 4, 5, 0, 60%, deep
+                show: dk.pl > 0.5
+                box { from: dk.x, dk.y; size: dk.w, dk.h; corner: 16 }
+            }
+            //  the tiles: as many columns as fit (150 px or more each), in rows that share the height
+            let dk.n = max(dw_items.count, 1)
+            let dk.cols = clamp(floor((dk.w - 16) / 158), 1, dk.n)
+            let dk.rows = ceil(dk.n / dk.cols)
+            let dk.tw = (dk.w - 24 - (dk.cols - 1) * 8) / dk.cols
+            let dk.th = (dk.h - 24 - (dk.rows - 1) * 8) / dk.rows
+            text t_wg_empty { at: dk.x + dk.w / 2, dk.y + dk.h / 2; anchor: center; align: center; size: 13; width: dk.w - 32; lines: 2; color: faint; show: dw_items.count < 1; family: "Space Grotesk" }
+            repeat i in 0..8 {
+                let tx = dk.x + 12 + mod(i, dk.cols) * (dk.tw + 8)
+                let ty = dk.y + 12 + floor(i / dk.cols) * (dk.th + 8)
+                let lit = if(dw_items.$i.on > 0.5 and dw_items.$i.avail > 0.5, 1, 0)
+                let hot = dw_t.$i.hover * (1 - dep)
+                let tl = if(dk.th > 64, 1, 0)                 // tall enough for the icon above the name
+                group {
+                    show: i < dw_items.count
+                    opacity: if(dw_items.$i.avail > 0.5, 100%, 45%)
+                    box { from: tx, ty; size: dk.tw, dk.th; corner: 14; color: mix(ink, mint, lit); opacity: 7% + 5% * hot + 13% * lit }
+                    box { from: tx, ty; size: dk.tw, dk.th; corner: 14; stroke: 1.2; color: mint; opacity: 50% * lit }
+                    let ix = tx + if(tl > 0.5, 24, 22)
+                    let iy = ty + if(tl > 0.5, 24, dk.th / 2)
+                    group {
+                        show: dw_items.$i.dk < 0 and dw_items.$i.custom < 0.5
+                        PIcon(k: max(dw_items.$i.pk, 0), cx: ix, cy: iy, lit: 0, c: mix(ink, mint, lit), a: 1, s: 2100 + i * 17, f: if(hot > 0.5, floor(time * 8), 0), z: 0.8)
+                    }
+                    group {
+                        show: dw_items.$i.dk >= 0
+                        HDev(k: max(dw_items.$i.dk, 0), cx: ix, cy: iy, c: mix(ink, mint, lit), a: 1, s: 2200 + i * 13, f: if(hot > 0.5, floor(time * 8), 0), z: 0.8)
+                    }
+                    image dw_items.$i.img { at: ix - 11, iy - 11; size: 22, 22; tint: mix(ink, mint, lit); show: dw_items.$i.custom > 0.5 }
+                    let nx = if(tl > 0.5, tx + 14, tx + 44)
+                    let ny = if(tl > 0.5, ty + dk.th - 34, ty + dk.th / 2 - 9)
+                    text dw_items.$i.name { at: nx, ny; anchor: left center; size: 14; weight: 600; width: tx + dk.tw - 10 - nx; lines: 1; color: ink; family: "Space Grotesk" }
+                    text dw_items.$i.sub { at: nx, ny + 18; anchor: left center; size: 11.5; weight: 500; width: tx + dk.tw - 10 - nx; lines: 1; color: if(lit > 0.5, mint, faint); family: "Space Grotesk" }
+                    //  a light: how bright, along the foot of the tile
+                    box { from: tx + 12, ty + dk.th - 7; size: dk.tw - 24, 3; corner: 1.5; color: ink; opacity: 12% * lit; show: dw_items.$i.kind == 0 }
+                    box { from: tx + 12, ty + dk.th - 7; size: (dk.tw - 24) * dw_items.$i.bri, 3; corner: 1.5; color: mint; opacity: lit; show: dw_items.$i.kind == 0 }
+                }
+                zone box dw_t.$i { from: tx, ty; size: dk.tw, dk.th; corner: 14; cursor: pointer; active: i < dw_items.count and widget_shown and not widget_edit and dk.here > 0.5; label: "{dw_items.$i.name}" }
+                on press dw_t.$i { emit dw_tap(i) }
+                on scroll dw_t.$i while dw_items.$i.kind == 0 { emit dw_bri(i * 1000 + round(clamp(dw_items.$i.bri + wheel * 0.1, 0, 1) * 100)) }
+            }
+            //  Edit mode: the cells it takes, outlined; carried by its middle, its corner pulls it bigger or smaller (a cell at a time), and two chips set it up
+            group {
+                show: dep > 0.01
+                opacity: dep
+                box { from: dk.x - 3, dk.y - 3; size: dk.w + 6, dk.h + 6; corner: 24; color: mint; opacity: 7% + 9% * if(dw_drag or dw_rs, 1, 0) }
+                box { from: dk.x - 3, dk.y - 3; size: dk.w + 6, dk.h + 6; corner: 24; stroke: 1.6; color: mint; opacity: 55% + 45% * if(dw_drag or dw_rs, 1, 0) }
+                text "HOME ASSISTANT" { at: dk.x + 14, dk.y - 14; anchor: left center; size: 11; weight: 700; color: mint; family: "Space Grotesk"; shadow: 0, 1, 5, 70% }
+                //  the corner to pull
+                box { at: dk.x + dk.w - 4, dk.y + dk.h - 4; size: 24, 24; corner: 12; color: mint; opacity: 85% + 15% * dw_rz.hover }
+                HUi(k: 6, cx: dk.x + dk.w - 4, cy: dk.y + dk.h - 4, c: onmint, a: 1, s: 2301, f: 0, z: 0.5)
+                //  Entities and Monitor
+                repeat q in 0..2 {
+                    let qx = dk.x + dk.w - 12 - pick(q, 0, 112) - 50
+                    box { at: qx, dk.y - 14; size: 100, 22; corner: 11; color: if(q == 0 and dw_pick, mint, deep); opacity: 85% }
+                    box { at: qx, dk.y - 14; size: 100, 22; corner: 11; stroke: 1.2; color: mint; opacity: 60% + 40% * dw_c.$q.hover }
+                    text pick(q, t_wg_ents, t_wg_monitor) { at: qx, dk.y - 14; anchor: center; align: center; size: 11.5; weight: 700; width: 92; lines: 1; color: if(q == 0 and dw_pick, onmint, mint); family: "Space Grotesk" }
+                    zone box dw_c.$q { at: qx, dk.y - 14; size: 100, 22; corner: 11; cursor: pointer; active: widget_edit and widget_shown and dk.here > 0.5; label: pick(q, "Entities", "Monitor") }
+                    on press dw_c.$q while q == 0 { toggle dw_pick }
+                    on press dw_c.$q while q == 1 { emit dw_mon_next }
+                }
+            }
+            //  the list of entities to choose from, beside the card (on whichever side has room): up to eight are shown
+            let dk.px = if(dk.x + dk.w + 16 + 420 < dk.sw, dk.x + dk.w + 16, dk.x - 16 - 420)
+            let dk.pr = ceil(dw_ents.count / 2)
+            group {
+                show: dpk > 0.01
+                opacity: dpk
+                body { color: tint; glass: 1; lens: false; rim: 70%; shine: 0, 0; shadow: 0, 6, 18, 30%; box { from: dk.px, dk.y; size: 420, 52 + dk.pr * 30; corner: 18 } }
+                text t_wg_ents { at: dk.px + 18, dk.y + 24; anchor: left center; size: 14; weight: 700; color: ink; family: "Space Grotesk" }
+                repeat e in 0..24 {
+                    let ex = dk.px + 12 + mod(e, 2) * 200
+                    let ey = dk.y + 46 + floor(e / 2) * 30
+                    group {
+                        show: e < dw_ents.count
+                        box { from: ex, ey; size: 196, 26; corner: 13; color: if(dw_ents.$e.on, mint, ink); opacity: if(dw_ents.$e.on, 22%, 6%) + 8% * dw_e.$e.hover }
+                        box { from: ex + 8, ey + 6; size: 14, 14; corner: 4; stroke: 1.4; color: mint }
+                        box { from: ex + 11, ey + 9; size: 8, 8; corner: 2; color: mint; show: dw_ents.$e.on }
+                        text dw_ents.$e.name { at: ex + 30, ey + 13; anchor: left center; size: 12.5; weight: 600; width: 158; lines: 1; color: ink; family: "Space Grotesk" }
+                    }
+                    zone box dw_e.$e { from: ex, ey; size: 196, 26; corner: 13; cursor: pointer; active: e < dw_ents.count and dw_pick and widget_edit and dk.here > 0.5 }
+                    on press dw_e.$e { emit dw_ent(e) }
+                }
+            }
+        }
+        //  Edit mode's zones: the card (carried), its corner (pulled), the chips. They are declared after the tiles, so they win the press while it lasts.
+        zone box dw_mv { from: dk.x, dk.y; size: dk.w, dk.h; corner: 22; cursor: if(dw_drag, grabbing, grab); active: widget_edit and widget_shown and dk.here > 0.5; label: "Move the Home Assistant widget" }
+        on press right dw_mv { }
+        on press dw_mv { dw_dx = 0; dw_dy = 0; dw_drag = true }
+        on drag dw_mv while dw_drag { dw_dx = drag.dx; dw_dy = drag.dy }
+        on release dw_mv while dw_drag { emit dw_move(clamp(round((dk.x - dk.gl - 3) / dk.cw), 0, 28 - dw_gw) * 100 + clamp(round((dk.y - dk.gt - 3) / dk.ch), 0, 16 - dw_gh)); dw_drag = false; dw_dx = 0; dw_dy = 0 }
+        zone box dw_rz { at: dk.x + dk.w - 4, dk.y + dk.h - 4; size: 30, 30; corner: 15; cursor: nwse_resize; active: widget_edit and widget_shown and dk.here > 0.5; label: "Resize the Home Assistant widget" }
+        on press dw_rz { dw_dx = 0; dw_dy = 0; dw_rs = true }
+        on drag dw_rz while dw_rs { dw_dx = drag.dx; dw_dy = drag.dy }
+        on release dw_rz while dw_rs { emit dw_size(clamp(round((dk.w + 6) / dk.cw), 3, 28 - dw_gx) * 100 + clamp(round((dk.h + 6) / dk.ch), 2, 16 - dw_gy)); dw_rs = false; dw_dx = 0; dw_dy = 0 }
+        on change widget_edit while not widget_edit { dw_pick = false; dw_drag = false; dw_rs = false }
     }
 }
