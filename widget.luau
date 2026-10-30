@@ -177,7 +177,7 @@ return function(api)
         local j = (tonumber(k) or -1) + 1
         if cards[j] then table.remove(cards, j); changed() end
     end)
-    -- let go of: the card's own place becomes the new one, and only then the scene lets go of it (so it never springs back on the way)
+    -- let go of: the card's own place becomes the new one (the scene lets go of it once it sees that, so it never springs back on the way)
     on("dw_move", function(v)
         v = math.floor(tonumber(v) or 0)
         local c = cards[v // 10000 + 1]
@@ -186,7 +186,6 @@ return function(api)
             c.gy = clampi(v % 100, 0, GY - c.gh)
             changed()
         end
-        fact.dw_di = -1
     end)
     on("dw_size", function(v)
         v = math.floor(tonumber(v) or 0)
@@ -196,7 +195,6 @@ return function(api)
             c.gh = clampi(v % 100, 2, GY - c.gy)
             changed()
         end
-        fact.dw_ri = -1
     end)
     on("dw_tap", function(k)
         local i = by_card[(tonumber(k) or -1) + 1]
