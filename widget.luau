@@ -105,8 +105,17 @@ return function(api)
         for _, c in ipairs(cards) do lines[#lines + 1] = table.concat({ c.entity, c.mon, c.gx, c.gy, c.gw, c.gh }, ",") end
         return table.concat(lines, ";")
     end
+    -- Vitreus's desktop editor ticks this add-on's tile while there are cards: it is told when that changes (it does not keep asking)
+    local said = nil
+    local function tell_editor()
+        local on = #cards > 0
+        if on == said then return end
+        said = on
+        run("pleamar", { "--say", "desktopedit", "text aw_said homeassistant", "fact aw_said_on " .. tostring(on), "emit aw_say" }, function() end)
+    end
     local function changed()
         save()
+        tell_editor()
         fact.widget_shown = #cards > 0
         text.widget_place = place()
         fill()
