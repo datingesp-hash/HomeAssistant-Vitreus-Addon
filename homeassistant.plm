@@ -341,13 +341,15 @@ scene HomeAssistant {
     prop hl_sp = 0 ~quick
     fact hl_grab = 0
     on change hl_sp { hl_sc = hl_sp }
-    //  Edit mode: a tile carried to another place (`mv_i`), how far it has gone, and where its middle is now (the tile under it is where it lands)
+    //  Edit mode: a tile carried to another place (`mv_i`), where its middle was when it was taken (`mv_ox`, `mv_oy`) and where it is now (`mv_cx`, `mv_cy`,
+    //  from the list's top left). The logic hears where it is and lays the others out around the place it would land on, at once; every tile moves to its
+    //  place on a spring of its own, so they make room smoothly, and the one let go of glides from the pointer to its place.
     fact mv_i = -1
-    fact mv_dx = 0
-    fact mv_dy = 0
+    fact mv_ox = 0
+    fact mv_oy = 0
     fact mv_cx = 0
     fact mv_cy = 0
-    event hl_move ->                                  // dropped: its place × 10 000 000 + where its middle is, x × 10 000 + y (unscaled, from the list's top left)
+    event hl_move ->                                  // let go of: its row (it lands where the logic has been showing it would)
     text t_rz = ""                                    // the size a tile being pulled would take ("½ × 1", "2 × 1"…)
     prop hl_spin = 0
     spin hl_spin by if(hl_state == 0, 1, 0)
@@ -453,7 +455,9 @@ scene HomeAssistant {
                 move: 0, gtop - hl_sp
                 //  a room's head: its name, and after it the temperature and the humidity, each with its sign, when the room has a sensor for them
                 for rm in hl_rooms {
-                    let hy = rm.yu * u
+                    prop hry = 0 ~quick
+                    follow hry = rm.yu * u
+                    let hy = mix(rm.yu * u, hry, hl_ed)          // (in edit mode the heads move on a spring too, as the tiles make room)
                     row {
                         at: gx + 4 * u, hy + 4 * u
                         gap: 6 * u
@@ -492,13 +496,22 @@ scene HomeAssistant {
                     let dx = if(small > 0.5, cx0 + tww / 2, cx0 + mix(33, 36, tall) * u)          // the disc's middle
                     let dy = if(small > 0.5, cy0 + thh / 2, mix(cy0 + thh / 2, cy0 + 36 * u, tall))
                     let carried = if(mv_i == r.index, 1, 0)
-                    let under = if(mv_i >= 0 and carried < 0.5 and mv_cx > cx0 and mv_cx < cx0 + tww and mv_cy > cy0 and mv_cy < cy0 + thh, 1, 0)
+                    //  where it is drawn: its place, or in edit mode its spring to it (the one carried follows the pointer, and glides to its place once let go of)
+                    prop tpx = 0 ~quick
+                    prop tpy = 0 ~quick
+                    follow tpx = if(carried > 0.5, mv_cx - tww / 2, cx0)
+                    follow tpy = if(carried > 0.5, mv_cy - thh / 2, cy0)
+                    let ex = if(carried > 0.5, mv_cx - tww / 2, mix(cx0, tpx, hl_ed))
+                    let ey = if(carried > 0.5, mv_cy - thh / 2, mix(cy0, tpy, hl_ed))
                     let tx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)                   // where the name starts, and how wide it may be
                     let tmax = tww - mix(if(r.kind == 1, 112, 72), 36, tall) * u
                     let ny = mix(cy0 + thh / 2 - 9 * u, cy0 + thh - if(r.kind == 0 and lit > 0.5, 46, 38) * u, tall)
+                    //  the place the carried tile would land on, while it is carried
+                    box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 10% * carried * hl_ed; show: carried > 0.5 }
+                    box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * carried * hl_ed; show: carried > 0.5 }
                     group {
-                        opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.15 * carried)
-                        move: mv_dx * carried, mv_dy * carried
+                        opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.1 * carried)
+                        move: ex - cx0, ey - cy0
                         zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { hl_grab = hl_sp; emit hl_tap(r.index) }
                         on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
@@ -507,8 +520,7 @@ scene HomeAssistant {
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held or carried > 0.5 or under > 0.5, mint, ink); opacity: hl_ed * if(held or carried > 0.5 or under > 0.5, 90%, 22%) }
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 12% * under }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held or carried > 0.5, mint, ink); opacity: hl_ed * if(held or carried > 0.5, 90%, 22%) }
                         //  the disc: hollow when off, lit and glowing when on (a little larger in a tall tile)
                         body {
                             color: mix(off, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), lit)
@@ -563,15 +575,58 @@ scene HomeAssistant {
                             box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
                             text t_rz { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
                         }
-                        //  edit mode: the tile itself is carried to another place (it follows the pointer; the tile under its middle lights, and it lands there)
-                        zone box hl_mv_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and seen and rz_i < 0 and (mv_i < 0 or carried > 0.5); label: "{r.name}" }
-                        on press hl_mv_z { mv_i = r.index; mv_dx = 0; mv_dy = 0; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2 }
-                        on drag hl_mv_z while mv_i == r.index { mv_dx = drag.dx; mv_dy = drag.dy; mv_cx = cx0 + tww / 2 + drag.dx; mv_cy = cy0 + thh / 2 + drag.dy }
-                        on release hl_mv_z while mv_i == r.index { emit hl_move(r.index * 10000000 + clamp(round(mv_cx / u), 0, 999) * 10000 + clamp(round(mv_cy / u), 0, 9999)); mv_i = -1; mv_dx = 0; mv_dy = 0 }
+                        //  edit mode: the tile itself is carried to another place (it follows the pointer; the others make room, and an outline shows where it lands)
+                        zone box hl_mv_z { from: cx0 - 1500 * u * carried, cy0 - 1500 * u * carried; size: tww + 3000 * u * carried, thh + 3000 * u * carried; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and seen and rz_i < 0 and (mv_i < 0 or carried > 0.5); label: "{r.name}" }
+                        //  (it is carried by its middle: where that was when it was taken, plus how far the pointer has gone; its own place changes under it as the others make room)
+                        on press hl_mv_z { mv_ox = cx0 + tww / 2; mv_oy = cy0 + thh / 2; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2; mv_i = r.index }
+                        on drag hl_mv_z while mv_i == r.index { mv_cx = mv_ox + drag.dx; mv_cy = mv_oy + drag.dy }
+                        on release hl_mv_z while mv_i == r.index { emit hl_move(r.index); mv_i = -1 }
                         zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "{t_resize} {r.name}" }
                         on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
                         on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (hw + gap)), 1, 2 * cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
                         on release hl_grip_z { rz_i = -1 }
+                    }
+                }
+                //  The carried tile again, over all the others (the rows are drawn in order, so in its own row it would pass under the ones after it): lifted, on an
+                //  opaque plate with a shadow, at the pointer. (`z:` would do it, but inside a `for` it mixes up the rows' `r.index`.)
+                for r in hl_items {
+                    let ccs = r.cs
+                    let crs = r.rs
+                    let cww = ccs * hw + (ccs - 1) * gap
+                    let chh = crs * th + (crs - 1) * gap
+                    let csm = if(ccs <= 1.5, 1, 0)
+                    let ctl = if(crs >= 2, 1, 0)
+                    let cx = mv_cx - cww / 2
+                    let cy = mv_cy - chh / 2
+                    let clit = r.on * r.avail
+                    let cdx = if(csm > 0.5, cx + cww / 2, cx + mix(33, 36, ctl) * u)
+                    let cdy = if(csm > 0.5, cy + chh / 2, mix(cy + chh / 2, cy + 36 * u, ctl))
+                    let ctx = mix(cx + 62 * u, cx + 18 * u, ctl)
+                    let cny = mix(cy + chh / 2 - 9 * u, cy + chh - 38 * u, ctl)
+                    group {
+                        show: mv_i == r.index and hl_ed > 0.5
+                        body {
+                            color: mix(tint, ink, 0.07)
+                            shadow: 0, 10 * u, 26 * u, 50%, deep
+                            box { from: cx, cy; size: cww, chh; corner: 14 * u }
+                        }
+                        box { from: cx, cy; size: cww, chh; corner: 14 * u; color: mint; opacity: 10% * clit }
+                        box { from: cx, cy; size: cww, chh; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 90% }
+                        body {
+                            color: mix(off, mint, clit)
+                            ellipse { at: cdx, cdy; radius: mix(19, 22, ctl) * u }
+                        }
+                        group {
+                            show: r.custom < 0.5 and r.pk >= 0
+                            PIcon(k: max(r.pk, 0), cx: cdx, cy: cdy, lit: 0, c: mix(ink, onmint, clit), a: 1, s: 3 + r.index * 17, f: 0, z: 0.78 + 0.12 * ctl)
+                        }
+                        image r.img { at: cdx - (11 + 2 * ctl) * u, cdy - (11 + 2 * ctl) * u; size: (22 + 4 * ctl) * u, (22 + 4 * ctl) * u; tint: mix(ink, onmint, clit); show: r.custom > 0.5 }
+                        group {
+                            show: r.dk >= 0
+                            HDev(k: max(r.dk, 0), cx: cdx, cy: cdy, c: mix(ink, onmint, clit), a: 1, s: 5 + r.index * 13, f: 0, z: 0.92 + 0.15 * ctl)
+                        }
+                        text r.name { at: ctx, cny; anchor: left center; size: 13.5 + ctl; weight: 600; width: cww - mix(72, 36, ctl) * u; lines: 1; color: ink; show: csm < 0.5; family: "Space Grotesk" }
+                        text r.sub { at: ctx, cny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: cww - mix(72, 36, ctl) * u; lines: 1; color: if(clit > 0.5, mint, faint); show: csm < 0.5; family: "Space Grotesk" }
                     }
                 }
               }
