@@ -15,7 +15,7 @@ import "addon-pencil.plm"                         // Vitreus's pencil (its add-o
 //  pencil's (addon-pencil.plm's PIcon) or of the add-on's own (ha-icons.plm's HDev); the buttons are ha-icons.plm's HUi.
 
 scene HomeAssistant {
-    surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4; keyboard: on_demand while shown > 0.5 and not st_open }
+    surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4; open: shown > 0.5; keyboard: on_demand while shown > 0.5 and not st_open }
 
     permissions {
         services: "files", "files.write", "env"
@@ -363,7 +363,12 @@ scene HomeAssistant {
     spin hl_spin by if(hl_state == 0, 1, 0)
 
     let u = 1.1
-    let fr = if(shown > 0.5 and look < 4.5, floor(time * 8), 0)       // which redrawing of the pencil this is (it holds still on the Proxy theme, whose HUD is crisp)
+    //  The scene's own clock, which only runs while something can boil (the panel out, a desktop card under the pointer): naming pleamar's `time` keeps a scene
+    //  awake for good, about fifty rounds a second all day with the panel shut. Stopped, nothing moves and the scene rests.
+    prop hl_clk = 0
+    fact dw_hov = false                               // the pointer is over a desktop card (its rules, in the desk surface)
+    spin hl_clk by if(shown > 0.5 or dw_hov, 1, 0)
+    let fr = if(shown > 0.5 and look < 4.5, floor(hl_clk * 8), 0)       // which redrawing of the pencil this is (it holds still on the Proxy theme, whose HUD is crisp)
     //  The content arrives as the Control Center's does (the add-on template's recipe): the head, then the tiles, then the rest, each rising a little as it fades in, each
     //  on its own spring, starting 200 ms after the panel is out (a scene that was shut draws nothing, so its first frame is long and a spring started in it would be over
     //  at once); out at once. `wk` keeps frames coming while the content waits.
@@ -783,7 +788,7 @@ scene HomeAssistant {
                     group {
                         show: st_fa >= 0
                         text st_fv { at: 14 * u + st_fx * u + 14 * u, st_fy * u + 37 * u; anchor: left center; size: 13.5; weight: 500; width: st_fw * u - 28 * u; lines: 1; color: ink; measure: stf; family: "Space Grotesk" }
-                        box { from: 14 * u + st_fx * u + 15 * u + min(stf.width, st_fw * u - 30 * u), st_fy * u + 28 * u; size: 2 * u, 18 * u; color: mint; opacity: if(field_kb, 1, 0) * (0.55 + 0.45 * sin(time * 6)) }
+                        box { from: 14 * u + st_fx * u + 15 * u + min(stf.width, st_fw * u - 30 * u), st_fy * u + 28 * u; size: 2 * u, 18 * u; color: mint; opacity: if(field_kb, 1, 0) * (0.55 + 0.45 * sin(hl_clk * 6)) }
                     }
                     //  a choice among a few (the language, a tile's kind, its room, a printer): the theme's lit piece under the chosen one
                     for c in st_chips {
@@ -1392,11 +1397,11 @@ scene HomeAssistant {
                 let z = if(tl > 0.5, 1, 0.9)
                 group {
                     show: dw_w.$i.dk < 0 and dw_w.$i.custom < 0.5
-                    PIcon(k: max(dw_w.$i.pk, 0), cx: ix, cy: iy, lit: 0, c: mix(ink, mint, lit), a: 1, s: 2100 + i * 17, f: if(hot > 0.5, floor(time * 8), 0), z: z)
+                    PIcon(k: max(dw_w.$i.pk, 0), cx: ix, cy: iy, lit: 0, c: mix(ink, mint, lit), a: 1, s: 2100 + i * 17, f: if(hot > 0.5, floor(hl_clk * 8), 0), z: z)
                 }
                 group {
                     show: dw_w.$i.dk >= 0
-                    HDev(k: max(dw_w.$i.dk, 0), cx: ix, cy: iy, c: mix(ink, mint, lit), a: 1, s: 2200 + i * 13, f: if(hot > 0.5, floor(time * 8), 0), z: z)
+                    HDev(k: max(dw_w.$i.dk, 0), cx: ix, cy: iy, c: mix(ink, mint, lit), a: 1, s: 2200 + i * 13, f: if(hot > 0.5, floor(hl_clk * 8), 0), z: z)
                 }
                 image dw_w.$i.img { at: ix - 12, iy - 12; size: 24, 24; tint: mix(ink, mint, lit); show: dw_w.$i.custom > 0.5 }
                 let nx = if(tl > 0.5, x + 18, x + 56)
@@ -1422,6 +1427,8 @@ scene HomeAssistant {
             //  its zones, the card's own first: out of Edit mode a click switches it and the wheel dims a light; in it, the card is carried, its corner pulled,
             //  its cross pressed (declared later, so they win the press)
             zone box dw_t.$i { from: x, y; size: w, h; corner: 20; cursor: pointer; active: here > 0.5 and not widget_edit; label: "{dw_w.$i.name}" }
+            on leave dw_t.$i { dw_hov = false }
+            on enter dw_t.$i { dw_hov = true }
             on press dw_t.$i { emit dw_tap(i) }
             on scroll dw_t.$i while dw_w.$i.kind == 0 { emit dw_bri(i * 1000 + round(clamp(dw_w.$i.bri + wheel * 0.1, 0, 1) * 100)) }
             zone box dw_mv.$i { from: x, y; size: w, h; corner: 20; cursor: if(dw_di == i, grabbing, grab); active: here > 0.5 and widget_edit; label: "Move {dw_w.$i.name}" }

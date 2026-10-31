@@ -129,7 +129,7 @@ library Pencil {
     component PSliderCC(x0: number, y: number, w: number, lv: number, hot: number, k: number, h: number, mute: number) {
         prop a = 0 ~calm
         follow a = hot
-        let fr = if(a > 0.02, floor(time * 5), 0)
+        let fr = if(a > 0.02, floor(hl_clk * 5), 0)          // (the panel's own clock, homeassistant.plm: pleamar's `time` kept the scene awake for good)
         let jt = (0.18 + 0.25 * a) * u
         let kx = clamp(x0 + w * lv, x0 + h * 0.6, x0 + w - h * 0.6)
         let sp = max(2.5 * k, (w - h) / 86)           // the 88 columns of pencil reach the end of any track: the control center's are as close as they were, a longer one spreads them
