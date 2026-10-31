@@ -15,7 +15,7 @@ import "addon-pencil.plm"                         // Vitreus's pencil (its add-o
 //  pencil's (addon-pencil.plm's PIcon) or of the add-on's own (ha-icons.plm's HDev); the buttons are ha-icons.plm's HUi.
 
 scene HomeAssistant {
-    surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4; keyboard: exclusive while tv_open and tv_tab == 1 and shown > 0.5 }
+    surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4; keyboard: on_demand while shown > 0.5 and not st_open }
 
     permissions {
         services: "files", "files.write", "env"
@@ -341,6 +341,12 @@ scene HomeAssistant {
     prop hl_sp = 0 ~quick
     fact hl_grab = 0
     on change hl_sp { hl_sc = hl_sp }
+    //  Esc: the card over the tiles shuts first (the Apple TV's has its own rule, in it); with none, the panel, as Vitreus's own panels do (the logic asks the
+    //  shell, whose X it is). The panel has the keyboard while the pointer is over it, as theirs do (`keyboard:` above; not on the settings page, whose fields
+    //  are typed through the shell).
+    on key Escape while sl_open { sl_open = false }
+    on key Escape while pr_open { pr_open = false }
+    on key Escape while slot_open and not tv_open and not sl_open and not pr_open and not st_open { emit hl_esc }
     //  Edit mode: a tile carried to another place (`mv_i`), where its middle was when it was taken (`mv_ox`, `mv_oy`) and where it is now (`mv_cx`, `mv_cy`,
     //  from the list's top left). The logic hears where it is and lays the others out around the place it would land on, at once; every tile moves to its
     //  place on a spring of its own, so they make room smoothly, and the one let go of glides from the pointer to its place.
@@ -349,6 +355,7 @@ scene HomeAssistant {
     fact mv_oy = 0
     fact mv_cx = 0
     fact mv_cy = 0
+    event hl_esc ->                                   // Esc: shut the panel
     event hl_move ->                                  // let go of: its row (it lands where the logic has been showing it would)
     text t_rz = ""                                    // the size a tile being pulled would take ("½ × 1", "2 × 1"…)
     prop hl_spin = 0

@@ -28,7 +28,7 @@ local hold_until = {}       -- by tile: until which tick (seconds) a poll must n
 -- The panel's rows keep their order while the panel lives (`keys`: the tiles' entities, `#2` for a second tile of the same one): a tile carried
 -- elsewhere moves on its spring instead of trading places with another row. `rowmap`: row (from 1) -> its tile in config.json's order. `mv`: the
 -- tile being carried in edit mode, and the order it would leave behind if it were let go of now (shown live: the others make room).
-local hl = { keys = {}, rowmap = {}, mv = nil }
+local hl = { keys = {}, rowmap = {}, mv = nil, wrote = nil }      -- (`wrote`: config.json as a move left it, already shown: not read again)
 local function row_item(k) return hl.rowmap[(tonumber(k) or -1) + 1] end
 local open = false
 local last_sig = ""
@@ -1447,9 +1447,47 @@ on("hl_move", function()
         ti = to.cidx
         if to.croom == it.croom and to.cidx > it.cidx then ti = ti - 1 end      -- (taken out first, the ones after it move up by one)
     end
-    st.move_item(it.croom, it.cidx, cfg.rooms[room].croom, ti)
-    -- config.json read again puts it there for good (and ends this); if it is not, after a while everything goes back to how it was
-    after(2500, function() if hl.mv == m then hl.mv = nil; layout(); show() end end)
+    local txt, c = st.move_item(it.croom, it.cidx, cfg.rooms[room].croom, ti)
+    if txt and c then
+        -- The tile is already where it goes: config.json's order is put in place here, and the file is not read again (reading it all again, every
+        -- entity and room, held the panel for about a second). Only if what was written is not what the panel has does it read it again.
+        local items, nstate, nhold = {}, {}, {}
+        for k, rm in ipairs(cfg.rooms) do
+            local n = 0
+            for _, o in ipairs(ord) do
+                if o.room == k then
+                    local x = cfg.items[o.i]
+                    n = n + 1
+                    x.room, x.croom, x.cidx = k, rm.croom, n
+                    items[#items + 1] = x
+                    nstate[#items], nhold[#items] = state[o.i], hold_until[o.i]
+                end
+            end
+        end
+        cfg.items, state, hold_until = items, nstate, nhold
+        hl.mv = nil
+        layout()
+        show()
+        local same = true
+        for k, rm in ipairs(cfg.rooms) do
+            local list = rm.croom == 0 and c.items or (type(c.rooms) == "table" and type(c.rooms[rm.croom]) == "table" and c.rooms[rm.croom].items) or {}
+            local n = 0
+            for _, x in ipairs(cfg.items) do
+                if x.room == k then
+                    n = n + 1
+                    if type(list[n]) ~= "table" or list[n].entity ~= x.entity then same = false end
+                end
+            end
+            if #list ~= n then same = false end
+        end
+        hl.wrote = same and txt or nil
+        if not same then load() end
+        return
+    end
+    -- not written: everything back to how it was
+    hl.mv = nil
+    layout()
+    show()
 end)
 
 -- A tile pulled to a new size in edit mode: the others make room at once, and it is kept
@@ -1580,6 +1618,11 @@ on("fact:sl_i", function(v)
     end
 end)
 
+-- Esc with nothing else open in the panel: the drawer is shut, as its X does (only if it is this add-on's: `slot_open`)
+on("hl_esc", function()
+    if fact.slot_open == true then run("pleamar", { "--say", "vitreus", "fact ax_open false" }, function() end) end
+end)
+
 on("hl_refresh", function()
     load()
 end)
@@ -1674,7 +1717,15 @@ st = require("settings")({
 
 lang_reload = function() load(); if st then st.refresh() end end
 sys.watch("files:" .. CONFIG, function()
-    after(150, function() load(); if st then st.refresh() end end)
+    after(150, function()
+        if hl.wrote then
+            local ok, now = pcall(sys.ask, "files.read", CONFIG)
+            if ok and (now == hl.wrote or now .. "\n" == hl.wrote) then return end           -- (a tile moved here: the panel already shows it)
+            hl.wrote = nil
+        end
+        load()
+        if st then st.refresh() end
+    end)
 end)
 
 every(1000, function()

@@ -817,7 +817,9 @@ return function(api)
             dst[#dst + 1] = it
         end
         if type(c.items) == "table" and #c.items == 0 then c.items = nil end
-        write_cfg(c)
+        -- (what was written, and the table it came from: the panel, which has already put the tile there, need not read it all again)
+        local txt = enc(c, 0, "top") .. "\n"
+        if pcall(sys.call, "files.write", CONFIG, txt) then return txt, c end
     end
 
     -- after config.json was read again (saved here or by hand): the page shows it, and the field stays where it is
