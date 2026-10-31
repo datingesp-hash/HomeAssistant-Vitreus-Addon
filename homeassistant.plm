@@ -353,6 +353,7 @@ scene HomeAssistant {
     fact mv_i = -1
     fact mv_ox = 0
     fact mv_oy = 0
+    fact mv_s0 = 0                                    // how far the list had scrolled when it was taken (it scrolls by itself while the tile is held near its top or bottom)
     fact mv_cx = 0
     fact mv_cy = 0
     event hl_esc ->                                   // Esc: shut the panel
@@ -583,10 +584,12 @@ scene HomeAssistant {
                             text t_rz { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
                         }
                         //  edit mode: the tile itself is carried to another place (it follows the pointer; the others make room, and an outline shows where it lands)
-                        zone box hl_mv_z { from: cx0 - 1500 * u * carried, cy0 - 1500 * u * carried; size: tww + 3000 * u * carried, thh + 3000 * u * carried; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and seen and rz_i < 0 and (mv_i < 0 or carried > 0.5); label: "{r.name}" }
+                        zone box hl_mv_z { from: cx0 - 1500 * u * carried, cy0 - 1500 * u * carried; size: tww + 3000 * u * carried, thh + 3000 * u * carried; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and rz_i < 0 and ((seen and mv_i < 0) or carried > 0.5); label: "{r.name}" }
                         //  (it is carried by its middle: where that was when it was taken, plus how far the pointer has gone; its own place changes under it as the others make room)
-                        on press hl_mv_z { mv_ox = cx0 + tww / 2; mv_oy = cy0 + thh / 2; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2; mv_i = r.index }
-                        on drag hl_mv_z while mv_i == r.index { mv_cx = mv_ox + drag.dx; mv_cy = mv_oy + drag.dy }
+                        //  (its zone stays while it is carried even when its place goes out of view, or the drag was lost and the tile stuck; held near the
+                        //  list's top or bottom, the list scrolls, and the tile stays under the pointer)
+                        on press hl_mv_z { mv_ox = cx0 + tww / 2; mv_oy = cy0 + thh / 2; mv_s0 = hl_sc; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2; mv_i = r.index }
+                        on drag hl_mv_z while mv_i == r.index { mv_cx = mv_ox + drag.dx; mv_cy = mv_oy + drag.dy + hl_sc - mv_s0; hl_sp: clamp(hl_sp + if(mv_cy - hl_sc > vh - 45 * u, 16 * u, if(mv_cy - hl_sc < 35 * u, -16 * u, 0)), 0, most) }
                         on release hl_mv_z while mv_i == r.index { emit hl_move(r.index); mv_i = -1 }
                         zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "{t_resize} {r.name}" }
                         on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
