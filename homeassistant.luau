@@ -25,6 +25,11 @@ local content = 0
 local busy = false
 local tick = 0
 local hold_until = {}       -- by tile: until which tick (seconds) a poll must not overwrite what a click just changed
+-- The panel's rows keep their order while the panel lives (`keys`: the tiles' entities, `#2` for a second tile of the same one): a tile carried
+-- elsewhere moves on its spring instead of trading places with another row. `rowmap`: row (from 1) -> its tile in config.json's order. `mv`: the
+-- tile being carried in edit mode, and the order it would leave behind if it were let go of now (shown live: the others make room).
+local hl = { keys = {}, rowmap = {}, mv = nil, wrote = nil }      -- (`wrote`: config.json as a move left it, already shown: not read again)
+local function row_item(k) return hl.rowmap[(tonumber(k) or -1) + 1] end
 local open = false
 local last_sig = ""
 
@@ -517,8 +522,9 @@ local function columns()
 end
 
 -- Lay the tiles out: room by room, each under its head (a room with no name has none), each tile in the first place it fits, left to right and
--- top to bottom, so a small one fills the hole a big one left.
-local function layout()
+-- top to bottom, so a small one fills the hole a big one left. `ord` (a list of { i = tile, room = room }) lays them out in another order, and
+-- another room, than config.json's: the order a tile being carried would leave behind.
+local function layout(ord)
     place, room_yu = {}, {}
     content = 0
     if not cfg then return end
@@ -540,8 +546,10 @@ local function layout()
         end
         local rows = 0
         local halves = cols * 2          -- (in half columns: a tile takes one, the icon alone, or two, a column, or more; its size is kept in columns, 0.5 for a half)
-        for i, it in ipairs(cfg.items) do
-            if it.room == k then
+        for n = 1, #(ord or cfg.items) do
+            local i = ord and ord[n].i or n
+            local it = cfg.items[i]
+            if (ord and ord[n].room or it.room) == k then
                 local sz = sizes[it.entity] or {}
                 local cs = math.max(1, math.min(halves, math.floor((tonumber(sz[1]) or 1) * 2 + 0.5)))
                 local rs = math.max(1, math.min(3, tonumber(sz[2]) or 1))
@@ -608,7 +616,7 @@ end
 -- half written) and shown with a version, so the same name is read again.
 local pr_pic_n, pr_shown, pr_busy = 0, "", false
 local function pr_item()
-    local it = cfg and cfg.items[(tonumber(fact.pr_i) or -1) + 1]
+    local it = cfg and cfg.items[row_item(fact.pr_i) or 0]
     return it and it.printer and it or nil
 end
 local function pr_fetch(pic)
@@ -683,7 +691,7 @@ local function clock(sec)
     return string.format("%d:%02d", m, x)
 end
 local function tv_item()
-    local it = cfg and cfg.items[(tonumber(fact.tv_i) or -1) + 1]
+    local it = cfg and cfg.items[row_item(fact.tv_i) or 0]
     return it and it.tv and it or nil
 end
 local function tv_fetch(pic)
@@ -956,7 +964,7 @@ local function tv_poll()
 end
 
 show = function()
-    local rows, heads = {}, {}
+    local rows, heads, byitem = {}, {}, {}
     if cfg then
         for i, it in ipairs(cfg.items) do
             local s = state[i] or { on = false, bri = 0, avail = false }
@@ -987,10 +995,25 @@ show = function()
                     sub = T(TV_LABEL[code]) .. (what ~= "" and (" · " .. what) or "")
                 end
             end
-            rows[#rows + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = own_pic(it) and 1 or 0, dk = dev_k(it), sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
+            byitem[#byitem + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = own_pic(it) and 1 or 0, dk = dev_k(it), sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
                 cc = it.color and 1 or 0, ct = it.tint and 1 or 0, hk = ((it.color or it.tint) and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
                 tvr = it.tv and 1 or 0, pk = pencil_k(it) }
+        end
+        -- the rows keep their order while the same tiles are there (moved, they only change place); tiles added or taken away start it again
+        local keys, at, seen = {}, {}, {}
+        for i, it in ipairs(cfg.items) do
+            seen[it.entity] = (seen[it.entity] or 0) + 1
+            keys[i] = it.entity .. "#" .. seen[it.entity]
+            at[keys[i]] = i
+        end
+        local same = #hl.keys == #keys
+        for _, key in ipairs(hl.keys) do if not at[key] then same = false end end
+        if not same then hl.keys = keys end
+        hl.rowmap = {}
+        for k, key in ipairs(hl.keys) do
+            hl.rowmap[k] = at[key]
+            rows[k] = byitem[at[key]]
         end
         for k, room in ipairs(cfg.rooms) do
             if room.name ~= "" then
@@ -1004,10 +1027,12 @@ show = function()
                 heads[#heads + 1] = { name = room.name, temp = t, hum = h, has_t = t ~= "" and 1 or 0, has_h = h ~= "" and 1 or 0, yu = room_yu[k] or 0 }
             end
         end
+    else
+        hl.rowmap = {}
     end
     pr_fill()
     tv_fill()
-    if wg then wg.rows(rows) end
+    if wg then wg.rows(byitem) end
     -- (only what changed: the poll answers every few seconds, mostly with the same)
     local sig = json.encode({ rows, heads, content })
     if sig == last_sig then return end
@@ -1145,14 +1170,17 @@ local function load()
             if type(sz) == "table" then sizes[e] = { tonumber(sz[1]) or 1, tonumber(sz[2]) or 1 } end
         end
     end
+    -- (read again after a change, a tile keeps what was known of it: it does not go blank until the next answer)
+    local known, was_url = {}, cfg and fact.hl_state == 1 and cfg.url or nil
+    if cfg then for i, it in ipairs(cfg.items) do known[it.entity] = { s = state[i], h = hold_until[i] } end end
+    hl.mv = nil
     local ok, c = pcall(sys.ask, "files.read", CONFIG, "json")
     lang_files()
     use_lang(ok and type(c) == "table" and c.language or nil)
     scene_words()
     cfg = nil
     state = {}
-    est = {}
-    tvs = {}
+    hold_until = {}
     last_sig = ""
     if not ok or type(c) ~= "table" then
         set_state(3, T("not_set"), T("unreadable", (tostring(c):gsub("^.-: ", ""))))
@@ -1217,6 +1245,15 @@ local function load()
         end
     end
     cfg = { url = url, insecure = c.insecure == true, rooms = rooms, items = items, art_search = c.artwork_search ~= false and not demo, demo = demo }
+    if url ~= was_url then
+        est = {}
+        tvs = {}
+    else
+        for i, it in ipairs(items) do
+            local k = known[it.entity]
+            if k then state[i] = k.s; hold_until[i] = k.h end
+        end
+    end
     if demo then
         -- The demo: config.json's own rooms (the example's, the first time), every tile working here and nowhere else: lights on and off at different levels, a colour
         -- on the ones that have one, a print half way, and something playing on a player.
@@ -1246,7 +1283,7 @@ local function load()
         set_state(2, T("offline"), T("no_auth"))
         return
     end
-    set_state(0, T("connecting"))
+    if url ~= was_url then set_state(0, T("connecting")) end
     layout()
     show()
     poll()
@@ -1269,7 +1306,7 @@ local function tap(k)
         after(700, poll)
     end)
 end
-on("hl_tap", tap)
+on("hl_tap", function(k) local i = row_item(k); if i then tap(i - 1) end end)       -- (a row of the panel; the desktop cards tap by tile)
 
 -- A light's brightness (0 to 1), from the card's slider or the desktop widget's wheel
 local function bri_to(i, v)
@@ -1289,12 +1326,12 @@ local function bri_to(i, v)
         after(900, function() hold_until[i] = nil; poll() end)
     end)
 end
-on("hl_bri", function(v) bri_to((tonumber(fact.sl_i) or -1) + 1, v) end)
+on("hl_bri", function(v) bri_to(row_item(fact.sl_i) or 0, v) end)
 
 -- A colour chosen in the card: hue in degrees times 1000 plus saturation in percent. Home Assistant takes it as hs_color; a light that is off is turned
 -- on with it, at full brightness.
 on("hl_color", function(v)
-    local i = (tonumber(fact.sl_i) or -1) + 1
+    local i = row_item(fact.sl_i) or 0
     local it = cfg and cfg.items[i]
     if not it or not it.color or it.bad then return end
     v = math.floor(tonumber(v) or 0)
@@ -1319,48 +1356,144 @@ function size_words(hs, rs)
     return ((whole > 0 and tostring(whole) or "") .. (half and "½" or "")) .. " × " .. tostring(rs)
 end
 on("fact:rz_i", function(v)
-    local i = (tonumber(v) or -1) + 1
+    local i = row_item(v) or 0
     local p = place[i]
     if p then text.t_rz = size_words(p.cs, p.rs) end
 end)
 
--- A tile carried to another place in edit mode: it takes the place of the tile it was dropped on (into that one's room), or goes to the end of the room it
--- was dropped in. config.json is written (settings.luau keeps it in order) and read again.
-on("hl_move", function(code)
-    code = math.floor(tonumber(code) or -1)
-    if code < 0 or not cfg then return end
-    local i = math.floor(code / 10000000) + 1
-    local px, py = math.floor(code % 10000000 / 10000), code % 10000
-    local it = cfg.items[i]
-    if not it or not st then return end
+-- A tile carried to another place in edit mode. While it is carried the others make room for it at once (on their springs): over another tile it takes
+-- that one's place (that one and the ones between move up or down by one), over another room with no tile under it, it goes to the end of that room;
+-- the place it would land on is where the scene shows its outline. Let go of, it goes there: config.json is written (settings.luau keeps it in order)
+-- and read again, which leaves everything where it already is.
+local function cell_w()
     local cols = columns()
     local W = (tonumber(fact.slot_w) or 520) / 1.1
-    local tw = (W - 28 - (cols - 1) * GAP) / cols
-    local hw = (tw - GAP) / 2
-    local target = nil
+    return ((W - 28 - (cols - 1) * GAP) / cols - GAP) / 2           -- half a column (unscaled)
+end
+local function preview()
+    local m = hl.mv
+    if not m or not cfg then return end
+    local px, py = (tonumber(fact.mv_cx) or 0) / 1.1, (tonumber(fact.mv_cy) or 0) / 1.1      -- the carried tile's middle, unscaled, from the list's top left
+    local hw = cell_w()
+    local over = nil
     for j, p in pairs(place) do
-        local x0, y0 = 14 + p.col * (hw + GAP), p.yu
-        local w, h = p.cs * hw + (p.cs - 1) * GAP, p.rs * TH + (p.rs - 1) * GAP
-        if j ~= i and px >= x0 and px <= x0 + w and py >= y0 and py <= y0 + h then target = j; break end
+        if j ~= m.i then
+            local x0, y0 = 14 + p.col * (hw + GAP), p.yu
+            if px >= x0 and px <= x0 + p.cs * hw + (p.cs - 1) * GAP and py >= y0 and py <= y0 + p.rs * TH + (p.rs - 1) * GAP then over = j; break end
+        end
     end
-    if target then
-        local to = cfg.items[target]
-        st.move_item(it.croom, it.cidx, to.croom, to.cidx)
+    local ord = m.ord
+    local function pos(i) for n, o in ipairs(ord) do if o.i == i then return n end end end
+    if over then
+        -- (once it has made room, the tile it was over has to be left before it counts again: two tiles of different sizes would otherwise swap back and forth)
+        if over == m.last then return end
+        m.last = over
+        local b = pos(over)
+        local me = table.remove(ord, pos(m.i))
+        for _, o in ipairs(ord) do if o.i == over then me.room = o.room end end
+        table.insert(ord, b, me)          -- (after it, when it came from before; before it, when it came from after)
+    else
+        m.last = nil
+        local room = nil
+        for k = 1, #cfg.rooms do if py >= (room_yu[k] or 0) then room = k end end
+        local n = pos(m.i)
+        if not room or room == ord[n].room then return end
+        local me = table.remove(ord, n)
+        me.room = room
+        ord[#ord + 1] = me                -- (the last of that room: the layout takes each room's tiles in this order)
+    end
+    layout(ord)
+    show()
+end
+on("fact:mv_cx", preview)
+on("fact:mv_cy", preview)
+on("fact:mv_i", function(v)
+    v = tonumber(v) or -1
+    if v >= 0 then
+        local i = row_item(v)
+        hl.mv = nil
+        if not cfg or not i then return end
+        local ord = {}
+        for n, it in ipairs(cfg.items) do ord[n] = { i = n, room = it.room } end
+        hl.mv = { i = i, ord = ord }
+    elseif hl.mv and not hl.mv.done then
+        -- let go of without an `hl_move` (it comes before this when there is one): everything back
+        local m = hl.mv
+        after(120, function() if hl.mv == m and not m.done then hl.mv = nil; layout(); show() end end)
+    end
+end)
+on("hl_move", function()
+    local m = hl.mv
+    if not m or not cfg or not st then return end
+    m.done = true
+    local it = cfg.items[m.i]
+    if not it then hl.mv = nil return end
+    local ord = m.ord
+    local n0 = 1
+    for n, o in ipairs(ord) do if o.i == m.i then n0 = n end end
+    local room = ord[n0].room
+    local nxt, was = nil, nil            -- the tile it goes before in its room (none: the last), and the one it was before
+    for n = n0 + 1, #ord do if ord[n].room == room then nxt = ord[n].i; break end end
+    for j = m.i + 1, #cfg.items do if cfg.items[j].room == it.room then was = j; break end end
+    if not cfg.rooms[room] or (room == it.room and nxt == was) then
+        hl.mv = nil
+        layout()
+        show()
         return
     end
-    -- no tile there: the room it was dropped in (the last whose head is above it)
-    local room = nil
-    for k = 1, #cfg.rooms do
-        local top = room_yu[k] or 0
-        if py >= top then room = k end
+    local ti = nil
+    if nxt then
+        local to = cfg.items[nxt]
+        ti = to.cidx
+        if to.croom == it.croom and to.cidx > it.cidx then ti = ti - 1 end      -- (taken out first, the ones after it move up by one)
     end
-    if room and cfg.rooms[room] then st.move_item(it.croom, it.cidx, cfg.rooms[room].croom, nil) end
+    local txt, c = st.move_item(it.croom, it.cidx, cfg.rooms[room].croom, ti)
+    if txt and c then
+        -- The tile is already where it goes: config.json's order is put in place here, and the file is not read again (reading it all again, every
+        -- entity and room, held the panel for about a second). Only if what was written is not what the panel has does it read it again.
+        local items, nstate, nhold = {}, {}, {}
+        for k, rm in ipairs(cfg.rooms) do
+            local n = 0
+            for _, o in ipairs(ord) do
+                if o.room == k then
+                    local x = cfg.items[o.i]
+                    n = n + 1
+                    x.room, x.croom, x.cidx = k, rm.croom, n
+                    items[#items + 1] = x
+                    nstate[#items], nhold[#items] = state[o.i], hold_until[o.i]
+                end
+            end
+        end
+        cfg.items, state, hold_until = items, nstate, nhold
+        hl.mv = nil
+        layout()
+        show()
+        local same = true
+        for k, rm in ipairs(cfg.rooms) do
+            local list = rm.croom == 0 and c.items or (type(c.rooms) == "table" and type(c.rooms[rm.croom]) == "table" and c.rooms[rm.croom].items) or {}
+            local n = 0
+            for _, x in ipairs(cfg.items) do
+                if x.room == k then
+                    n = n + 1
+                    if type(list[n]) ~= "table" or list[n].entity ~= x.entity then same = false end
+                end
+            end
+            if #list ~= n then same = false end
+        end
+        hl.wrote = same and txt or nil
+        if not same then load() end
+        return
+    end
+    -- not written: everything back to how it was
+    hl.mv = nil
+    layout()
+    show()
 end)
 
 -- A tile pulled to a new size in edit mode: the others make room at once, and it is kept
 local save_due = false
 on("hl_resize", function(k)
-    local it = cfg and cfg.items[(tonumber(k) or -1) + 1]
+    local it = cfg and cfg.items[row_item(k) or 0]
     if not it then return end
     local hs = math.max(1, math.min(8, math.floor((tonumber(fact.rz_w) or 2) + 0.5)))       -- in half columns
     local rs = math.max(1, math.min(3, math.floor((tonumber(fact.rz_h) or 1) + 0.5)))
@@ -1477,12 +1610,17 @@ on("tv_cmd", function(c)
 end)
 
 on("fact:sl_i", function(v)
-    local it = cfg and cfg.items[(tonumber(v) or -1) + 1]
+    local it = cfg and cfg.items[row_item(v) or 0]
     if it then
         text.sl_name = it.name
         text.sl_icon = it.file and "" or it.icon
         fact.sl_custom = own_pic(it)
     end
+end)
+
+-- Esc with nothing else open in the panel: the drawer is shut, as its X does (only if it is this add-on's: `slot_open`)
+on("hl_esc", function()
+    if fact.slot_open == true then run("pleamar", { "--say", "vitreus", "fact ax_open false" }, function() end) end
 end)
 
 on("hl_refresh", function()
@@ -1531,7 +1669,7 @@ local last_w = -1
 on("fact:slot_w", function(v)
     if not cfg or tonumber(v) == last_w then return end
     last_w = tonumber(v) or -1
-    layout()
+    layout(hl.mv and hl.mv.ord)
     show()
     if st then st.width_changed() end
 end)
@@ -1579,7 +1717,15 @@ st = require("settings")({
 
 lang_reload = function() load(); if st then st.refresh() end end
 sys.watch("files:" .. CONFIG, function()
-    after(150, function() load(); if st then st.refresh() end end)
+    after(150, function()
+        if hl.wrote then
+            local ok, now = pcall(sys.ask, "files.read", CONFIG)
+            if ok and (now == hl.wrote or now .. "\n" == hl.wrote) then return end           -- (a tile moved here: the panel already shows it)
+            hl.wrote = nil
+        end
+        load()
+        if st then st.refresh() end
+    end)
 end)
 
 every(1000, function()
