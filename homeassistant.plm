@@ -152,7 +152,7 @@ scene HomeAssistant {
     //  kind: 0 a section's title · 1 a field (label, value or placeholder; `on` 1: it has a value) · 4 a note · 5 a suggestion (label, sub) · 6 a button (`tone`: 0 plain,
     //  1 the accent, 2 danger, 3 danger armed: pressed once, asking again)
     model st_chips max 24 { label: text; x: number; y: number; w: number; sel: number }
-    model st_icons max 18 { pk: number; dk: number; x: number; y: number; sel: number }
+    model st_icons max 36 { pk: number; dk: number; x: number; y: number; sel: number }
     model st_ents max 44 { kind: number; name: text; sub: text; pk: number; y: number }      // kind 0 a room · 1 a tile
     fact st_fa = -1                                   // the field the shell's field is on (a row of st_rows), where it is, and what it says (masked for the token)
     fact st_fx = 0
@@ -671,6 +671,14 @@ scene HomeAssistant {
                     let qcx = gx + r.col * (hw + gap) + qww / 2
                     let qcy = r.yu * u + (r.rs * th + (r.rs - 1) * gap) / 2
                     let qk = max(qa_k, 0)
+                    //  each button's light and push (pressed: 1 at once, then back to 0 in its time), and where it is (the zones and their rules are here,
+                    //  in the tile's own copy, as the tiles' are: inside the `repeat` below, a press on them did not reach its rule)
+                    prop qf0 = 0 ~2600ms
+                    prop qf1 = 0 ~2600ms
+                    prop qp0 = 0 ~spring(420, 16)
+                    prop qp1 = 0 ~spring(420, 16)
+                    let qx0 = mix(qcx, qcx + if(r.qa >= 2, -0.5, 0) * (hw + gap), qk)
+                    let qx1 = mix(qcx, qcx + 0.5 * (hw + gap), qk)
                     group {
                         show: qa_i == r.index and qa_k > 0.01
                         repeat i in 0..2 {
@@ -679,8 +687,9 @@ scene HomeAssistant {
                             let x = mix(qcx, bx, qk)
                             let y = qcy
                             let dyc = y - 11 * u                          // the disc's middle
-                            prop qf = 0 ~2600ms                           // pressed: 1 at once, then back to 0 in its time (the light, then the fade)
-                            prop qp = 0 ~spring(420, 16)                  // pressed: a little push in
+                            let qf = pick(i, qf0, qf1)
+                            let qp = pick(i, qp0, qp1)
+                            let hov = pick(i, qa_b0_z.hover, qa_b1_z.hover)
                             let run = pick(i, r.ar1, r.ar2)
                             let flash = if(run > 0.5, clamp(qf * 3, 0, 1), 0)
                             let lit = max(pick(i, r.ao1, r.ao2), flash)
@@ -697,7 +706,7 @@ scene HomeAssistant {
                                     rim: 10%
                                     box { at: x, y; size: hw, th; corner: 14 * u }
                                 }
-                                box { at: x, y; size: hw, th; corner: 14 * u; color: ink; opacity: 6% + 6% * qa_b_z.$i.hover }
+                                box { at: x, y; size: hw, th; corner: 14 * u; color: ink; opacity: 6% + 6% * hov }
                                 box { at: x, y; size: hw, th; corner: 14 * u; color: mint; opacity: 16% * lit }
                                 box { at: x, y; size: hw, th; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * flash }
                                 //  the ring of light, out of the disc
@@ -710,7 +719,7 @@ scene HomeAssistant {
                                 }
                                 group {
                                     show: pick(i, r.ak1, r.ak2) >= 0
-                                    PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + r.index * 11 + i * 5, f: if(lit > 0.5 or qa_b_z.$i.hover > 0.5, fr, 0), z: 0.64)
+                                    PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + r.index * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
                                 }
                                 //  a command's own: a prompt, › and _
                                 group {
@@ -721,11 +730,14 @@ scene HomeAssistant {
                                 }
                                 text r.an1 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 0; family: "Space Grotesk" }
                                 text r.an2 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 1; family: "Space Grotesk" }
-                                zone box qa_b_z.$i { at: x, y; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_k > 0.6 and i < r.qa and av > 0.5; label: "{r.name}" }
-                                on press qa_b_z.$i { emit qa_tap(r.index * 10 + i + 1); qf: 1 ~0ms; qf: 0 after 30ms; qp: 1 ~0ms; qp: 0 after 20ms }
-                                on press right qa_b_z.$i { qa_open = false }
                             }
                         }
+                        zone box qa_b0_z { at: qx0, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 1 and r.av1 > 0.5; label: "{r.an1}" }
+                        zone box qa_b1_z { at: qx1, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 2 and r.av2 > 0.5; label: "{r.an2}" }
+                        on press qa_b0_z { emit qa_tap(r.index * 10 + 1); qf0: 1 ~0ms; qf0: 0 after 30ms; qp0: 1 ~0ms; qp0: 0 after 20ms }
+                        on press qa_b1_z { emit qa_tap(r.index * 10 + 2); qf1: 1 ~0ms; qf1: 0 after 30ms; qp1: 1 ~0ms; qp1: 0 after 20ms }
+                        on press right qa_b0_z { qa_open = false }
+                        on press right qa_b1_z { qa_open = false }
                     }
                 }
               }

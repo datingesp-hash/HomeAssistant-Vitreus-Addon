@@ -424,10 +424,23 @@ return function(api)
         switch("acts", T("st_acts"), d.acts)
         if d.acts then
             note(T("st_acts_note"))
-            local f1 = field("act1", T("st_act1"), d.act1, T("st_act_ph"))
-            if fa == f1 - 1 then sugs(suggest(fq, nil, nil), "act1") end
-            local f2 = field("act2", T("st_act2"), d.act2, T("st_act_ph"))
-            if fa == f2 - 1 then sugs(suggest(fq, nil, nil), "act2") end
+            -- each button: its entity, a name of its own (its entity's if left empty) and an icon (pressing the one chosen goes back to its own)
+            for n = 1, 2 do
+                local key = "act" .. n
+                local f = field(key, T("st_act" .. n), d[key], T("st_act_ph"))
+                if fa == f - 1 then sugs(suggest(fq, nil, nil), key) end
+                local e = d[key] or ""
+                local auto = (ha_has[e] and ha_has[e].name) or ((e:match("%.(.+)$") or ""):gsub("_", " "):gsub("^%l", string.upper))
+                field(key .. "_name", string.format(T("st_act_name"), n), d[key .. "_name"], auto ~= "" and auto or T("st_name_ph"))
+                note(string.format(T("st_act_icon"), n))
+                local cur = api.PENCIL[d[key .. "_icon"] or ""]
+                local m = 0
+                for q = 0, 8 do
+                    icons[#icons + 1] = { pk = q, dk = -1, x = (m % cols) * 52, y = y + math.floor(m / cols) * 52, sel = (cur == q) and 1 or 0, key = key }
+                    m = m + 1
+                end
+                y = y + math.ceil(m / cols) * 52 + 6
+            end
         end
         field("on_text", T("st_on_text"), d.on_text, d.type == "light" and T("light_on") or T("on"))
         field("off_text", T("st_off_text"), d.off_text, d.type == "light" and T("light_off") or T("off"))
@@ -553,7 +566,7 @@ return function(api)
     end)
 
     -- ── presses ──
-    local act_id                                     -- (below)
+    local act_id, act_of                             -- (below)
     local function back()
         unplace()
         draft, armed, errmsg = nil, nil, nil
@@ -565,6 +578,10 @@ return function(api)
         local a = type(list) == "table" and list[n] or nil
         if type(a) == "table" then a = a.entity end
         return type(a) == "string" and a or ""
+    end
+    act_of = function(list, n, k)            -- its name or its icon, when config.json gives it one
+        local a = type(list) == "table" and list[n] or nil
+        return (type(a) == "table" and type(a[k]) == "string") and a[k] or ""
     end
     local function open_entity(room, idx)
         local c = read_cfg() or {}
@@ -585,6 +602,9 @@ return function(api)
             printer = type(it.printer) == "table" and it.printer or nil, printer_on = type(it.printer) == "table", printer_prefix = nil,
             on_text = type(it.on_text) == "string" and it.on_text or "", off_text = type(it.off_text) == "string" and it.off_text or "",
             acts = type(it.actions) == "table" and #it.actions > 0, act1 = act_id(it.actions, 1), act2 = act_id(it.actions, 2),
+            act1_name = act_of(it.actions, 1, "name"), act2_name = act_of(it.actions, 2, "name"),
+            act1_icon = act_of(it.actions, 1, "icon") ~= "" and act_of(it.actions, 1, "icon") or nil,
+            act2_icon = act_of(it.actions, 2, "icon") ~= "" and act_of(it.actions, 2, "icon") or nil,
         }
         if not idx then
             -- a new one: into the first room there is
@@ -641,8 +661,13 @@ return function(api)
             for n = 1, 2 do
                 local e = (d["act" .. n] or ""):gsub("^%s+", ""):gsub("%s+$", "")
                 if valid(e) then
-                    local was = type(it.actions) == "table" and it.actions[n] or nil
-                    out[#out + 1] = (type(was) == "table" and was.entity == e) and was or e
+                    local name = (d["act" .. n .. "_name"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                    local icon = d["act" .. n .. "_icon"]
+                    if name ~= "" or icon then
+                        out[#out + 1] = { entity = e, name = name ~= "" and name or nil, icon = icon }
+                    else
+                        out[#out + 1] = e
+                    end
                 end
             end
             it.actions = #out > 0 and out or nil
@@ -807,7 +832,9 @@ return function(api)
         local c = icons[(math.floor(tonumber(i) or -1)) + 1]
         if not c or not draft then return end
         if fa >= 0 then commit() end
-        if c.pk >= 0 then draft.icon = PNAMES[c.pk]
+        if c.key then                                -- a button's: the one pressed, or (pressed again) its own back
+            draft[c.key .. "_icon"] = (c.sel ~= 1) and PNAMES[c.pk] or nil
+        elseif c.pk >= 0 then draft.icon = PNAMES[c.pk]
         else draft.icon = ((api.lang() == "es") and DNAMES_ES or DNAMES_EN)[c.dk] end
         unplace()
         build()

@@ -150,7 +150,8 @@ It works on tiles one column wide or more (1 × 1 and up): a half-column tile, o
 take the right click's place, and their cards stay out of reach until the buttons are turned off again.
 
 Turn it on in the settings: open the tile in **Entities**, switch on **Two buttons on a right click**, and write an entity in **Button 1** and **Button 2**. The suggestions
-include your shell commands. Or in `config.json`:
+include your shell commands. Under each one you can give the button a **name** of its own (left empty, it is the entity's) and pick its **icon** (press the chosen one
+again to go back to its own). Or in `config.json`:
 
 ```json
 { "type": "light", "name": "Lamp", "entity": "light.lamp",
