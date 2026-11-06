@@ -23,7 +23,7 @@ return function(api)
     local ORDER = {
         top = { "_help", "_language", "language", "_url", "url", "_token", "token", "_insecure", "insecure", "_artwork_search", "artwork_search", "_rooms", "_items", "rooms", "items" },
         room = { "name", "temperature", "humidity", "items" },
-        item = { "type", "name", "icon", "entity", "color", "tint", "on_text", "off_text", "apple_tv", "printer" },
+        item = { "type", "name", "icon", "entity", "color", "tint", "on_text", "off_text", "apple_tv", "printer", "actions" },
         apple_tv = { "media_player", "remote" },
         printer = { "task", "progress", "remaining", "status", "start", "end", "cover", "camera", "pause", "resume", "stop" },
     }
@@ -92,7 +92,25 @@ return function(api)
                     table.sort(ha, function(a, b) return a.id < b.id end)
                 end
             end
-            if done then done() end
+            -- the shell commands (services, not entities: the states do not list them), for a tile's buttons
+            api.call("/api/services", nil, function(ok2, out2)
+                local okj, list = pcall(json.decode, ok2 and out2 or "")
+                if okj and type(list) == "table" then
+                    for _, d in ipairs(list) do
+                        if type(d) == "table" and d.domain == "shell_command" and type(d.services) == "table" then
+                            for name in pairs(d.services) do
+                                local id = "shell_command." .. tostring(name)
+                                if not ha_has[id] then
+                                    ha[#ha + 1] = { id = id, name = (tostring(name):gsub("_", " "):gsub("^%l", string.upper)), class = "" }
+                                    ha_has[id] = ha[#ha]
+                                end
+                            end
+                        end
+                    end
+                    table.sort(ha, function(a, b) return a.id < b.id end)
+                end
+                if done then done() end
+            end)
         end)
     end
     -- the suggestions for what is written: entities whose id or name holds it (a domain or a device class narrows them), the closest first
@@ -403,6 +421,32 @@ return function(api)
                 note(T("st_printer_none"))
             end
         end
+        switch("acts", T("st_acts"), d.acts)
+        if d.acts then
+            note(T("st_acts_note"))
+            -- each button: its entity, a name of its own (its entity's if left empty) and an icon (pressing the one chosen goes back to its own)
+            for n = 1, 2 do
+                local key = "act" .. n
+                local f = field(key, T("st_act" .. n), d[key], T("st_act_ph"))
+                if fa == f - 1 then sugs(suggest(fq, nil, nil), key) end
+                local e = d[key] or ""
+                local auto = (ha_has[e] and ha_has[e].name) or ((e:match("%.(.+)$") or ""):gsub("_", " "):gsub("^%l", string.upper))
+                field(key .. "_name", string.format(T("st_act_name"), n), d[key .. "_name"], auto ~= "" and auto or T("st_name_ph"))
+                note(string.format(T("st_act_icon"), n))
+                local ic = d[key .. "_icon"] or ""
+                local cur = api.PENCIL[ic]
+                local curd = api.DEV[api.ALIAS[ic] or ic]
+                local m = 0
+                local function bcell(p, q)
+                    icons[#icons + 1] = { pk = p, dk = q, x = (m % cols) * 52, y = y + math.floor(m / cols) * 52, key = key,
+                        sel = ((p >= 0 and cur == p and not curd) or (q >= 0 and curd == q)) and 1 or 0 }
+                    m = m + 1
+                end
+                for q = 0, 8 do bcell(q, -1) end
+                bcell(-1, 5)                               -- the Apple TV's (reproductor.svg), for a button that switches to it
+                y = y + math.ceil(m / cols) * 52 + 6
+            end
+        end
         field("on_text", T("st_on_text"), d.on_text, d.type == "light" and T("light_on") or T("on"))
         field("off_text", T("st_off_text"), d.off_text, d.type == "light" and T("light_off") or T("off"))
         if errmsg then note(errmsg) end
@@ -493,7 +537,7 @@ return function(api)
             r.val = fq
             if draft and (tonumber(fact.st_page) or 0) > 0 then draft[r.key] = fq end
             -- a field with suggestions: they follow what is written (the rows below it move, the field stays where it is)
-            if r.key == "entity" or r.key == "remote" or r.key == "temperature" or r.key == "humidity" then
+            if r.key == "entity" or r.key == "remote" or r.key == "temperature" or r.key == "humidity" or r.key == "act1" or r.key == "act2" then
                 local keep = fa
                 build()
                 fa = keep
@@ -527,11 +571,22 @@ return function(api)
     end)
 
     -- ── presses ──
+    local act_id, act_of                             -- (below)
     local function back()
         unplace()
         draft, armed, errmsg = nil, nil, nil
         fact.st_page = 0
         build()
+    end
+    -- a tile's button n in config.json: an entity id, or { entity, name, icon }
+    act_id = function(list, n)
+        local a = type(list) == "table" and list[n] or nil
+        if type(a) == "table" then a = a.entity end
+        return type(a) == "string" and a or ""
+    end
+    act_of = function(list, n, k)            -- its name or its icon, when config.json gives it one
+        local a = type(list) == "table" and list[n] or nil
+        return (type(a) == "table" and type(a[k]) == "string") and a[k] or ""
     end
     local function open_entity(room, idx)
         local c = read_cfg() or {}
@@ -551,6 +606,10 @@ return function(api)
             tv = type(it.apple_tv) == "table", remote = type(it.apple_tv) == "table" and type(it.apple_tv.remote) == "string" and it.apple_tv.remote or "",
             printer = type(it.printer) == "table" and it.printer or nil, printer_on = type(it.printer) == "table", printer_prefix = nil,
             on_text = type(it.on_text) == "string" and it.on_text or "", off_text = type(it.off_text) == "string" and it.off_text or "",
+            acts = type(it.actions) == "table" and #it.actions > 0, act1 = act_id(it.actions, 1), act2 = act_id(it.actions, 2),
+            act1_name = act_of(it.actions, 1, "name"), act2_name = act_of(it.actions, 2, "name"),
+            act1_icon = act_of(it.actions, 1, "icon") ~= "" and act_of(it.actions, 1, "icon") or nil,
+            act2_icon = act_of(it.actions, 2, "icon") ~= "" and act_of(it.actions, 2, "icon") or nil,
         }
         if not idx then
             -- a new one: into the first room there is
@@ -600,6 +659,25 @@ return function(api)
             it.apple_tv = copy
         else
             it.apple_tv = nil
+        end
+        -- its two buttons: what was written in each (a name or an icon given in config.json is kept while the entity is the same)
+        if d.acts then
+            local out = {}
+            for n = 1, 2 do
+                local e = (d["act" .. n] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                if valid(e) then
+                    local name = (d["act" .. n .. "_name"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                    local icon = d["act" .. n .. "_icon"]
+                    if name ~= "" or icon then
+                        out[#out + 1] = { entity = e, name = name ~= "" and name or nil, icon = icon }
+                    else
+                        out[#out + 1] = e
+                    end
+                end
+            end
+            it.actions = #out > 0 and out or nil
+        else
+            it.actions = nil
         end
         if d.printer_on then
             if d.printer_prefix then it.printer = printer_block(d.printer_prefix)
@@ -759,7 +837,9 @@ return function(api)
         local c = icons[(math.floor(tonumber(i) or -1)) + 1]
         if not c or not draft then return end
         if fa >= 0 then commit() end
-        if c.pk >= 0 then draft.icon = PNAMES[c.pk]
+        if c.key then                                -- a button's: the one pressed, or (pressed again) its own back
+            draft[c.key .. "_icon"] = (c.sel ~= 1) and (c.pk >= 0 and PNAMES[c.pk] or ((api.lang() == "es") and DNAMES_ES or DNAMES_EN)[c.dk]) or nil
+        elseif c.pk >= 0 then draft.icon = PNAMES[c.pk]
         else draft.icon = ((api.lang() == "es") and DNAMES_ES or DNAMES_EN)[c.dk] end
         unplace()
         build()

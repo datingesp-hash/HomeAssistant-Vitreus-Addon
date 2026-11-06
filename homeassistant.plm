@@ -152,7 +152,7 @@ scene HomeAssistant {
     //  kind: 0 a section's title · 1 a field (label, value or placeholder; `on` 1: it has a value) · 4 a note · 5 a suggestion (label, sub) · 6 a button (`tone`: 0 plain,
     //  1 the accent, 2 danger, 3 danger armed: pressed once, asking again)
     model st_chips max 24 { label: text; x: number; y: number; w: number; sel: number }
-    model st_icons max 18 { pk: number; dk: number; x: number; y: number; sel: number }
+    model st_icons max 40 { pk: number; dk: number; x: number; y: number; sel: number }
     model st_ents max 44 { kind: number; name: text; sub: text; pk: number; y: number }      // kind 0 a room · 1 a tile
     fact st_fa = -1                                   // the field the shell's field is on (a row of st_rows), where it is, and what it says (masked for the token)
     fact st_fx = 0
@@ -188,7 +188,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number }      // `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number; ad1: number; ad2: number; ai1: image 48, 48; ai2: image 48, 48 }      // `qa` how many buttons a right click brings out of it (0 none; config.json's "actions"), each one's name (`an`), pencil icon (`ak`, -1: a command's), whether it is only run (`ar`), on (`ao`) and there (`av`) · `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -208,6 +208,19 @@ scene HomeAssistant {
     fact rz_h = 1
     on change rz_w while rz_i >= 0 { emit hl_resize(rz_i) }
     on change rz_h while rz_i >= 0 { emit hl_resize(rz_i) }
+
+    //  A tile's two buttons (config.json's "actions"), brought out of its middle by a right click on a tile of a column or more: `qa_i` which tile
+    fact qa_open = false
+    fact qa_i = -1
+    prop qa_k = 0 ~spring(230, 15)                   // (a little past its place, and back: they pop out)
+    follow qa_k = if(qa_open, 1, 0)
+    //  what is seen: in step with qa_k while it comes out, but gone in a moment once shut. (qa_k's spring goes past 0 and back as it shuts: seen through
+    //  it alone, the buttons came back for an instant after they had gone.)
+    prop qa_v = 0 ~140ms
+    follow qa_v = if(qa_open, 1, 0)
+    event qa_tap ->                                   // one pressed: the tile's place × 10 + the button (1 or 2)
+    on change hl_editing { qa_open = false }
+    on change slot_open { qa_open = false }            // (shut with the panel: never there, half drawn, when it opens again)
 
     //  The brightness slider, over the panel
     fact sl_open = false
@@ -346,7 +359,8 @@ scene HomeAssistant {
     //  are typed through the shell).
     on key Escape while sl_open { sl_open = false }
     on key Escape while pr_open { pr_open = false }
-    on key Escape while slot_open and not tv_open and not sl_open and not pr_open and not st_open { emit hl_esc }
+    on key Escape while qa_open { qa_open = false }
+    on key Escape while slot_open and not tv_open and not sl_open and not pr_open and not st_open and not qa_open { emit hl_esc }
     //  Edit mode: a tile carried to another place (`mv_i`), where its middle was when it was taken (`mv_ox`, `mv_oy`) and where it is now (`mv_cx`, `mv_cy`,
     //  from the list's top left). The logic hears where it is and lays the others out around the place it would land on, at once; every tile moves to its
     //  place on a spring of its own, so they make room smoothly, and the one let go of glides from the pointer to its place.
@@ -525,11 +539,13 @@ scene HomeAssistant {
                     group {
                         opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.1 * carried)
                         move: ex - cx0, ey - cy0
-                        zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
+                        zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and qa_v < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { hl_grab = hl_sp; emit hl_tap(r.index) }
-                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
-                        on press right hl_tile_z while r.prn > 0.5 { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
-                        on press right hl_tile_z while r.tvr > 0.5 { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
+                        //  (a tile with its two buttons, a column wide or more, brings them out instead of its card)
+                        on press right hl_tile_z while r.qa > 0.5 and r.cs >= 2 { qa_i = r.index; qa_open = true }
+                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 and not (r.qa > 0.5 and r.cs >= 2) { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
+                        on press right hl_tile_z while r.prn > 0.5 and not (r.qa > 0.5 and r.cs >= 2) { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
+                        on press right hl_tile_z while r.tvr > 0.5 and not (r.qa > 0.5 and r.cs >= 2) { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
                         //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
                         box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
@@ -642,6 +658,96 @@ scene HomeAssistant {
                         }
                         text r.name { at: ctx, cny; anchor: left center; size: 13.5 + ctl; weight: 600; width: cww - mix(72, 36, ctl) * u; lines: 1; color: ink; show: csm < 0.5; family: "Space Grotesk" }
                         text r.sub { at: ctx, cny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: cww - mix(72, 36, ctl) * u; lines: 1; color: if(clit > 0.5, mint, faint); show: csm < 0.5; family: "Space Grotesk" }
+                    }
+                }
+                //  ── a tile's two buttons: a right click brings them out of its middle, two half tiles side by side over it, each with its icon and its name under
+                //  it. One that toggles is lit while its entity is on; one that is only run (a shell_command, a script…) lights up a few seconds when pressed, with
+                //  a ring of light going out from its disc. A click outside them, a right click or Escape puts them back. ──
+                group {
+                    show: qa_v > 0.01
+                    opacity: clamp(qa_k * 1.6, 0, 1) * qa_v
+                    box { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; color: deep; opacity: 40% }
+                }
+                zone box qa_scrim_z { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; active: qa_open }
+                on press qa_scrim_z { qa_open = false }
+                on press right qa_scrim_z { qa_open = false }
+                for r in hl_items {
+                    let qww = r.cs * hw + (r.cs - 1) * gap
+                    let qcx = gx + r.col * (hw + gap) + qww / 2
+                    let qcy = r.yu * u + (r.rs * th + (r.rs - 1) * gap) / 2
+                    let qk = max(qa_k, 0)
+                    //  each button's light and push (pressed: 1 at once, then back to 0 in its time), and where it is (the zones and their rules are here,
+                    //  in the tile's own copy, as the tiles' are: inside the `repeat` below, a press on them did not reach its rule)
+                    prop qf0 = 0 ~2600ms
+                    prop qf1 = 0 ~2600ms
+                    prop qp0 = 0 ~spring(420, 16)
+                    prop qp1 = 0 ~spring(420, 16)
+                    let qx0 = mix(qcx, qcx + if(r.qa >= 2, -0.5, 0) * (hw + gap), qk)
+                    let qx1 = mix(qcx, qcx + 0.5 * (hw + gap), qk)
+                    group {
+                        show: qa_i == r.index and qa_v > 0.01
+                        opacity: qa_v
+                        repeat i in 0..2 {
+                            //  where it lands: the two side by side about the tile's middle (one alone, in the middle), and on its way out of it
+                            let bx = qcx + if(r.qa >= 2, i - 0.5, 0) * (hw + gap)
+                            let x = mix(qcx, bx, qk)
+                            let y = qcy
+                            let dyc = y - 11 * u                          // the disc's middle
+                            let qf = pick(i, qf0, qf1)
+                            let qp = pick(i, qp0, qp1)
+                            let hov = pick(i, qa_b0_z.hover, qa_b1_z.hover)
+                            let run = pick(i, r.ar1, r.ar2)
+                            let flash = if(run > 0.5, clamp(qf * 3, 0, 1), 0)
+                            let lit = max(pick(i, r.ao1, r.ao2), flash)
+                            let wave = clamp((1 - qf) * 2.2, 0, 1)        // the ring's way out, in the first part of the light
+                            let av = pick(i, r.av1, r.av2)
+                            group {
+                                show: i < r.qa
+                                opacity: if(av > 0.5, 100%, 45%)
+                                pivot: x, y
+                                scale: (0.3 + 0.7 * qk) * (1 - 0.06 * qp)
+                                body {
+                                    color: card
+                                    shadow: 0, 8 * u, 22 * u, 45%, deep
+                                    rim: 10%
+                                    box { at: x, y; size: hw, th; corner: 14 * u }
+                                }
+                                box { at: x, y; size: hw, th; corner: 14 * u; color: ink; opacity: 6% + 6% * hov }
+                                box { at: x, y; size: hw, th; corner: 14 * u; color: mint; opacity: 16% * lit }
+                                box { at: x, y; size: hw, th; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * flash }
+                                //  the ring of light, out of the disc
+                                arc { at: x, dyc; radius: (16 + 20 * wave) * u; span: 360deg; width: 2 * u; color: mint; opacity: 80% * (1 - wave) * if(run > 0.5 and qf > 0.02, 1, 0) }
+                                body {
+                                    color: mix(off, mint, lit)
+                                    shadow: 0, 0, 10 * u * lit, 45% * lit, mint
+                                    rim: 16% * lit
+                                    ellipse { at: x, dyc; radius: 16 * u }
+                                }
+                                let qd = pick(i, r.ad1, r.ad2)         // one of the add-on's own drawings (the Apple TV's…), or -1
+                                //  (its file, tinted as the tiles' own pictures are: drawn in pencil in each copy it took too many of the scene's properties)
+                                image r.ai1 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 0 }
+                                image r.ai2 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 1 }
+                                group {
+                                    show: qd < 0 and pick(i, r.ak1, r.ak2) >= 0
+                                    PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + r.index * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
+                                }
+                                //  a command's own: a prompt, › and _
+                                group {
+                                    show: qd < 0 and pick(i, r.ak1, r.ak2) < 0
+                                    box { at: x - 3.2 * u, dyc - 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: 45deg; color: mix(ink, onmint, lit) }
+                                    box { at: x - 3.2 * u, dyc + 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: -45deg; color: mix(ink, onmint, lit) }
+                                    box { at: x + 4 * u, dyc + 5 * u; size: 7 * u, 2 * u; corner: 1 * u; color: mix(ink, onmint, lit) }
+                                }
+                                text r.an1 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 0; family: "Space Grotesk" }
+                                text r.an2 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 1; family: "Space Grotesk" }
+                            }
+                        }
+                        zone box qa_b0_z { at: qx0, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 1 and r.av1 > 0.5; label: "{r.an1}" }
+                        zone box qa_b1_z { at: qx1, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 2 and r.av2 > 0.5; label: "{r.an2}" }
+                        on press qa_b0_z { emit qa_tap(r.index * 10 + 1); qf0: 1 ~0ms; qf0: 0 after 30ms; qp0: 1 ~0ms; qp0: 0 after 20ms }
+                        on press qa_b1_z { emit qa_tap(r.index * 10 + 2); qf1: 1 ~0ms; qf1: 0 after 30ms; qp1: 1 ~0ms; qp1: 0 after 20ms }
+                        on press right qa_b0_z { qa_open = false }
+                        on press right qa_b1_z { qa_open = false }
                     }
                 }
               }
