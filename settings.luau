@@ -23,7 +23,7 @@ return function(api)
     local ORDER = {
         top = { "_help", "_language", "language", "_url", "url", "_token", "token", "_insecure", "insecure", "_artwork_search", "artwork_search", "_rooms", "_items", "rooms", "items" },
         room = { "name", "temperature", "humidity", "items" },
-        item = { "type", "name", "icon", "entity", "color", "tint", "on_text", "off_text", "apple_tv", "printer" },
+        item = { "type", "name", "icon", "entity", "color", "tint", "on_text", "off_text", "apple_tv", "printer", "actions" },
         apple_tv = { "media_player", "remote" },
         printer = { "task", "progress", "remaining", "status", "start", "end", "cover", "camera", "pause", "resume", "stop" },
     }
@@ -92,7 +92,25 @@ return function(api)
                     table.sort(ha, function(a, b) return a.id < b.id end)
                 end
             end
-            if done then done() end
+            -- the shell commands (services, not entities: the states do not list them), for a tile's buttons
+            api.call("/api/services", nil, function(ok2, out2)
+                local okj, list = pcall(json.decode, ok2 and out2 or "")
+                if okj and type(list) == "table" then
+                    for _, d in ipairs(list) do
+                        if type(d) == "table" and d.domain == "shell_command" and type(d.services) == "table" then
+                            for name in pairs(d.services) do
+                                local id = "shell_command." .. tostring(name)
+                                if not ha_has[id] then
+                                    ha[#ha + 1] = { id = id, name = (tostring(name):gsub("_", " "):gsub("^%l", string.upper)), class = "" }
+                                    ha_has[id] = ha[#ha]
+                                end
+                            end
+                        end
+                    end
+                    table.sort(ha, function(a, b) return a.id < b.id end)
+                end
+                if done then done() end
+            end)
         end)
     end
     -- the suggestions for what is written: entities whose id or name holds it (a domain or a device class narrows them), the closest first
@@ -403,6 +421,14 @@ return function(api)
                 note(T("st_printer_none"))
             end
         end
+        switch("acts", T("st_acts"), d.acts)
+        if d.acts then
+            note(T("st_acts_note"))
+            local f1 = field("act1", T("st_act1"), d.act1, T("st_act_ph"))
+            if fa == f1 - 1 then sugs(suggest(fq, nil, nil), "act1") end
+            local f2 = field("act2", T("st_act2"), d.act2, T("st_act_ph"))
+            if fa == f2 - 1 then sugs(suggest(fq, nil, nil), "act2") end
+        end
         field("on_text", T("st_on_text"), d.on_text, d.type == "light" and T("light_on") or T("on"))
         field("off_text", T("st_off_text"), d.off_text, d.type == "light" and T("light_off") or T("off"))
         if errmsg then note(errmsg) end
@@ -493,7 +519,7 @@ return function(api)
             r.val = fq
             if draft and (tonumber(fact.st_page) or 0) > 0 then draft[r.key] = fq end
             -- a field with suggestions: they follow what is written (the rows below it move, the field stays where it is)
-            if r.key == "entity" or r.key == "remote" or r.key == "temperature" or r.key == "humidity" then
+            if r.key == "entity" or r.key == "remote" or r.key == "temperature" or r.key == "humidity" or r.key == "act1" or r.key == "act2" then
                 local keep = fa
                 build()
                 fa = keep
@@ -527,11 +553,18 @@ return function(api)
     end)
 
     -- ── presses ──
+    local act_id                                     -- (below)
     local function back()
         unplace()
         draft, armed, errmsg = nil, nil, nil
         fact.st_page = 0
         build()
+    end
+    -- a tile's button n in config.json: an entity id, or { entity, name, icon }
+    act_id = function(list, n)
+        local a = type(list) == "table" and list[n] or nil
+        if type(a) == "table" then a = a.entity end
+        return type(a) == "string" and a or ""
     end
     local function open_entity(room, idx)
         local c = read_cfg() or {}
@@ -551,6 +584,7 @@ return function(api)
             tv = type(it.apple_tv) == "table", remote = type(it.apple_tv) == "table" and type(it.apple_tv.remote) == "string" and it.apple_tv.remote or "",
             printer = type(it.printer) == "table" and it.printer or nil, printer_on = type(it.printer) == "table", printer_prefix = nil,
             on_text = type(it.on_text) == "string" and it.on_text or "", off_text = type(it.off_text) == "string" and it.off_text or "",
+            acts = type(it.actions) == "table" and #it.actions > 0, act1 = act_id(it.actions, 1), act2 = act_id(it.actions, 2),
         }
         if not idx then
             -- a new one: into the first room there is
@@ -600,6 +634,20 @@ return function(api)
             it.apple_tv = copy
         else
             it.apple_tv = nil
+        end
+        -- its two buttons: what was written in each (a name or an icon given in config.json is kept while the entity is the same)
+        if d.acts then
+            local out = {}
+            for n = 1, 2 do
+                local e = (d["act" .. n] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                if valid(e) then
+                    local was = type(it.actions) == "table" and it.actions[n] or nil
+                    out[#out + 1] = (type(was) == "table" and was.entity == e) and was or e
+                end
+            end
+            it.actions = #out > 0 and out or nil
+        else
+            it.actions = nil
         end
         if d.printer_on then
             if d.printer_prefix then it.printer = printer_block(d.printer_prefix)

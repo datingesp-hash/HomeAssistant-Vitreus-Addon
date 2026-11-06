@@ -12,6 +12,7 @@ It speaks English by default and ships with a Spanish translation already instal
 - [Install and update](#install-and-update)
 - [Setting it up](#setting-it-up)
 - [Using the panel](#using-the-panel) (and the desktop widgets)
+- [Two buttons on a right click](#two-buttons-on-a-right-click)
 - [Lights and colours](#lights-and-colours)
 - [Apple TV](#apple-tv)
 - [3D printer](#3d-printer)
@@ -95,6 +96,7 @@ Until a token is set, the panel runs as a demo. A banner explains what is missin
 
 - **Click** a tile to toggle it.
 - **Right click** a light, an Apple TV or a printer to open its card.
+- **Right click** a tile with [two buttons](#two-buttons-on-a-right-click) to bring them out of it.
 - The **refresh** button reloads states from Home Assistant.
 
 ### Edit mode
@@ -133,6 +135,31 @@ Drag the add-ons piece onto the bar (**Settings > Bar > Island layout**), and th
 hl.unbind("SUPER + H")
 hl.bind("SUPER + H", hl.dsp.exec_cmd("PATH=\"$HOME/.local/bin:$PATH\" pleamar --say vitreus \"emit ax_toggle\""))
 ```
+
+## Two buttons on a right click
+
+Any tile can carry two buttons of its own, for whatever you want at hand next to it: another light, a switch, or a command. A right click on the tile brings them out
+of its middle: two half tiles that pop out and land side by side over it, each with its icon and its name under it. A click outside them, a right click or Escape puts
+them back.
+
+- A button for an entity (a light, a switch, an `input_boolean`…) **toggles** it, and is lit while it is on.
+- A button for something that is only run, a **`shell_command`**, a `script`, a `scene`, a `button` or an `automation`, runs it. It lights up for a few seconds, with a
+  ring of light going out from its icon, so you can see it went.
+
+It works on tiles one column wide or more (1 × 1 and up): a half-column tile, only an icon, keeps its usual right click. On a light, a printer or an Apple TV, the buttons
+take the right click's place, and their cards stay out of reach until the buttons are turned off again.
+
+Turn it on in the settings: open the tile in **Entities**, switch on **Two buttons on a right click**, and write an entity in **Button 1** and **Button 2**. The suggestions
+include your shell commands. Or in `config.json`:
+
+```json
+{ "type": "light", "name": "Lamp", "entity": "light.lamp",
+  "actions": [ "light.led_strip", { "entity": "shell_command.shutdown_pc", "name": "Shut down", "icon": "power" } ] }
+```
+
+Each button is an entity id, or `{ "entity", "name", "icon" }` to give it a name (otherwise it is the entity's own name in Home Assistant, or for a shell command
+one made from its id) and an icon (otherwise one that fits its kind; a command gets a prompt). The shell commands themselves are set up in Home Assistant, under
+`shell_command:` in its `configuration.yaml`.
 
 ## Lights and colours
 
@@ -323,6 +350,7 @@ Each tile:
 | `tint` | Lights only: draw the tile and card in the light's colour. |
 | `apple_tv` | `{ "remote": "remote.…" }`: the Apple TV card (see [Apple TV](#apple-tv)). |
 | `printer` | The printer card's entities (see [3D printer](#3d-printer)). |
+| `actions` | Up to two buttons a right click brings out of the tile (see [Two buttons on a right click](#two-buttons-on-a-right-click)). |
 
 Tile sizes set in edit mode are kept apart, in `layout.json`. A plain `items` list at the top level (outside any room) also works: it is shown first, with no title.
 

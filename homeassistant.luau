@@ -144,6 +144,8 @@ local STR = {
         st_save = "Guardar", st_add = "Añadir", st_cancel = "Cancelar", st_delete = "Eliminar", st_up = "Subir", st_down = "Bajar",
         st_delete_room_sure = "¿Eliminar con sus %d fichas?", st_room_name = "Nombre de la habitación", st_room_name_ph = "Salón, Dormitorio…",
         st_temp = "Sensor de temperatura (opcional)", st_hum = "Sensor de humedad (opcional)",
+        st_acts = "Dos botones con el clic derecho", st_act1 = "Botón 1", st_act2 = "Botón 2", st_act_ph = "Una entidad, o shell_command.…",
+        st_acts_note = "En fichas de 1 x 1 o más grandes. Cada botón enciende o apaga su entidad; un shell_command, un script, una escena o un botón se ejecuta.",
         st_need_entity = "Falta la entidad, o no es válida (dominio.nombre, p. ej. light.salon).", st_need_name = "Falta el nombre de la habitación.",
         st_broken = "config.json tiene un error y no se puede leer aquí: ábrelo en el editor para arreglarlo.",
         demo = "Demostración", demo_title = "Modo demostración: todavía sin conectar",
@@ -197,6 +199,8 @@ local STR = {
         st_save = "Save", st_add = "Add", st_cancel = "Cancel", st_delete = "Delete", st_up = "Move up", st_down = "Move down",
         st_delete_room_sure = "Delete with its %d tiles?", st_room_name = "Room name", st_room_name_ph = "Living room, Bedroom…",
         st_temp = "Temperature sensor (optional)", st_hum = "Humidity sensor (optional)",
+        st_acts = "Two buttons on a right click", st_act1 = "Button 1", st_act2 = "Button 2", st_act_ph = "An entity, or shell_command.…",
+        st_acts_note = "On tiles of 1 x 1 or bigger. Each button toggles its entity; a shell_command, a script, a scene or a button is run.",
         st_need_entity = "The entity is missing, or not valid (domain.name, e.g. light.living_room).", st_need_name = "The room needs a name.",
         st_broken = "config.json has an error and can't be read here: open it in the editor to fix it.",
         demo = "Demo", demo_title = "Demo mode: not connected yet",
@@ -328,6 +332,11 @@ local WORDS = {
     "st_hum",
     "st_need_entity",
     "st_need_name",
+    "st_acts",
+    "st_act1",
+    "st_act2",
+    "st_act_ph",
+    "st_acts_note",
     "st_broken",
     "demo",
     "demo_title",
@@ -507,6 +516,13 @@ on("fact:hl_editing", function() text.t_ed = fact.hl_editing == true and T("ed_d
 
 -- an entity id is a domain, a dot and a name: anything else could break the template it is written into
 local function valid(e) return type(e) == "string" and e:match("^[%a_]+%.[%w_]+$") ~= nil end
+local parse_actions          -- (below, with the printer's)
+-- (a tile's buttons) what is only run, not switched; and a name made from an id, "shell_command.reboot_pc" → "Reboot pc"
+local RUN = { shell_command = true, script = true, scene = true, button = true, input_button = true, automation = true }
+local function humane(id)                  -- "shell_command.reboot_pc" → "Reboot pc"
+    local n = (tostring(id):match("%.(.+)$") or tostring(id)):gsub("_", " ")
+    return (n:gsub("^%l", string.upper))
+end
 
 local function decimal(v, places)
     local s = string.format("%." .. places .. "f", v)
@@ -999,6 +1015,20 @@ show = function()
                 avail = (s.avail and not it.bad) and 1 or 0, col = p.col, cs = p.cs, rs = p.rs, yu = p.yu, prn = it.printer and 1 or 0, pp = pp,
                 cc = it.color and 1 or 0, ct = it.tint and 1 or 0, hk = ((it.color or it.tint) and s.hs) and 1 or 0, hu = s.hs and s.hs.h or 0, sa = s.hs and s.hs.s or 0,
                 tvr = it.tv and 1 or 0, pk = pencil_k(it) }
+            -- its two buttons (a right click brings them out), each with its name, its icon, whether it is on (lit), and whether it is only run (lit a moment)
+            local row = byitem[#byitem]
+            local acts = (not it.bad) and it.acts or nil
+            row.qa = acts and #acts or 0
+            for n = 1, 2 do
+                local a = acts and acts[n]
+                local e = a and est[a.entity]
+                row["an" .. n] = a and (a.name or (e and e.name ~= "" and e.name) or humane(a.entity)) or ""
+                row["ak" .. n] = a and a.pk or 0
+                row["ar" .. n] = (a and a.run) and 1 or 0
+                local st = e and e.st or ""
+                row["ao" .. n] = (a and not a.run and (st == "on" or st == "open" or st == "playing" or st == "home" or st == "unlocked")) and 1 or 0
+                row["av" .. n] = (a and (a.dom == "shell_command" or cfg.demo or (e and st ~= "unavailable"))) and 1 or 0
+            end
         end
         -- the rows keep their order while the same tiles are there (moved, they only change place); tiles added or taken away start it again
         local keys, at, seen = {}, {}, {}
@@ -1082,6 +1112,7 @@ local function poll()
     for _, room in ipairs(cfg.rooms) do want(room.temp); want(room.hum) end
     for _, it in ipairs(cfg.items) do
         if it.printer then for _, k in ipairs(PR_POLL) do want(it.printer[k]) end end
+        for _, a in ipairs(it.acts or {}) do if a.dom ~= "shell_command" then want(a.entity) end end      -- (a shell_command is no entity: nothing to read)
     end
     tv_poll()
     if #ids == 0 then
@@ -1093,7 +1124,7 @@ local function poll()
     for k, e in ipairs(ids) do quoted[k] = '"' .. e .. '"' end
     -- The state, the brightness (0 to 255), the unit, the picture's address (an image's or a camera's), the colour (hue and saturation, a light's) and, for a time, when it is (HH:MM, or dd/mm HH:MM
     -- another day, in Home Assistant's time zone) of each entity, as a JSON list, in the order of `ids`.
-    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set ts = as_timestamp(states(e), none) %}[{{ states(e) | tojson }},{{ (state_attr(e, 'brightness') or 0) | int }},{{ (state_attr(e, 'unit_of_measurement') or '') | tojson }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{{ (state_attr(e, 'hs_color') or []) | list | tojson }},{% if ts is not none %}{{ (ts | timestamp_custom('%H:%M') if (ts | timestamp_custom('%Y%m%d')) == now().strftime('%Y%m%d') else ts | timestamp_custom('%d/%m %H:%M')) | tojson }}{% else %}\"\"{% endif %}]{{ ',' if not loop.last }}{% endfor %}]"
+    local tpl = "[{% for e in [" .. table.concat(quoted, ",") .. "] %}{% set ts = as_timestamp(states(e), none) %}[{{ states(e) | tojson }},{{ (state_attr(e, 'brightness') or 0) | int }},{{ (state_attr(e, 'unit_of_measurement') or '') | tojson }},{{ (state_attr(e, 'entity_picture') or '') | tojson }},{{ (state_attr(e, 'hs_color') or []) | list | tojson }},{% if ts is not none %}{{ (ts | timestamp_custom('%H:%M') if (ts | timestamp_custom('%Y%m%d')) == now().strftime('%Y%m%d') else ts | timestamp_custom('%d/%m %H:%M')) | tojson }}{% else %}\"\"{% endif %},{{ (state_attr(e, 'friendly_name') or '') | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
     busy = true
     call("/api/template", json.encode({ template = tpl }), function(ok, out, err)
         busy = false
@@ -1109,7 +1140,7 @@ local function poll()
         end
         for k, e in ipairs(ids) do
             local row = list[k]
-            if type(row) == "table" then est[e] = { st = tostring(row[1] or "unknown"), bri = tonumber(row[2]) or 0, unit = tostring(row[3] or ""), pic = tostring(row[4] or ""), hs = row[5], tm = tostring(row[6] or "") } end
+            if type(row) == "table" then est[e] = { st = tostring(row[1] or "unknown"), bri = tonumber(row[2]) or 0, unit = tostring(row[3] or ""), pic = tostring(row[4] or ""), hs = row[5], tm = tostring(row[6] or ""), name = tostring(row[7] or "") } end
         end
         local count = 0
         for i, it in ipairs(cfg.items) do
@@ -1133,6 +1164,27 @@ local function poll()
         set_state(1, T("connected", count, #cfg.items, #cfg.items == 1 and T("tile") or T("tiles")))
         show()
     end)
+end
+
+-- A tile's "actions": up to two buttons that a right click brings out of it (on a tile of a column or more). Each one an entity id, or { "entity", "name",
+-- "icon" }. A button toggles its entity; one that is only run (a shell_command, a script, a scene, a button…) is run, and lights up a moment. None: nil.
+parse_actions = function(list)
+    if type(list) ~= "table" then return nil end
+    local out = {}
+    for _, a in ipairs(list) do
+        local e, name, icon = nil, nil, nil
+        if type(a) == "string" then e = a
+        elseif type(a) == "table" then e, name, icon = a.entity, a.name, a.icon end
+        if valid(e) and #out < 2 then
+            local dom = e:match("^([%a_]+)%.")
+            local pk = PENCIL[type(icon) == "string" and icon or ""]
+            if pk == nil then
+                pk = ({ light = 0, fan = 4, climate = 4, media_player = 5, switch = 6, cover = 7, lock = 7 })[dom] or (RUN[dom] and -1 or 2)
+            end
+            out[#out + 1] = { entity = e, dom = dom, run = RUN[dom] == true, name = type(name) == "string" and name ~= "" and name or nil, pk = pk }
+        end
+    end
+    return #out > 0 and out or nil
 end
 
 -- A tile's "printer": the entities it names (any of PR_KEYS), the ones that are valid ids. None: no printer.
@@ -1221,6 +1273,7 @@ local function load()
                     color = kind == 0 and it.color == true,          -- its colour is chosen in the card too
                     tint = kind == 0 and it.tint == true,            -- its tile and card are drawn in its own colour, not the accent
                     tv = parse_tv(it.apple_tv, entity),
+                    acts = parse_actions(it.actions),
                     room = k,
                     croom = croom, cidx = n,         -- where it is in config.json: the room there (0: the top level's items) and its place in it
                 }
@@ -1307,6 +1360,32 @@ local function tap(k)
     end)
 end
 on("hl_tap", function(k) local i = row_item(k); if i then tap(i - 1) end end)       -- (a row of the panel; the desktop cards tap by tile)
+
+-- One of a tile's two buttons, pressed (`v`: the tile's row × 10 + the button, 1 or 2). One that is only run is run (a shell_command by its own service);
+-- any other is toggled, and shown so at once, as a tile is.
+on("qa_tap", function(v)
+    v = math.floor(tonumber(v) or 0)
+    local i = row_item(v // 10)
+    local it = i and cfg and cfg.items[i]
+    local a = it and it.acts and it.acts[v % 10]
+    if not a then return end
+    local dom, name = a.entity:match("^([%a_]+)%.(.+)$")
+    local path, body = "/api/services/homeassistant/toggle", { entity_id = a.entity }
+    if dom == "shell_command" then path, body = "/api/services/shell_command/" .. name, {}
+    elseif dom == "script" or dom == "scene" then path = "/api/services/" .. dom .. "/turn_on"
+    elseif dom == "button" or dom == "input_button" then path = "/api/services/" .. dom .. "/press"
+    elseif dom == "automation" then path = "/api/services/automation/trigger"
+    else
+        local e = est[a.entity] or { st = "off", bri = 0, unit = "", pic = "", tm = "", name = "" }      -- (the demo has read nothing: off to begin with)
+        e.st = (e.st == "on") and "off" or "on"
+        est[a.entity] = e
+        show()
+    end
+    call(path, next(body) and json.encode(body) or "{}", function(ok, _, err)          -- (an empty table would go as [], which is no object)
+        if not ok then set_state(2, T("offline"), err) end
+        after(700, poll)
+    end)
+end)
 
 -- A light's brightness (0 to 1), from the card's slider or the desktop widget's wheel
 local function bri_to(i, v)
