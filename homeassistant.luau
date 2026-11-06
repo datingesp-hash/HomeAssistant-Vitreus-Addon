@@ -1028,6 +1028,8 @@ show = function()
                 local e = a and est[a.entity]
                 row["an" .. n] = a and (a.name or (e and e.name ~= "" and e.name) or humane(a.entity)) or ""
                 row["ak" .. n] = a and a.pk or 0
+                row["ad" .. n] = a and a.dk or -1
+                row["ai" .. n] = (a and a.file) and (folder .. "/" .. a.file) or ""
                 row["ar" .. n] = (a and a.run) and 1 or 0
                 local st = e and e.st or ""
                 row["ao" .. n] = (a and not a.run and (st == "on" or st == "open" or st == "playing" or st == "home" or st == "unlocked")) and 1 or 0
@@ -1181,11 +1183,14 @@ parse_actions = function(list)
         elseif type(a) == "table" then e, name, icon = a.entity, a.name, a.icon end
         if valid(e) and #out < 2 then
             local dom = e:match("^([%a_]+)%.")
+            -- an icon: one of the pencil's by name, or one of the add-on's own drawings by its file (reproductor.svg, the Apple TV's, and the rest)
+            local dk = type(icon) == "string" and DEV[ALIAS[icon] or icon] or nil
             local pk = PENCIL[type(icon) == "string" and icon or ""]
+            if dk then pk = 0 end
             if pk == nil then
                 pk = ({ light = 0, fan = 4, climate = 4, media_player = 5, switch = 6, cover = 7, lock = 7 })[dom] or (RUN[dom] and -1 or 2)
             end
-            out[#out + 1] = { entity = e, dom = dom, run = RUN[dom] == true, name = type(name) == "string" and name ~= "" and name or nil, pk = pk }
+            out[#out + 1] = { entity = e, dom = dom, run = RUN[dom] == true, name = type(name) == "string" and name ~= "" and name or nil, pk = pk, dk = dk or -1, file = dk and (ALIAS[icon] or icon) or nil }
         end
     end
     return #out > 0 and out or nil

@@ -433,12 +433,17 @@ return function(api)
                 local auto = (ha_has[e] and ha_has[e].name) or ((e:match("%.(.+)$") or ""):gsub("_", " "):gsub("^%l", string.upper))
                 field(key .. "_name", string.format(T("st_act_name"), n), d[key .. "_name"], auto ~= "" and auto or T("st_name_ph"))
                 note(string.format(T("st_act_icon"), n))
-                local cur = api.PENCIL[d[key .. "_icon"] or ""]
+                local ic = d[key .. "_icon"] or ""
+                local cur = api.PENCIL[ic]
+                local curd = api.DEV[api.ALIAS[ic] or ic]
                 local m = 0
-                for q = 0, 8 do
-                    icons[#icons + 1] = { pk = q, dk = -1, x = (m % cols) * 52, y = y + math.floor(m / cols) * 52, sel = (cur == q) and 1 or 0, key = key }
+                local function bcell(p, q)
+                    icons[#icons + 1] = { pk = p, dk = q, x = (m % cols) * 52, y = y + math.floor(m / cols) * 52, key = key,
+                        sel = ((p >= 0 and cur == p and not curd) or (q >= 0 and curd == q)) and 1 or 0 }
                     m = m + 1
                 end
+                for q = 0, 8 do bcell(q, -1) end
+                bcell(-1, 5)                               -- the Apple TV's (reproductor.svg), for a button that switches to it
                 y = y + math.ceil(m / cols) * 52 + 6
             end
         end
@@ -833,7 +838,7 @@ return function(api)
         if not c or not draft then return end
         if fa >= 0 then commit() end
         if c.key then                                -- a button's: the one pressed, or (pressed again) its own back
-            draft[c.key .. "_icon"] = (c.sel ~= 1) and PNAMES[c.pk] or nil
+            draft[c.key .. "_icon"] = (c.sel ~= 1) and (c.pk >= 0 and PNAMES[c.pk] or ((api.lang() == "es") and DNAMES_ES or DNAMES_EN)[c.dk]) or nil
         elseif c.pk >= 0 then draft.icon = PNAMES[c.pk]
         else draft.icon = ((api.lang() == "es") and DNAMES_ES or DNAMES_EN)[c.dk] end
         unplace()

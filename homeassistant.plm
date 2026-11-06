@@ -152,7 +152,7 @@ scene HomeAssistant {
     //  kind: 0 a section's title · 1 a field (label, value or placeholder; `on` 1: it has a value) · 4 a note · 5 a suggestion (label, sub) · 6 a button (`tone`: 0 plain,
     //  1 the accent, 2 danger, 3 danger armed: pressed once, asking again)
     model st_chips max 24 { label: text; x: number; y: number; w: number; sel: number }
-    model st_icons max 36 { pk: number; dk: number; x: number; y: number; sel: number }
+    model st_icons max 40 { pk: number; dk: number; x: number; y: number; sel: number }
     model st_ents max 44 { kind: number; name: text; sub: text; pk: number; y: number }      // kind 0 a room · 1 a tile
     fact st_fa = -1                                   // the field the shell's field is on (a row of st_rows), where it is, and what it says (masked for the token)
     fact st_fx = 0
@@ -188,7 +188,7 @@ scene HomeAssistant {
     text t_off = ""
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
-    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number }      // `qa` how many buttons a right click brings out of it (0 none; config.json's "actions"), each one's name (`an`), pencil icon (`ak`, -1: a command's), whether it is only run (`ar`), on (`ao`) and there (`av`) · `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number; ad1: number; ad2: number; ai1: image 48, 48; ai2: image 48, 48 }      // `qa` how many buttons a right click brings out of it (0 none; config.json's "actions"), each one's name (`an`), pencil icon (`ak`, -1: a command's), whether it is only run (`ar`), on (`ao`) and there (`av`) · `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -723,13 +723,17 @@ scene HomeAssistant {
                                     rim: 16% * lit
                                     ellipse { at: x, dyc; radius: 16 * u }
                                 }
+                                let qd = pick(i, r.ad1, r.ad2)         // one of the add-on's own drawings (the Apple TV's…), or -1
+                                //  (its file, tinted as the tiles' own pictures are: drawn in pencil in each copy it took too many of the scene's properties)
+                                image r.ai1 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 0 }
+                                image r.ai2 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 1 }
                                 group {
-                                    show: pick(i, r.ak1, r.ak2) >= 0
+                                    show: qd < 0 and pick(i, r.ak1, r.ak2) >= 0
                                     PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + r.index * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
                                 }
                                 //  a command's own: a prompt, › and _
                                 group {
-                                    show: pick(i, r.ak1, r.ak2) < 0
+                                    show: qd < 0 and pick(i, r.ak1, r.ak2) < 0
                                     box { at: x - 3.2 * u, dyc - 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: 45deg; color: mix(ink, onmint, lit) }
                                     box { at: x - 3.2 * u, dyc + 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: -45deg; color: mix(ink, onmint, lit) }
                                     box { at: x + 4 * u, dyc + 5 * u; size: 7 * u, 2 * u; corner: 1 * u; color: mix(ink, onmint, lit) }
