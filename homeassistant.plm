@@ -214,8 +214,13 @@ scene HomeAssistant {
     fact qa_i = -1
     prop qa_k = 0 ~spring(230, 15)                   // (a little past its place, and back: they pop out)
     follow qa_k = if(qa_open, 1, 0)
+    //  what is seen: in step with qa_k while it comes out, but gone in a moment once shut. (qa_k's spring goes past 0 and back as it shuts: seen through
+    //  it alone, the buttons came back for an instant after they had gone.)
+    prop qa_v = 0 ~140ms
+    follow qa_v = if(qa_open, 1, 0)
     event qa_tap ->                                   // one pressed: the tile's place × 10 + the button (1 or 2)
     on change hl_editing { qa_open = false }
+    on change slot_open { qa_open = false }            // (shut with the panel: never there, half drawn, when it opens again)
 
     //  The brightness slider, over the panel
     fact sl_open = false
@@ -534,7 +539,7 @@ scene HomeAssistant {
                     group {
                         opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.1 * carried)
                         move: ex - cx0, ey - cy0
-                        zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and qa_k < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
+                        zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and qa_v < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
                         on press hl_tile_z { hl_grab = hl_sp; emit hl_tap(r.index) }
                         //  (a tile with its two buttons, a column wide or more, brings them out instead of its card)
                         on press right hl_tile_z while r.qa > 0.5 and r.cs >= 2 { qa_i = r.index; qa_open = true }
@@ -659,8 +664,8 @@ scene HomeAssistant {
                 //  it. One that toggles is lit while its entity is on; one that is only run (a shell_command, a script…) lights up a few seconds when pressed, with
                 //  a ring of light going out from its disc. A click outside them, a right click or Escape puts them back. ──
                 group {
-                    show: qa_k > 0.01
-                    opacity: clamp(qa_k * 1.6, 0, 1)
+                    show: qa_v > 0.01
+                    opacity: clamp(qa_k * 1.6, 0, 1) * qa_v
                     box { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; color: deep; opacity: 40% }
                 }
                 zone box qa_scrim_z { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; active: qa_open }
@@ -680,7 +685,8 @@ scene HomeAssistant {
                     let qx0 = mix(qcx, qcx + if(r.qa >= 2, -0.5, 0) * (hw + gap), qk)
                     let qx1 = mix(qcx, qcx + 0.5 * (hw + gap), qk)
                     group {
-                        show: qa_i == r.index and qa_k > 0.01
+                        show: qa_i == r.index and qa_v > 0.01
+                        opacity: qa_v
                         repeat i in 0..2 {
                             //  where it lands: the two side by side about the tile's middle (one alone, in the middle), and on its way out of it
                             let bx = qcx + if(r.qa >= 2, i - 0.5, 0) * (hw + gap)
