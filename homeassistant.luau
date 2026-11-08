@@ -1368,6 +1368,14 @@ local function load()
     poll()
 end
 
+-- Play or pause, by what it is doing: media_pause or media_play. Home Assistant only takes media_play_pause from a player that says it can do both
+-- at once, and many DLNA renderers say only the one that fits their state (playing: pause; paused: play). Unknown: play_pause, and let it decide.
+local function play_or_pause(code)
+    if code == 2 then return "/api/services/media_player/media_pause" end
+    if code == 3 or code == 1 then return "/api/services/media_player/media_play" end
+    return "/api/services/media_player/media_play_pause"
+end
+
 -- What the tiles and the slider ask for
 local function tap(k)
     local i = (tonumber(k) or -1) + 1
@@ -1377,12 +1385,13 @@ local function tap(k)
     if it.spk then                                        -- a speaker: play or pause, at once on the tile; Home Assistant confirms it
         local t = tvs[it.entity]
         local code = tv_code(t)
+        local svc = play_or_pause(code)
         if t and code == 2 then t.pos = tv_now(t); t.el = 0; t.at = tick; t.st = "paused"
         elseif t and code == 3 then t.st = "playing"; t.at = tick; t.el = 0 end
         s.on = t ~= nil and t.st == "playing"
         hold_until[i] = tick + 3
         show()
-        call("/api/services/media_player/media_play_pause", json.encode({ entity_id = it.entity }), function(ok, _, err)
+        call(svc, json.encode({ entity_id = it.entity }), function(ok, _, err)
             if not ok then set_state(2, T("offline"), err) end
             hold_until[i] = nil
             after(800, poll)
@@ -1726,7 +1735,7 @@ on("tv_cmd", function(c)
     elseif TV_REMOTE[c] and remote then
         svc, body = "/api/services/remote/send_command", { entity_id = remote, command = TV_REMOTE[c] }
     elseif media and (c == 7 or c == 8 or c == 9) then     -- no remote: the media player's own
-        svc = "/api/services/media_player/" .. ({ [7] = "media_play_pause", [8] = "volume_up", [9] = "volume_down" })[c]
+        svc = c == 7 and play_or_pause(tv_code(t)) or ("/api/services/media_player/" .. ({ [8] = "volume_up", [9] = "volume_down" })[c])
         body = { entity_id = media }
     end
     if not svc then return end
