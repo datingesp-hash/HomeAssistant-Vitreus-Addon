@@ -1700,6 +1700,19 @@ on("tv_vol", function(v)                                  -- the card's volume s
         after(900, tv_poll)
     end)
 end)
+on("tv_seek", function(x)                                 -- the card's progress bar clicked: there, 0 to 1 of what plays
+    local it = tv_item()
+    local media = it and it.tv.media
+    local t = media and tvs[media]
+    if not t or t.dur <= 0 then return end
+    local to = math.floor(math.max(0, math.min(1, tonumber(x) or 0)) * t.dur + 0.5)
+    t.pos = to; t.el = 0; t.at = tick                     -- (at once on the card; Home Assistant confirms it)
+    tv_fill()
+    call("/api/services/media_player/media_seek", json.encode({ entity_id = media, seek_position = to }), function(ok, _, err)
+        if not ok then set_state(2, T("offline"), err) end
+        after(1200, tv_poll)
+    end)
+end)
 on("tv_cmd", function(c)
     c = tonumber(c) or -1
     local it = tv_item()

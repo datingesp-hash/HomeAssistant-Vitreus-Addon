@@ -310,6 +310,7 @@ scene HomeAssistant {
     prop tv_vols = 0 ~quick
     follow tv_vols = tv_vol
     event tv_vol ->                                   // the volume slider let go (or paused): 0 to 1
+    event tv_seek ->                                  // the progress bar clicked: where to go, 0 to 1 of what plays
     fact tv_custom = false
     text tv_icon = "tv"
     text tv_name = ""
@@ -1308,7 +1309,9 @@ scene HomeAssistant {
                             rim: 10%
                             box { from: ax, cy0; size: as, as; corner: 14 * v }
                         }
-                        HUi(k: 22, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_has_appic, 0, 0.85), s: 651, f: 0, z: 1.1 * tsc)
+                        HUi(k: 22, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_has_appic or tv_spk, 0, 0.85), s: 651, f: 0, z: 1.1 * tsc)
+                        //  (a speaker's: the pencil speaker)
+                        HDev(k: 8, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_spk and not tv_has_appic, 0.85, 0), s: 656, f: 0, z: 1.6 * tsc)
                         //  the app's icon, rounded as on the Apple TV's home screen
                         group {
                             show: tv_has_appic
@@ -1333,6 +1336,10 @@ scene HomeAssistant {
                             shadow: 0, 0, 8 * v * tlit, 30%, mint
                             box { from: mx, cy0 + as - 28 * v; size: max(5 * v, mw * tv_progs), 5 * v; corner: 2.5 * v }
                         }
+                        //  a click on the bar goes there (a little taller than the bar, so it is easy to hit); it thickens under the pointer
+                        box { from: mx, cy0 + as - 29 * v; size: mw, 7 * v; corner: 3.5 * v; color: ink; opacity: 8% * tv_sk_z.hover }
+                        zone box tv_sk_z { from: mx - 4 * v, cy0 + as - 40 * v; size: mw + 8 * v, 28 * v; corner: 8 * v; cursor: pointer; active: tv_st >= 2 and tv_tk < 0.5; label: t_progress; role: slider; value: "{tv_pos}" }
+                        on press tv_sk_z { tv_prog = clamp((local.x - mx) / mw, 0, 1); emit tv_seek(clamp((local.x - mx) / mw, 0, 1)) }
                         text tv_pos { at: mx, cy0 + as - 8 * v; anchor: left center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
                         text tv_rem { at: mx + mw, cy0 + as - 8 * v; anchor: right center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
                     }

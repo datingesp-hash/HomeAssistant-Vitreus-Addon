@@ -260,13 +260,15 @@ For a media player from Home Assistant's [DLNA Digital Media Renderer](https://w
 
 - **A click** plays or pauses it. The tile is lit while it plays, and says what: *Playing · Song*.
 - **A right click** opens its card:
-  - the artwork, the title and the artist, and the live progress;
+  - the artwork, the title and the artist, and the live progress: **click the bar to jump** forwards or backwards in the song;
   - play/pause and next;
   - a volume slider, with a quieter and a louder button at its ends (5 % each). The mouse wheel anywhere on the card changes the volume too.
 
 There is no power button: a DLNA renderer is not switched on or off. Without an `icon`, a speaker gets the pencil speaker (`speaker.svg`). In the settings menu, picking an entity of the DLNA integration sets all of this for you.
 
 ![The speaker card](docs/img/speaker.png)
+
+<sub>Playing “Carefree” by Kevin MacLeod ([incompetech.com](https://incompetech.com)), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).</sub>
 
 ## 3D printer
 
@@ -379,7 +381,7 @@ Each tile:
 
 Tile sizes set in edit mode are kept apart, in `layout.json`. A plain `items` list at the top level (outside any room) also works: it is shown first, with no title.
 
-Lights use `light.toggle` and `light.turn_on`. Speakers use `media_player.media_play_pause`, `media_player.media_next_track` and `media_player.volume_set`. Everything else (`switch`, `input_boolean`, `media_player`, scripts…) uses `homeassistant.toggle`.
+Lights use `light.toggle` and `light.turn_on`. Speakers use `media_player.media_play` / `media_pause` (by their state: many renderers do not take `media_play_pause`), `media_next_track`, `media_seek` and `volume_set`. Everything else (`switch`, `input_boolean`, `media_player`, scripts…) uses `homeassistant.toggle`.
 
 ## Privacy
 
