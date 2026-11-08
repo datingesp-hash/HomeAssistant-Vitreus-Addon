@@ -304,6 +304,12 @@ scene HomeAssistant {
     fact tv_has_prog = false                          // it says how long what plays is, and how far it has got
     fact tv_has_pic = false
     fact tv_has_rm = false                            // a remote entity is configured: the remote's tab
+    fact tv_spk = false                               // a speaker (a DLNA renderer, config.json's "type": "speaker"): play/pause and next, and a volume slider
+    fact tv_vol = 0                                   // its volume, 0 to 1 (the slider moves it here; the logic sends it)
+    fact tv_vdirty = false                            // moved since it was last sent
+    prop tv_vols = 0 ~quick
+    follow tv_vols = tv_vol
+    event tv_vol ->                                   // the volume slider let go (or paused): 0 to 1
     fact tv_custom = false
     text tv_icon = "tv"
     text tv_name = ""
@@ -341,6 +347,7 @@ scene HomeAssistant {
     text t_mute = ""
     text t_prev = ""
     text t_next = ""
+    text t_volume = ""
     text t_wg_title = ""
     text t_wg_hint = ""
     prop sl_k = 0 ~240ms
@@ -1200,10 +1207,12 @@ scene HomeAssistant {
                 opacity: tv_k
                 show: tv_k > 0.01
                 //  all of it a little smaller when the panel is not tall enough for it (`v` is its `u`)
-                let tsc = min(1, (H - 16 * u) / ((mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)) * u))
+                //  how tall it is: with the remote's tab, without it (no remote), or a speaker's (no tabs, a volume row under the buttons)
+                let tvh = if(tv_spk, 332, (mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)))
+                let tsc = min(1, (H - 16 * u) / (tvh * u))
                 let v = u * tsc
                 let tcw = min(W - 28 * u, 460 * v)
-                let tch = (mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)) * v
+                let tch = tvh * v
                 let tcl = (W - tcw) / 2
                 let tct = (H - tch) / 2 + 10 * v * (1 - tv_k)
                 let tlit = if(tv_st == 2, 1, 0)
@@ -1222,6 +1231,9 @@ scene HomeAssistant {
                 }
                 zone box tv_card_z { from: tcl, tct; size: tcw, tch; corner: 20 * v }
                 on press right tv_card_z { tv_open = false }
+                on scroll tv_card_z while tv_spk { tv_vol = clamp(tv_vol + wheel * 0.05, 0, 1); tv_vdirty = true }
+                //  a pause in the moving sends it too, so the speaker follows the finger without a request per frame
+                on still tv_vol for 280ms while tv_open and tv_vdirty { emit tv_vol(tv_vol); tv_vdirty = false }
                 //  the head: its disc (lit while it plays), its name, how it is and in which app, the power and the X
                 body {
                     color: mix(off, mint, tlit)
@@ -1248,13 +1260,17 @@ scene HomeAssistant {
                     ellipse { radius: 3.5 * v; color: pick(tv_st, faint, ink, mint, ink) }
                     text tv_status { size: 11.5 * tsc; weight: 600; width: tcw - 170 * v; lines: 1; color: pick(tv_st, faint, ink, mint, ink); family: "Space Grotesk" }
                 }
-                body {
-                    color: mix(ink, mint, if(tv_st > 0, 1, 0))
-                    opacity: if(tv_st > 0, 90%, 8% + 10% * tv_pw_z.hover)
-                    ellipse { at: tcl + tcw - 64 * v, tct + 28 * v; radius: 13 * v }
+                //  (a speaker has none: a DLNA renderer is not switched on or off)
+                group {
+                    show: not tv_spk
+                    body {
+                        color: mix(ink, mint, if(tv_st > 0, 1, 0))
+                        opacity: if(tv_st > 0, 90%, 8% + 10% * tv_pw_z.hover)
+                        ellipse { at: tcl + tcw - 64 * v, tct + 28 * v; radius: 13 * v }
+                    }
+                    HUi(k: 20, cx: tcl + tcw - 64 * v, cy: tct + 28 * v, c: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)), a: 1, s: 611, f: if(tv_pw_z.hover > 0.5, fr, 0), z: 0.6 * tsc)
+                    zone box tv_pw_z { at: tcl + tcw - 64 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
                 }
-                HUi(k: 20, cx: tcl + tcw - 64 * v, cy: tct + 28 * v, c: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)), a: 1, s: 611, f: if(tv_pw_z.hover > 0.5, fr, 0), z: 0.6 * tsc)
-                zone box tv_pw_z { at: tcl + tcw - 64 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
                 on press tv_pw_z { emit tv_cmd(10) }
                 ellipse { at: tcl + tcw - 30 * v, tct + 28 * v; radius: 13 * v; color: ink; opacity: 8% + 10% * tv_x_z.hover }
                 HUi(k: 10, cx: tcl + tcw - 30 * v, cy: tct + 28 * v, c: mix(faint, ink, tv_x_z.hover), a: 1, s: 621, f: if(tv_x_z.hover > 0.5, fr, 0), z: 0.62 * tsc)
@@ -1320,14 +1336,15 @@ scene HomeAssistant {
                         text tv_pos { at: mx, cy0 + as - 8 * v; anchor: left center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
                         text tv_rem { at: mx + mw, cy0 + as - 8 * v; anchor: right center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
                     }
-                    //  the transport: volume down, previous, play/pause (lit), next, volume up
+                    //  the transport: volume down, previous, play/pause (lit), next, volume up; a speaker's only play/pause and next (its volume is the slider below)
                     let ty0 = cy0 + as + 44 * v
                     repeat i in 0..5 {
-                        let bx = tcl + tcw / 2 + (i - 2) * 70 * v
+                        let bx = tcl + tcw / 2 + if(tv_spk, pick(i, 0, 0, -38, 38, 0), (i - 2) * 70) * v
                         let code = pick(i, 9, 11, 7, 12, 8)
                         let big = if(i == 2, 1, 0)
                         let live = if(i == 0 or i == 4 or tv_st > 0, 1, 0)
                         group {
+                            show: not tv_spk or i == 2 or i == 3
                             opacity: if(live > 0.5, 100%, 35%)
                             ellipse { at: bx, ty0; radius: 21 * v; color: ink; opacity: if(tv_fl == code, 24%, 8% + 8% * tv_m_z.$i.hover) * (1 - big) }
                             body {
@@ -1341,6 +1358,26 @@ scene HomeAssistant {
                             zone box tv_m_z.$i { at: bx, ty0; size: (44 + 12 * big) * v, (44 + 12 * big) * v; corner: (22 + 6 * big) * v; cursor: pointer; active: live > 0.5 and tv_tk < 0.5; label: pick(i, t_voldown, t_prev, t_playpause, t_next, t_volup) }
                         }
                         on press tv_m_z.$i { emit tv_cmd(code); tv_fl = code }
+                    }
+                    //  a speaker's volume: the Control Center's slider between a quieter and a louder speaker, each a nudge of 5 %; the wheel anywhere on the card too
+                    group {
+                        show: tv_spk
+                        let vy = ty0 + 54 * v
+                        let vl = tcl + 62 * v
+                        let vw = tcw - 124 * v
+                        repeat j in 0..2 {
+                            let vx = if(j == 0, tcl + 34 * v, tcl + tcw - 34 * v)
+                            ellipse { at: vx, vy; radius: 16 * v; color: ink; opacity: if(tv_fl == 30 + j, 22%, 6% + 8% * tv_vb_z.$j.hover) }
+                            HUi(k: pick(j, 23, 26), cx: vx, cy: vy, c: mix(faint, ink, tv_vb_z.$j.hover), a: 1, s: 781 + j * 10, f: if(tv_vb_z.$j.hover > 0.5, fr, 0), z: 0.7 * tsc)
+                            zone box tv_vb_z.$j { at: vx, vy; size: 32 * v, 32 * v; corner: 16 * v; cursor: pointer; label: pick(j, t_voldown, t_volup) }
+                            on press tv_vb_z.$j { tv_vol = clamp(tv_vol + pick(j, -0.05, 0.05), 0, 1); tv_fl = 30 + j; emit tv_vol(tv_vol) }
+                        }
+                        PSlider(x0: vl, y: vy, w: vw, lv: tv_vols, h: 14 * v, f: if(tv_vt_z.hover > 0.5 or tv_vdirty, fr, 0))
+                        zone box tv_vt_z { from: vl - 6 * v, vy - 18 * v; size: vw + 12 * v, 36 * v; corner: 18 * v; cursor: pointer; label: "{t_volume}: {tv_name}"; role: slider; value: "{tv_vols * 100} %" }
+                        on press tv_vt_z { tv_vol = clamp((local.x - vl) / vw, 0, 1); tv_vdirty = true }
+                        on drag tv_vt_z { tv_vol = clamp((local.x - vl) / vw, 0, 1); tv_vdirty = true }
+                        on release tv_vt_z { emit tv_vol(tv_vol); tv_vdirty = false }
+                        on scroll tv_vt_z { tv_vol = clamp(tv_vol + wheel * 0.05, 0, 1); tv_vdirty = true }
                     }
                 }
                 //  ── the remote: laid out as the Siri Remote, on its side: the clickpad, and beside it its buttons in two columns (back and TV, play/pause and

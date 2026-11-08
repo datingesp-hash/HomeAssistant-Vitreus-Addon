@@ -52,6 +52,9 @@ local ICONS = {
     ["reproductor.svg"] = [[<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
 <rect x="3" y="3" width="18" height="18" rx="4.6"/><path d="M9 8.4v6.1a1.6 1.6 0 0 0 1.6 1.6h.5"/><path d="M7.4 10.6h3.3"/><path d="M12.6 10.6l2 5.4 2-5.4"/>
 </svg>]],
+    ["altavoz.svg"] = [[<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<rect x="5.5" y="2.5" width="13" height="19" rx="2.4"/><circle cx="12" cy="14.5" r="4.2"/><circle cx="12" cy="14.5" r="1.1" fill="#ffffff" stroke="none"/><circle cx="12" cy="7" r="1.7" stroke-width="1.5"/>
+</svg>]],
     ["lampara-pie.svg"] = [[<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
 <path d="M8.2 3.2h7.6l2.2 6.3H6z"/><path d="M12 9.5v10.3"/><path d="M8.3 20.6h7.4"/><path d="M14.6 9.5v1.8"/>
 </svg>]],
@@ -74,7 +77,7 @@ local EXAMPLE = [[{
   "_insecure": "true only for https with a certificate of your own (self-signed).",
   "insecure": false,
   "_rooms": "The rooms, in order. name: its title. temperature and humidity (optional): a sensor whose reading is shown beside the name. items: its tiles.",
-  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: drawn in Vitreus's pencil, by name: lightbulb, floor_lamp, power, bedtime, mode_fan, tv, power_outlet, door_front, home (anything else is a bulb for a light, a power sign for a switch), or one of the add-on's own (led-strip.svg and the rest, see its README), or an .svg of yours. color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. tint: true draws that light's tile and card in its own colour instead of the accent. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
+  "_items": "type: \"light\" (a click toggles it, a right click opens its brightness) or \"toggle\" (input_boolean, switch, plug, media player...). icon: drawn in Vitreus's pencil, by name: lightbulb, floor_lamp, power, bedtime, mode_fan, tv, power_outlet, door_front, home (anything else is a bulb for a light, a power sign for a switch), or one of the add-on's own (led-strip.svg and the rest, see its README), or an .svg of yours. color: true on a light whose colour can change (an RGB bulb or LED strip): its right click card shows the colours too. tint: true draws that light's tile and card in its own colour instead of the accent. apple_tv: on an Apple TV's tile, { \"remote\": \"remote.living_room\" } gives it a card (right click) with what plays, its buttons and a remote. \"type\": \"speaker\" on a DLNA renderer's media_player (a Mi Smart Clock, a network speaker): a click plays or pauses it, a right click opens its card with the artwork, play/pause, next and a volume slider; its icon is speaker.svg. on_text and off_text are optional. A tile's size is changed on the panel, with the pencil.",
   "rooms": [
     {
       "name": "Living room",
@@ -135,7 +138,7 @@ local STR = {
         st_add_ent = "+ Entidad", st_add_room = "+ Habitación", st_no_room = "Sin habitación", st_n_tile = "%d ficha", st_n_tiles = "%d fichas",
         st_new_ent = "Nueva entidad", st_edit_ent = "Editar entidad", st_new_room = "Nueva habitación", st_edit_room = "Editar habitación",
         st_entity = "Entidad de Home Assistant", st_entity_ph = "Escribe para buscar: salón, light.…", st_name = "Nombre", st_name_ph = "Cómo se llama en el panel",
-        st_type = "Tipo", st_light = "Luz", st_toggle = "Interruptor", st_room = "Habitación", st_icon = "Icono",
+        st_type = "Tipo", st_light = "Luz", st_toggle = "Interruptor", st_speaker = "Altavoz (DLNA)", st_room = "Habitación", st_icon = "Icono",
         st_own_icon = "Usa un icono propio (%s): elige otro aquí para cambiarlo.",
         st_color = "Cambiar el color desde su tarjeta", st_tint = "Ficha del color de la luz", st_tv = "Tarjeta de reproductor y mando (Apple TV)",
         st_remote = "Mando (entidad remote.…)", st_printer = "Tarjeta de impresora 3D", st_printer_pick = "Impresora (Bambu Lab) encontrada en Home Assistant:",
@@ -155,7 +158,7 @@ local STR = {
         tv_off = "Apagado", tv_on = "Encendido", tv_playing = "Reproduciendo", tv_paused = "En pausa", tv_nothing = "No se está reproduciendo nada",
         tab_media = "Reproducción", tab_remote = "Mando", kb_hint = "Teclado: flechas, Intro, Retroceso (atrás) y Espacio (reproducir/pausa)",
         power = "Encender o apagar", up = "Arriba", down = "Abajo", left = "Izquierda", right = "Derecha", select = "Seleccionar", back = "Atrás",
-        home = "TV (inicio)", playpause = "Reproducir o pausar", volup = "Subir el volumen", voldown = "Bajar el volumen", mute = "Silenciar", prev = "Anterior", next = "Siguiente",
+        home = "TV (inicio)", playpause = "Reproducir o pausar", volup = "Subir el volumen", voldown = "Bajar el volumen", mute = "Silenciar", prev = "Anterior", next = "Siguiente", volume = "Volumen", spk_ready = "Listo",
     },
     en = {
         connecting = "Connecting…", connected = "Connected · %d of %d %s", tile = "tile", tiles = "tiles", no_tiles = "Connected · no tiles",
@@ -191,7 +194,7 @@ local STR = {
         st_add_ent = "+ Entity", st_add_room = "+ Room", st_no_room = "No room", st_n_tile = "%d tile", st_n_tiles = "%d tiles",
         st_new_ent = "New entity", st_edit_ent = "Edit entity", st_new_room = "New room", st_edit_room = "Edit room",
         st_entity = "Home Assistant entity", st_entity_ph = "Type to search: living, light.…", st_name = "Name", st_name_ph = "What the panel calls it",
-        st_type = "Kind", st_light = "Light", st_toggle = "Switch", st_room = "Room", st_icon = "Icon",
+        st_type = "Kind", st_light = "Light", st_toggle = "Switch", st_speaker = "Speaker (DLNA)", st_room = "Room", st_icon = "Icon",
         st_own_icon = "Uses an icon of its own (%s): pick another here to change it.",
         st_color = "Change its colour from its card", st_tint = "Tile in the light's colour", st_tv = "Player card and remote (Apple TV)",
         st_remote = "Remote (remote.… entity)", st_printer = "3D printer card", st_printer_pick = "Printer (Bambu Lab) found in Home Assistant:",
@@ -211,7 +214,7 @@ local STR = {
         tv_off = "Off", tv_on = "On", tv_playing = "Playing", tv_paused = "Paused", tv_nothing = "Nothing playing",
         tab_media = "Now playing", tab_remote = "Remote", kb_hint = "Keyboard: arrows, Return, BackSpace (back) and Space (play/pause)",
         power = "Power", up = "Up", down = "Down", left = "Left", right = "Right", select = "Select", back = "Back",
-        home = "TV (home)", playpause = "Play or pause", volup = "Volume up", voldown = "Volume down", mute = "Mute", prev = "Previous", next = "Next",
+        home = "TV (home)", playpause = "Play or pause", volup = "Volume up", voldown = "Volume down", mute = "Mute", prev = "Previous", next = "Next", volume = "Volume", spk_ready = "Ready",
     },
 }
 local WORDS = {
@@ -308,6 +311,7 @@ local WORDS = {
     "st_type",
     "st_light",
     "st_toggle",
+    "st_speaker",
     "st_room",
     "st_icon",
     "st_own_icon",
@@ -369,6 +373,8 @@ local WORDS = {
     "mute",
     "prev",
     "next",
+    "volume",
+    "spk_ready",
     "wg_title",
     "wg_hint",
 }
@@ -445,7 +451,7 @@ end
 local ALIAS = {
     ["led-strip.svg"] = "tira-led.svg", ["wall-lantern.svg"] = "farol-pared.svg", ["pendant-lamp.svg"] = "lampara-pergola.svg",
     ["floor-lamp.svg"] = "lampara-pie.svg", ["3d-printer.svg"] = "impresora-3d.svg", ["tv-box.svg"] = "reproductor.svg",
-    ["terrarium.svg"] = "terrario.svg", ["fan-heater.svg"] = "calefactor.svg",
+    ["terrarium.svg"] = "terrario.svg", ["fan-heater.svg"] = "calefactor.svg", ["speaker.svg"] = "altavoz.svg",
 }
 
 
@@ -464,7 +470,7 @@ local PENCIL = {
 }
 -- The add-on's own icons (its .svg files) are drawn in pencil too, from ha-icons.plm's HDev; any other .svg or .png is drawn as it is.
 local DEV = { ["tira-led.svg"] = 0, ["farol-pared.svg"] = 1, ["lampara-pergola.svg"] = 2, ["lampara-pie.svg"] = 3, ["impresora-3d.svg"] = 4,
-    ["reproductor.svg"] = 5, ["terrario.svg"] = 6, ["calefactor.svg"] = 7 }
+    ["reproductor.svg"] = 5, ["terrario.svg"] = 6, ["calefactor.svg"] = 7, ["altavoz.svg"] = 8 }
 local function dev_k(it)
     if not it.file then return -1 end
     return DEV[it.file] or -1
@@ -512,7 +518,7 @@ local function scene_words()
     text.t_tab1 = T("tab_remote")
     text.t_kb = T("kb_hint")
     text.t_power = T("power")
-    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next", "wg_title", "wg_hint" }) do
+    for _, k in ipairs({ "up", "down", "left", "right", "select", "back", "home", "playpause", "volup", "voldown", "mute", "prev", "next", "volume", "wg_title", "wg_hint" }) do
         text["t_" .. k] = T(k)
     end
 end
@@ -697,6 +703,7 @@ local tvs = {}              -- by media player: { st, title, artist, series, app
 local TV_CODE = { off = 0, standby = 0, unavailable = 0, unknown = 0, idle = 1, on = 1, playing = 2, buffering = 2, paused = 3 }
 local TV_LABEL = { [0] = "tv_off", "tv_on", "tv_playing", "tv_paused" }
 local tv_busy, tv_pic_n, tv_shown, tv_pbusy, tv_retry = false, 0, "", false, nil
+local tv_vol_until = nil    -- the volume slider was just moved: its value stands until Home Assistant has caught up
 local function tv_code(t) return t and (TV_CODE[t.st] or 1) or 0 end
 local function tv_now(t)                -- where it is now, in seconds (-1: it does not say)
     if not t or t.dur <= 0 or t.pos < 0 then return -1 end
@@ -912,6 +919,9 @@ local function tv_fill()
     text.tv_icon = it.file and "" or it.icon
     fact.tv_custom = own_pic(it)
     fact.tv_has_rm = it.tv.remote ~= nil
+    fact.tv_spk = it.tv.spk == true
+    if tv_vol_until and tick >= tv_vol_until then tv_vol_until = nil end
+    if not tv_vol_until and fact.tv_vdirty ~= true and t and t.vol >= 0 then fact.tv_vol = t.vol end
     fact.tv_st = code
     local app = t and t.app or ""
     text.tv_app = code > 0 and app or ""
@@ -1013,6 +1023,8 @@ show = function()
                 if code >= 2 then          -- playing or paused: that, and what (or in which app), instead of the tile's line
                     local what = (t.title ~= "" and t.title) or t.app
                     sub = T(TV_LABEL[code]) .. (what ~= "" and (" · " .. what) or "")
+                elseif it.spk and s.avail then  -- a speaker with nothing to play: ready for music
+                    sub = code == 1 and T("spk_ready") or T("tv_off")
                 end
             end
             byitem[#byitem + 1] = { name = it.name, icon = it.file and "" or it.icon, img = it.file and (folder .. "/" .. it.file) or "", custom = own_pic(it) and 1 or 0, dk = dev_k(it), sub = sub, on = s.on and 1 or 0, kind = it.kind, bri = s.bri or 0,
@@ -1157,6 +1169,7 @@ local function poll()
                 s.known = true
                 s.avail = st ~= "unavailable" and st ~= "unknown"
                 s.on = st == "on" or st == "open" or st == "playing" or st == "paused" or st == "idle" or st == "buffering" or st == "home"
+                if it.spk then s.on = st == "playing" or st == "buffering" end          -- a speaker is lit while it plays
                 if it.kind == 0 then s.bri = s.on and math.max(0.01, e.bri / 255) or 0 end
                 -- its colour, when it says one (a light that is off says none: the last one is kept)
                 local hs = e.hs
@@ -1268,20 +1281,24 @@ local function load()
             if type(it) == "table" and type(it.entity) == "string" and #items < MAX_ITEMS then
                 local entity = it.entity
                 local kind = (it.type == "light" or (it.type == nil and entity:match("^light%."))) and 0 or 1
+                -- a speaker (a DLNA Digital Media Renderer, such as the Mi Smart Clock): a click plays or pauses, a right click opens its card
+                local spk = it.type == "speaker" and entity:match("^media_player%.") ~= nil
+                local icon = type(it.icon) == "string" and it.icon ~= "" and it.icon or (spk and "speaker.svg") or (kind == 0 and "lightbulb" or "toggle_on")
                 items[#items + 1] = {
                     kind = kind,
                     entity = entity,
                     name = type(it.name) == "string" and it.name or entity,
-                    icon = type(it.icon) == "string" and it.icon ~= "" and it.icon or (kind == 0 and "lightbulb" or "toggle_on"),
+                    icon = icon,
                     -- an icon of its own: a file in the data folder (only a plain name: the folder is all a scene may read)
-                    file = type(it.icon) == "string" and it.icon:match("^[%w%._%-]+%.[sp][vn]g$") and (ALIAS[it.icon] or it.icon) or nil,
+                    file = icon:match("^[%w%._%-]+%.[sp][vn]g$") and (ALIAS[icon] or icon) or nil,
                     on_text = type(it.on_text) == "string" and it.on_text or nil,
                     off_text = type(it.off_text) == "string" and it.off_text or nil,
                     bad = not valid(entity),
                     printer = parse_printer(it.printer),
                     color = kind == 0 and it.color == true,          -- its colour is chosen in the card too
                     tint = kind == 0 and it.tint == true,            -- its tile and card are drawn in its own colour, not the accent
-                    tv = parse_tv(it.apple_tv, entity),
+                    tv = spk and { media = entity, spk = true } or parse_tv(it.apple_tv, entity),
+                    spk = spk,
                     acts = parse_actions(it.actions),
                     room = k,
                     croom = croom, cidx = n,         -- where it is in config.json: the room there (0: the top level's items) and its place in it
@@ -1357,6 +1374,21 @@ local function tap(k)
     local it = cfg and cfg.items[i]
     local s = state[i]
     if not it or it.bad or not s or not s.avail then return end
+    if it.spk then                                        -- a speaker: play or pause, at once on the tile; Home Assistant confirms it
+        local t = tvs[it.entity]
+        local code = tv_code(t)
+        if t and code == 2 then t.pos = tv_now(t); t.el = 0; t.at = tick; t.st = "paused"
+        elseif t and code == 3 then t.st = "playing"; t.at = tick; t.el = 0 end
+        s.on = t ~= nil and t.st == "playing"
+        hold_until[i] = tick + 3
+        show()
+        call("/api/services/media_player/media_play_pause", json.encode({ entity_id = it.entity }), function(ok, _, err)
+            if not ok then set_state(2, T("offline"), err) end
+            hold_until[i] = nil
+            after(800, poll)
+        end)
+        return
+    end
     s.on = not s.on
     if it.kind == 0 and s.on and (s.bri or 0) <= 0 then s.bri = 1 end
     hold_until[i] = tick + 3
@@ -1646,6 +1678,19 @@ local tv_muted = false
 local TV_REMOTE = { [0] = "up", "down", "left", "right", "select", "menu", "home", "play_pause", "volume_up", "volume_down" }
 on("fact:tv_open", function(v) if v == true then tv_shown = ""; art_shown = ""; fact.tv_has_pic = false; fact.tv_has_appic = false; model.tv_pic = {}; tv_fill(); tv_poll() end end)
 on("fact:tv_i", function() if fact.tv_open == true then tv_shown = ""; art_shown = ""; tv_fill() end end)
+on("tv_vol", function(v)                                  -- the card's volume slider (a speaker's): 0 to 1
+    local it = tv_item()
+    local media = it and it.tv.media
+    if not media then return end
+    v = math.max(0, math.min(1, tonumber(v) or 0))
+    local t = tvs[media]
+    if t then t.vol = v end
+    tv_vol_until = tick + 4
+    call("/api/services/media_player/volume_set", json.encode({ entity_id = media, volume_level = math.floor(v * 100 + 0.5) / 100 }), function(ok, _, err)
+        if not ok then set_state(2, T("offline"), err) end
+        after(900, tv_poll)
+    end)
+end)
 on("tv_cmd", function(c)
     c = tonumber(c) or -1
     local it = tv_item()

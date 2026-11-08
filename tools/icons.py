@@ -82,6 +82,8 @@ DEV['terrario'] = (S(poly((3.5, 7.2), (20.5, 7.2))) + S(poly((4.5, 7.2), (4.5, 1
                    + S(poly((10, 14.8), (8.6, 12.8), (7.4, 12.3), (8.3, 14.2), (10, 14.8)), 1.4) + S(poly((15.2, 17), (15.2, 15.4)), 1.4), [])
 DEV['calefactor'] = (S(rect(4, 9, 20, 21, 2)) + [((12, 15), (12 + 3 * math.cos(math.radians(a)), 15 + 3 * math.sin(math.radians(a))), 1.4) for a in (-70, 50, 170)]
                      + S(poly((8.5, 6.8), (8, 5.4), (8.5, 4)) + poly((12, 6.8), (11.5, 5.4), (12, 4)) + poly((15.5, 6.8), (15, 5.4), (15.5, 4)), 1.4), [(12, 15, 3.6, -1, 1.5)])
+# a speaker cabinet (a DLNA renderer such as the Mi Smart Clock): the box, the woofer (a circle), its dust cap and the tweeter above it
+DEV['altavoz'] = (S(rect(5.5, 2.5, 18.5, 21.5, 2)) + S(dot(12, 14.5), 2.6) + S(arc(12, 7, 1.7, -90, 270, 6), 1.5), [(12, 14.5, 4.2, -1, 1.8)])
 
 def fmt(v):
     v = round(v, 2)

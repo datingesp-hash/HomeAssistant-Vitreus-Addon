@@ -1,6 +1,6 @@
 # Home Assistant for Vitreus
 
-A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that brings your Home Assistant home into the shell: lights, switches, an Apple TV and a 3D printer, grouped by room, in a panel made of Vitreus's own glass.
+A [Vitreus](https://github.com/natepayn3/Vitreus) add-on that brings your Home Assistant home into the shell: lights, switches, an Apple TV, DLNA speakers and a 3D printer, grouped by room, in a panel made of Vitreus's own glass.
 
 It speaks English by default and ships with a Spanish translation already installed (see [Languages](#languages)).
 
@@ -15,6 +15,7 @@ It speaks English by default and ships with a Spanish translation already instal
 - [Two buttons on a right click](#two-buttons-on-a-right-click)
 - [Lights and colours](#lights-and-colours)
 - [Apple TV](#apple-tv)
+- [Speakers (DLNA)](#speakers-dlna)
 - [3D printer](#3d-printer)
 - [Icons](#icons)
 - [Languages](#languages)
@@ -28,6 +29,7 @@ It speaks English by default and ships with a Spanish translation already instal
 - **Rooms and tiles.** Each room has a title and, optionally, its temperature and humidity. A click turns a tile on or off.
 - **Lights.** A right click opens a brightness card. Colour lights can also get a colour picker, and their tiles can be tinted in the colour they have.
 - **Apple TV.** A card shows what is playing, with artwork, progress, transport controls and volume. A second tab holds a remote laid out like the Siri Remote, which the keyboard can drive too.
+- **Speakers (DLNA).** A click plays or pauses a DLNA renderer (a Mi Smart Clock, a network speaker). A right click opens a card with the artwork, play/pause, next and a volume slider.
 - **3D printer.** A card shows the print's cover or the live camera, its progress and times, and Pause / Resume / Stop buttons.
 - **Settings menu.** The gear opens a settings page where you set everything from the panel itself, with no JSON needed. Your entities are suggested as you type.
 - **Edit mode.** You can resize tiles in half columns, down to icon-only tiles, and drag them to rearrange.
@@ -68,9 +70,10 @@ Click the **gear** to open the settings. It has two tabs.
 - **+ Room** and **+ Entity** add one. Click an existing room or tile to edit it.
 - An entity is found by typing. The suggestions are your Home Assistant entities, matched by id or by name.
 - For each tile you choose:
-  - its name, kind (light or switch), room and icon;
+  - its name, kind (light, switch or speaker), room and icon;
   - the on/off texts;
   - the options that fit it: colour picker and tint for a light, card and remote for a media player, card for a printer.
+- A DLNA renderer (Home Assistant's *DLNA Digital Media Renderer* integration) is detected automatically and set up as a speaker.
 - A Bambu Lab printer is detected automatically, and all its entities are filled in for you.
 - A room has a name and optional temperature and humidity sensors. Rooms can be moved up or down, or deleted.
 
@@ -95,7 +98,8 @@ Until a token is set, the panel runs as a demo. A banner explains what is missin
 ## Using the panel
 
 - **Click** a tile to toggle it.
-- **Right click** a light, an Apple TV or a printer to open its card.
+- **Click** a speaker to play or pause it.
+- **Right click** a light, an Apple TV, a speaker or a printer to open its card.
 - **Right click** a tile with [two buttons](#two-buttons-on-a-right-click) to bring them out of it.
 - The **refresh** button reloads states from Home Assistant.
 
@@ -246,6 +250,24 @@ What the app sends sets the limit. Netflix and Crunchyroll, for example, don't s
 
 Turn the lookup off with `"artwork_search": false`, or with its switch in the settings.
 
+## Speakers (DLNA)
+
+For a media player from Home Assistant's [DLNA Digital Media Renderer](https://www.home-assistant.io/integrations/dlna_dmr/) integration (a [Mi Smart Clock running Casa](https://github.com/datingesp-hash/MiSmartClock-CasaApp), a network speaker, a TV's renderer…), set `"type": "speaker"`:
+
+```json
+{ "type": "speaker", "name": "Mi Smart Clock", "icon": "speaker.svg", "entity": "media_player.mi_smart_clock" }
+```
+
+- **A click** plays or pauses it. The tile is lit while it plays, and says what: *Playing · Song*.
+- **A right click** opens its card:
+  - the artwork, the title and the artist, and the live progress;
+  - play/pause and next;
+  - a volume slider, with a quieter and a louder button at its ends (5 % each). The mouse wheel anywhere on the card changes the volume too.
+
+There is no power button: a DLNA renderer is not switched on or off. Without an `icon`, a speaker gets the pencil speaker (`speaker.svg`). In the settings menu, picking an entity of the DLNA integration sets all of this for you.
+
+![The speaker card](docs/img/speaker.png)
+
 ## 3D printer
 
 Add a `printer` block to a tile. Every entity is optional: leave out the ones your printer doesn't have.
@@ -299,6 +321,7 @@ Every icon in the panel is drawn in Vitreus's pencil style, and it sketches itse
    | TV box | `tv-box.svg` |
    | Terrarium | `terrarium.svg` |
    | Fan heater | `fan-heater.svg` |
+   | Speaker | `speaker.svg` |
 
    Their Spanish file names (`tira-led.svg`, `impresora-3d.svg`…) work too.
 3. **Your own**: put any white `.svg` in `~/.local/share/pleamar/homeassistant/` and use its file name.
@@ -343,7 +366,7 @@ Each tile:
 
 | Key | Meaning |
 | --- | --- |
-| `type` | `"light"` (with brightness) or `"toggle"`. |
+| `type` | `"light"` (with brightness), `"toggle"`, or `"speaker"` (a DLNA renderer: play/pause on a click, see [Speakers](#speakers-dlna)). |
 | `name` | The tile's label. |
 | `entity` | The entity id, e.g. `light.living_room`. |
 | `icon` | An icon name or `.svg` file (see [Icons](#icons)). |
@@ -356,7 +379,7 @@ Each tile:
 
 Tile sizes set in edit mode are kept apart, in `layout.json`. A plain `items` list at the top level (outside any room) also works: it is shown first, with no title.
 
-Lights use `light.toggle` and `light.turn_on`. Everything else (`switch`, `input_boolean`, `media_player`, scripts…) uses `homeassistant.toggle`.
+Lights use `light.toggle` and `light.turn_on`. Speakers use `media_player.media_play_pause`, `media_player.media_next_track` and `media_player.volume_set`. Everything else (`switch`, `input_boolean`, `media_player`, scripts…) uses `homeassistant.toggle`.
 
 ## Privacy
 

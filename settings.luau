@@ -77,7 +77,7 @@ return function(api)
     local function fetch_ha(done)
         local c = api.cfg()
         if not c or c.demo then ha, ha_has = {}, {}; if done then done() end return end
-        local tpl = "[{% for s in states %}[{{ s.entity_id | tojson }},{{ s.name | tojson }},{{ (s.attributes.device_class or '') | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
+        local tpl = "{% set dl = integration_entities('dlna_dmr') %}[{% for s in states %}[{{ s.entity_id | tojson }},{{ s.name | tojson }},{{ (s.attributes.device_class or '') | tojson }},{{ (s.entity_id in dl) | tojson }}]{{ ',' if not loop.last }}{% endfor %}]"
         api.call("/api/template", json.encode({ template = tpl }), function(ok, out)
             if ok then
                 local okj, list = pcall(json.decode, out)
@@ -85,7 +85,7 @@ return function(api)
                     ha, ha_has = {}, {}
                     for _, r in ipairs(list) do
                         if type(r) == "table" and type(r[1]) == "string" then
-                            ha[#ha + 1] = { id = r[1], name = tostring(r[2] or r[1]), class = tostring(r[3] or "") }
+                            ha[#ha + 1] = { id = r[1], name = tostring(r[2] or r[1]), class = tostring(r[3] or ""), dlna = r[4] == true }
                             ha_has[r[1]] = ha[#ha]
                         end
                     end
@@ -301,9 +301,9 @@ return function(api)
         return OLD[l:lower()] or l
     end
     local PNAMES = { [0] = "lightbulb", "floor_lamp", "power", "bedtime", "mode_fan", "tv", "power_outlet", "door_front", "home" }
-    local DNAMES_EN = { [0] = "led-strip.svg", "wall-lantern.svg", "pendant-lamp.svg", "floor-lamp.svg", "3d-printer.svg", "tv-box.svg", "terrarium.svg", "fan-heater.svg" }
-    local DNAMES_ES = { [0] = "tira-led.svg", "farol-pared.svg", "lampara-pergola.svg", "lampara-pie.svg", "impresora-3d.svg", "reproductor.svg", "terrario.svg", "calefactor.svg" }
-    local DEV_NEAR = { [0] = 0, 1, 0, 1, 5, 5, 6, 4 }      -- the add-on's own icons, as the closest of the pencil's (the list draws only those)
+    local DNAMES_EN = { [0] = "led-strip.svg", "wall-lantern.svg", "pendant-lamp.svg", "floor-lamp.svg", "3d-printer.svg", "tv-box.svg", "terrarium.svg", "fan-heater.svg", "speaker.svg" }
+    local DNAMES_ES = { [0] = "tira-led.svg", "farol-pared.svg", "lampara-pergola.svg", "lampara-pie.svg", "impresora-3d.svg", "reproductor.svg", "terrario.svg", "calefactor.svg", "altavoz.svg" }
+    local DEV_NEAR = { [0] = 0, 1, 0, 1, 5, 5, 6, 4, 5 }      -- the add-on's own icons, as the closest of the pencil's (the list draws only those)
     local function icon_of(name, kind)                  -- an icon's name → { pk, dk }
         if type(name) == "string" and name:match("%.[sp][vn]g$") then
             local f = api.ALIAS[name] or name
@@ -375,7 +375,11 @@ return function(api)
         if fa == fe - 1 then sugs(suggest(fq, nil, nil), "entity") end
         field("name", T("st_name"), d.name, T("st_name_ph"))
         note(T("st_type"))
-        chipset("type", { { label = T("st_light"), sel = d.type == "light", value = "light" }, { label = T("st_toggle"), sel = d.type ~= "light", value = "toggle" } })
+        local kinds = { { label = T("st_light"), sel = d.type == "light", value = "light" }, { label = T("st_toggle"), sel = d.type ~= "light" and d.type ~= "speaker", value = "toggle" } }
+        if (d.entity or ""):match("^media_player%.") or d.type == "speaker" then          -- a speaker (a DLNA renderer): play/pause on a click, its card on a right one
+            kinds[#kinds + 1] = { label = T("st_speaker"), sel = d.type == "speaker", value = "speaker" }
+        end
+        chipset("type", kinds)
         note(T("st_room"))
         local ro = {}
         if type(c.items) == "table" and #c.items > 0 then ro[#ro + 1] = { label = T("st_no_room"), sel = d.room == 0, value = 0 } end
@@ -393,14 +397,14 @@ return function(api)
             n = n + 1
         end
         for p = 0, 8 do cell(p, -1) end
-        for q = 0, 7 do cell(-1, q) end
+        for q = 0, 8 do cell(-1, q) end
         y = y + math.ceil(n / cols) * 52 + 6
         if pk < 0 and dk < 0 then note(string.format(T("st_own_icon"), tostring(d.icon))) end
         if d.type == "light" then
             switch("color", T("st_color"), d.color)
             switch("tint", T("st_tint"), d.tint)
         end
-        if (d.entity or ""):match("^media_player%.") or d.tv then
+        if ((d.entity or ""):match("^media_player%.") or d.tv) and d.type ~= "speaker" then
             switch("tv", T("st_tv"), d.tv)
             if d.tv then
                 local fr = field("remote", T("st_remote"), d.remote, "remote." .. ((d.entity or ""):match("^media_player%.(.+)$") or "…"))
@@ -557,6 +561,7 @@ return function(api)
         if draft and r.key == "entity" and nxt and nxt.kind == 5 then
             if (draft.name or "") == "" then draft.name = nxt.pick.name end
             draft.type = fq:match("^light%.") and "light" or draft.type
+            if ha_has[fq] and ha_has[fq].dlna then draft.type = "speaker"; draft.tv = false end      -- a DLNA renderer: a speaker
         end
         local keep = fa
         build()
@@ -600,7 +605,7 @@ return function(api)
         draft = {
             room = room, idx = idx, orig = it,
             entity = entity, name = type(it.name) == "string" and it.name or "",
-            type = it.type == "light" and "light" or ((it.type == nil and entity:match("^light%.")) and "light" or (idx and "toggle" or "light")),
+            type = (it.type == "light" or it.type == "speaker") and it.type or ((it.type == nil and entity:match("^light%.")) and "light" or (idx and "toggle" or "light")),
             icon = type(it.icon) == "string" and it.icon or nil,
             color = it.color == true, tint = it.tint == true,
             tv = type(it.apple_tv) == "table", remote = type(it.apple_tv) == "table" and type(it.apple_tv.remote) == "string" and it.apple_tv.remote or "",
@@ -645,13 +650,13 @@ return function(api)
         for k, v in pairs(d.orig or {}) do it[k] = v end
         it.type = d.type
         it.name = (d.name ~= "" and d.name) or d.entity
-        it.icon = d.icon or (d.type == "light" and "lightbulb" or "power")
+        it.icon = d.icon or (d.type == "light" and "lightbulb") or (d.type == "speaker" and "speaker.svg") or "power"
         it.entity = d.entity
         it.color = (d.type == "light" and d.color) and true or nil
         it.tint = (d.type == "light" and d.tint) and true or nil
         it.on_text = d.on_text ~= "" and d.on_text or nil
         it.off_text = d.off_text ~= "" and d.off_text or nil
-        if d.tv then
+        if d.tv and d.type ~= "speaker" then
             local tv = type(it.apple_tv) == "table" and it.apple_tv or {}
             local copy = {}
             for k, v in pairs(tv) do copy[k] = v end
@@ -765,7 +770,11 @@ return function(api)
                 if draft and r.key == "entity" then
                     if (draft.name or "") == "" then draft.name = r.pick.name end
                     if fq:match("^light%.") then draft.type = "light" elseif not fq:match("^light%.") and draft.type == "light" and not draft.idx then draft.type = "toggle" end
-                    if fq:match("^media_player%.") then
+                    if fq:match("^media_player%.") and ha_has[fq] and ha_has[fq].dlna then
+                        draft.type = "speaker"
+                        draft.tv = false
+                        if not draft.icon then draft.icon = (api.lang() == "es") and "altavoz.svg" or "speaker.svg" end
+                    elseif fq:match("^media_player%.") then
                         draft.tv = true
                         local cand = "remote." .. fq:match("^media_player%.(.+)$")
                         if ha_has[cand] and (draft.remote or "") == "" then draft.remote = cand end
