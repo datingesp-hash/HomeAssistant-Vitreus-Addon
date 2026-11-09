@@ -15,7 +15,7 @@ import "addon-pencil.plm"                         // Vitreus's pencil (its add-o
 //  pencil's (addon-pencil.plm's PIcon) or of the add-on's own (ha-icons.plm's HDev); the buttons are ha-icons.plm's HUi.
 
 scene HomeAssistant {
-    surface { size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: each max 4; open: shown > 0.5; keyboard: on_demand while shown > 0.5 and not st_open }
+    surface { size: 1, 1; anchor: top_left; margin: 0; level: background; screens: each max 4; open: shown > 0.5 }      // empty: its copies tell the logic the monitors' names (`screen.K.name`, which the desktop cards go by), and the scene's rules run while it is open (with the panel, as they always have)
 
     permissions {
         services: "files", "files.write", "env"
@@ -101,11 +101,10 @@ scene HomeAssistant {
     fact slot_sw = 0                                  // the size of the monitor the panel is on (0: not told yet, every copy draws)
     fact slot_sh = 0
     text slot_mon = ""                                // the name of that monitor (DP-1...), which Vitreus sends before `slot_open`
-    //  Which copy draws: the one on the monitor Vitreus names (`slot_mon`; a scene cannot compare a text, so the logic finds the copy whose `screen.K.name`
-    //  it is, `hl_mon`). -1: no copy has that name (an older Vitreus does not send it), and the monitor's size decides, as before.
-    fact hl_mon = -1
-    let by_size = if(slot_sw == 0 or (screen.width == slot_sw and screen.height == slot_sh), 1, 0)
-    let shown = if(slot_open, if(hl_mon >= 0, if(screen.index == hl_mon, 1, 0), if(hl_mon == -1, by_size, 0)), 0)
+    //  One copy of the panel, not one per monitor: it goes to the monitor Vitreus names (`slot_mon`), which the logic copies into `hl_screen` (with `screens:
+    //  each` the whole scene was compiled once per monitor, four times: a gigabyte of memory for a panel that is only ever on one of them).
+    text hl_screen = ""
+    let shown = if(slot_open, 1, 0)
 
     //  What the logic says (homeassistant.luau)
     fact hl_demo = false                              // no token in config.json yet: the example's rooms, played with here, and a banner on how to set it up
@@ -189,6 +188,8 @@ scene HomeAssistant {
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
     model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number; ad1: number; ad2: number; ai1: image 48, 48; ai2: image 48, 48 }      // `qa` how many buttons a right click brings out of it (0 none; config.json's "actions"), each one's name (`an`), pencil icon (`ak`, -1: a command's), whether it is only run (`ar`), on (`ao`) and there (`av`) · `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_carry max 1 { name: text; sub: text; on: number; avail: number; cs: number; rs: number; img: image 48, 48; custom: number; pk: number; dk: number }      // the tile being carried (`mv_i`'s row), copied by the logic: drawn once over the others
+    model hl_qbtn max 1 { col: number; cs: number; rs: number; yu: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number; ad1: number; ad2: number; ai1: image 48, 48; ai2: image 48, 48 }      // the tile whose two buttons are out (`qa_i`'s row), likewise
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -419,1052 +420,1058 @@ scene HomeAssistant {
     on change most while hl_sp > most { hl_sp: most }
 
 
-    group {
-        show: shown > 0.5
+    //  ── The panel: one surface, on the monitor Vitreus names (`hl_screen`). Not a copy per monitor (`screens: each`): every copy is the whole panel compiled
+    //  again, four times a gigabyte of memory for something that is only ever on one monitor.
+    surface panel {
+        size: full, full; anchor: top_left; margin: 0; level: top, overlay while slot_open; screens: hl_screen; open: shown > 0.5; keyboard: on_demand while shown > 0.5 and not st_open
         group {
-            move: slot_x - W / 2, slot_y - H / 2
-
+            show: shown > 0.5
             group {
-            opacity: en1
-            move: 0, (1 - en1) * 12 * u
-            //  ── the head: how it is, and the refresh arrow and the gear ──
-            ellipse { at: 24 * u, 28 * u; radius: 4 * u; color: pick(hl_state, faint, mint, alert, faint) }
-            ellipse { at: 24 * u, 28 * u; radius: 8 * u; color: mint; opacity: if(hl_state == 1, 18%, 0%) }
-            text hl_status { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: faint; opacity: (1 - hl_ed) * (1 - hl_ne); family: "Space Grotesk" }
-            text t_noed { at: 38 * u, 28 * u; anchor: left center; size: 11.5; weight: 600; width: W - 190 * u; lines: 2; color: alert; opacity: hl_ne * (1 - hl_ed); family: "Space Grotesk" }
-            text t_hint { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: mint; opacity: hl_ed; family: "Space Grotesk" }
+                move: slot_x - W / 2, slot_y - H / 2
 
-            //  the pencil: edit mode (lit, a tick, while it is on)
-            body {
-                color: mix(ink, mint, hl_ed)
-                opacity: 8% + 10% * hl_ed_z.hover + 82% * hl_ed
-                shadow: 0, 0, 10 * u * hl_ed, 35% * hl_ed, mint
-                ellipse { at: W - 121 * u, 28 * u; radius: 16 * u }
-            }
-            HUi(k: if(hl_editing, 1, 0), cx: W - 121 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed), a: 1, s: 401, f: if(hl_ed_z.hover > 0.5, fr, 0), z: 0.73)
-            zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_ed; active: not st_open }
-            on press hl_ed_z { toggle hl_editing; rz_i = -1 }
-
-            ellipse { at: W - 37 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_rf_z.hover }
-            HUi(k: 2, cx: W - 37 * u, cy: 28 * u, c: mix(ink, mint, hl_rf_z.hover), a: 1, s: 411, f: if(hl_rf_z.hover > 0.5, fr, 0), z: 0.75)
-            zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_refresh }
-            on press hl_rf_z { emit hl_refresh }
-
-            body {
-                color: mix(ink, mint, st_k)
-                opacity: 8% + 10% * hl_gear_z.hover + 82% * st_k
-                shadow: 0, 0, 10 * u * st_k, 35% * st_k, mint
-                ellipse { at: W - 79 * u, 28 * u; radius: 16 * u }
-            }
-            HUi(k: 3, cx: W - 79 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_gear_z.hover), onmint, st_k), a: 1, s: 421, f: if(hl_gear_z.hover > 0.5, fr, 0), z: 0.7)
-            zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_edit_cfg }
-            on press hl_gear_z { toggle st_open }
-
-            box { at: W / 2, 50 * u; size: W - 2 * gx, 1.5; color: ink; opacity: 12% }
-
-            //  ── the demo: no token yet. A banner on what to do, over the example's rooms, which can be played with ──
-            group {
-                show: hl_demo
-                opacity: 1 - st_k
-                box { from: 14 * u, 60 * u; size: W - 28 * u, 62 * u; corner: 12 * u; color: mint; opacity: 14% }
-                PRound(x: 16.6 * u, y: 62.6 * u, w: W - 33.2 * u, h: 56.8 * u, r: 9.7 * u, s: 5, wd: 1.5 * u, c: mint, a: 0.7, f: 0)
-                PIcon(k: 8, cx: 38 * u, cy: 91 * u, lit: 0, c: mint, a: 1, s: 11, f: 0, z: 1)
-                text t_demo_title { at: 62 * u, 76 * u; anchor: left center; size: 13.5; weight: 700; width: W - 90 * u; lines: 1; color: mint; family: "Space Grotesk" }
-                text t_demo_hint { at: 62 * u, 86 * u; anchor: left top; size: 11.5; weight: 600; width: W - 90 * u; lines: 2; color: ink; family: "Space Grotesk" }
-            }
-            }
-            group {
-            opacity: en2 * (1 - st_k)
-            move: 0, (1 - en2) * 12 * u
-            //  ── the rooms and their tiles ──
-            //  One list that scrolls as the shell's own do (the wheel, a drag, the spring they glide with): what it holds is laid out by the logic, in a single piece
-            //  as tall as all of it, so everything below is in that piece's own place, from its top (`hl_sc` is how far it has gone). Under the tiles, a zone the
-            //  size of the view takes the wheel and the drag; a drag that starts on a tile reaches it too (any zone under the press does), but not in edit mode.
-            zone box hl_view_z { from: 0, gtop; size: W, vh }
-            on scroll hl_view_z while not sl_open and not st_open { hl_sp: clamp(hl_sp - wheel * 80 * u, 0, most) }
-            on press hl_view_z { hl_grab = hl_sp }
-            on drag hl_view_z while not hl_editing and mv_i < 0 and rz_i < 0 { hl_sp: clamp(hl_grab - drag.dy, 0, most) }
-            group {
-              clip box { from: 0, gtop; size: W, vh }
-              group {
-                move: 0, gtop - hl_sp
-                //  a room's head: its name, and after it the temperature and the humidity, each with its sign, when the room has a sensor for them
-                for rm in hl_rooms {
-                    prop hry = 0 ~quick
-                    follow hry = rm.yu * u
-                    let hy = mix(rm.yu * u, hry, hl_ed)          // (in edit mode the heads move on a spring too, as the tiles make room)
-                    row {
-                        at: gx + 4 * u, hy + 4 * u
-                        gap: 6 * u
-                        align: center
-                        show: hy - hl_sc > -40 * u and hy - hl_sc < vh
-                        text rm.name { size: 15; weight: 700; color: ink; family: "Space Grotesk" }
-                        space 4 * u
-                        group { size: 16 * u, 16 * u; show: rm.has_t > 0.5; HUi(k: 4, cx: 8 * u, cy: 8 * u, c: faint, a: 1, s: 431, f: 0, z: 0.62) }
-                        text rm.temp { size: 12.5; weight: 600; color: faint; show: rm.has_t > 0.5; family: "Space Grotesk" }
-                        space 2 * u
-                        group { size: 15 * u, 16 * u; show: rm.has_h > 0.5; HUi(k: 5, cx: 7.5 * u, cy: 8 * u, c: faint, a: 1, s: 441, f: 0, z: 0.58) }
-                        text rm.hum { size: 12.5; weight: 600; color: faint; show: rm.has_h > 0.5; family: "Space Grotesk" }
-                    }
-                }
-                for r in hl_items {
-                    let held = rz_i == r.index
-                    let tcs = if(held, rz_w, r.cs)
-                    let trs = if(held, rz_h, r.rs)
-                    let cx0 = gx + r.col * (hw + gap)
-                    let cy0 = r.yu * u
-                    let tww = tcs * hw + (tcs - 1) * gap        // the tile's own size: as many half columns as it takes, and the gaps between them
-                    let small = if(tcs <= 1.5, 1, 0)            // half a column: the icon alone, in the middle
-                    let thh = trs * th + (trs - 1) * gap
-                    let tall = if(trs >= 2, 1, 0)               // two rows or more: the disc at the top, the name and the rest along the bottom
-                    let seen = cy0 - hl_sc > -thh and cy0 - hl_sc < vh
-                    //  a light shows the slider's value while the slider is on it
-                    let bv = if(sl_open and sl_i == r.index, sl_vs, r.bri)
-                    //  a light with a colour of its own is lit in it instead of the accent (the card's, while it is chosen there)
-                    let live = if(sl_open and sl_i == r.index and sl_ck > 0.5, 1, 0)
-                    let kh = if(live > 0.5, sl_hs, r.hu)
-                    let ks = if(live > 0.5, sl_ss, r.sa)
-                    let kk = if(r.ct > 0.5 and (r.hk > 0.5 or live > 0.5), 1, 0)
-                    //  (the colours are drawn a little softer than the light's, as the shell's accents are; a dark one takes a light icon)
-                    let kdark = if(kk > 0.5 and 0.3 * (1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))) < 0.6, 1, 0)
-                    let lit = r.on * r.avail
-                    let dx = if(small > 0.5, cx0 + tww / 2, cx0 + mix(33, 36, tall) * u)          // the disc's middle
-                    let dy = if(small > 0.5, cy0 + thh / 2, mix(cy0 + thh / 2, cy0 + 36 * u, tall))
-                    let carried = if(mv_i == r.index, 1, 0)
-                    //  where it is drawn: its place, or in edit mode its spring to it (the one carried follows the pointer, and glides to its place once let go of)
-                    prop tpx = 0 ~quick
-                    prop tpy = 0 ~quick
-                    follow tpx = if(carried > 0.5, mv_cx - tww / 2, cx0)
-                    follow tpy = if(carried > 0.5, mv_cy - thh / 2, cy0)
-                    let ex = if(carried > 0.5, mv_cx - tww / 2, mix(cx0, tpx, hl_ed))
-                    let ey = if(carried > 0.5, mv_cy - thh / 2, mix(cy0, tpy, hl_ed))
-                    let tx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)                   // where the name starts, and how wide it may be
-                    let tmax = tww - mix(if(r.kind == 1, 112, 72), 36, tall) * u
-                    let ny = mix(cy0 + thh / 2 - 9 * u, cy0 + thh - if(r.kind == 0 and lit > 0.5, 46, 38) * u, tall)
-                    //  the place the carried tile would land on, while it is carried
-                    box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 10% * carried * hl_ed; show: carried > 0.5 }
-                    box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * carried * hl_ed; show: carried > 0.5 }
-                    group {
-                        opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.1 * carried)
-                        move: ex - cx0, ey - cy0
-                        zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and qa_v < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
-                        on press hl_tile_z { hl_grab = hl_sp; emit hl_tap(r.index) }
-                        //  (a tile with its two buttons, a column wide or more, brings them out instead of its card)
-                        on press right hl_tile_z while r.qa > 0.5 and r.cs >= 2 { qa_i = r.index; qa_open = true }
-                        on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 and not (r.qa > 0.5 and r.cs >= 2) { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
-                        on press right hl_tile_z while r.prn > 0.5 and not (r.qa > 0.5 and r.cs >= 2) { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
-                        on press right hl_tile_z while r.tvr > 0.5 and not (r.qa > 0.5 and r.cs >= 2) { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
-                        //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
-                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held or carried > 0.5, mint, ink); opacity: hl_ed * if(held or carried > 0.5, 90%, 22%) }
-                        //  the disc: hollow when off, lit and glowing when on (a little larger in a tall tile)
-                        body {
-                            color: mix(off, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), lit)
-                            shadow: 0, 0, 10 * u * lit, 45% * lit, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk)
-                            rim: 16% * lit
-                            ellipse { at: dx, dy; radius: mix(19, 22, tall) * u }
-                        }
-                        //  the pencil's icon (the default): drawn in strokes, still unless the tile is on or under the pointer
-                        group {
-                            show: r.custom < 0.5 and r.pk >= 0
-                            PIcon(k: max(r.pk, 0), cx: dx, cy: dy, lit: 0, c: mix(ink, if(kdark > 0.5, ink, onmint), lit), a: 1, s: 3 + r.index * 17, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0), z: 0.78 + 0.12 * tall)
-                        }
-                        //  an icon of its own: a white svg, tinted as the Material ones are
-                        image r.img { at: dx - (11 + 2 * tall) * u, dy - (11 + 2 * tall) * u; size: (22 + 4 * tall) * u, (22 + 4 * tall) * u; tint: mix(ink, if(kdark > 0.5, ink, onmint), lit); show: r.custom > 0.5 }
-                        //  the add-on's own icons, in pencil (tira-led.svg and the rest): still unless the tile is on or under the pointer
-                        group {
-                            show: r.dk >= 0
-                            HDev(k: max(r.dk, 0), cx: dx, cy: dy, c: mix(ink, if(kdark > 0.5, ink, onmint), lit), a: 1, s: 5 + r.index * 13, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0), z: 0.92 + 0.15 * tall)
-                        }
-                        //  the name and how it is
-                        text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; show: small < 0.5; family: "Space Grotesk" }
-                        text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; show: small < 0.5; color: if(lit > 0.5, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), faint); family: "Space Grotesk" }
-                        //  a light: how bright, along the bottom
-                        group {
-                            show: r.kind == 0 and lit > 0.5 and small < 0.5
-                            let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
-                            let bw = mix(tww - 76 * u, tww - 36 * u, tall)
-                            //  (the Control Center's little slider, at the foot of a lit light, as the add-on template has it; it boils under the pointer)
-                            PSliderMiniTint(x0: bx, y: cy0 + thh - 13 * u, w: bw, lv: bv, h: 8 * u, f: if(hl_tile_z.hover > 0.5 or (sl_open and sl_i == r.index), fr, 0), c: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk))
-                        }
-                        //  a printer: the print's progress along the bottom, while one runs
-                        group {
-                            show: r.prn > 0.5 and r.pp >= 0 and not (r.kind == 0 and lit > 0.5) and small < 0.5
-                            let px0 = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
-                            let pw0 = mix(tww - if(r.kind == 1, 116, 76) * u, tww - 36 * u, tall)
-                            box { from: px0, cy0 + thh - 13 * u; size: pw0, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
-                            box { from: px0, cy0 + thh - 13 * u; size: max(3 * u, pw0 * r.pp), 3 * u; corner: 1.5 * u; color: mint }
-                        }
-                        //  a switch: the Control Center's (addon-pencil.plm's PSwitch: grey and hollow off, lit and wider on, the knob stretching as it travels), top right in
-                        //  a tall tile; its pencil outline boils while it is on or under the pointer, as the shell's
-                        group {
-                            show: r.kind == 1 and small < 0.5
-                            let sy = mix(cy0 + thh / 2, cy0 + 30 * u, tall)
-                            PSwitch(sx: cx0 + tww - 36 * u, sy: sy, on: lit, av: 1, s: 7 + r.index, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0))
-                        }
-                        //  edit mode: the handle in the corner. While it is held its zone covers the panel, so the drag is not lost as the tile grows under it;
-                        //  the size it would take, in cells, in the middle of the tile
-                        group {
-                            opacity: hl_ed
-                            ellipse { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; radius: 11 * u; color: mint; opacity: if(held, 100%, 80% + 20% * hl_grip_z.hover) }
-                            HUi(k: 6, cx: cx0 + tww - 15 * u, cy: cy0 + thh - 15 * u, c: onmint, a: 1, s: 451, f: 0, z: 0.5)
-                            box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
-                            text t_rz { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
-                        }
-                        //  edit mode: the tile itself is carried to another place (it follows the pointer; the others make room, and an outline shows where it lands)
-                        zone box hl_mv_z { from: cx0 - 1500 * u * carried, cy0 - 1500 * u * carried; size: tww + 3000 * u * carried, thh + 3000 * u * carried; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and rz_i < 0 and ((seen and mv_i < 0) or carried > 0.5); label: "{r.name}" }
-                        //  (it is carried by its middle: where that was when it was taken, plus how far the pointer has gone; its own place changes under it as the others make room)
-                        //  (its zone stays while it is carried even when its place goes out of view, or the drag was lost and the tile stuck; held near the
-                        //  list's top or bottom, the list scrolls, and the tile stays under the pointer)
-                        on press hl_mv_z { mv_ox = cx0 + tww / 2; mv_oy = cy0 + thh / 2; mv_s0 = hl_sc; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2; mv_i = r.index }
-                        on drag hl_mv_z while mv_i == r.index { mv_cx = mv_ox + drag.dx; mv_cy = mv_oy + drag.dy + hl_sc - mv_s0; hl_sp: clamp(hl_sp + if(mv_cy - hl_sc > vh - 45 * u, 16 * u, if(mv_cy - hl_sc < 35 * u, -16 * u, 0)), 0, most) }
-                        on release hl_mv_z while mv_i == r.index { emit hl_move(r.index); mv_i = -1 }
-                        zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "{t_resize} {r.name}" }
-                        on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
-                        on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (hw + gap)), 1, 2 * cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
-                        on release hl_grip_z { rz_i = -1 }
-                    }
-                }
-                //  The carried tile again, over all the others (the rows are drawn in order, so in its own row it would pass under the ones after it): lifted, on an
-                //  opaque plate with a shadow, at the pointer. (`z:` would do it, but inside a `for` it mixes up the rows' `r.index`.)
-                for r in hl_items {
-                    let ccs = r.cs
-                    let crs = r.rs
-                    let cww = ccs * hw + (ccs - 1) * gap
-                    let chh = crs * th + (crs - 1) * gap
-                    let csm = if(ccs <= 1.5, 1, 0)
-                    let ctl = if(crs >= 2, 1, 0)
-                    let cx = mv_cx - cww / 2
-                    let cy = mv_cy - chh / 2
-                    let clit = r.on * r.avail
-                    let cdx = if(csm > 0.5, cx + cww / 2, cx + mix(33, 36, ctl) * u)
-                    let cdy = if(csm > 0.5, cy + chh / 2, mix(cy + chh / 2, cy + 36 * u, ctl))
-                    let ctx = mix(cx + 62 * u, cx + 18 * u, ctl)
-                    let cny = mix(cy + chh / 2 - 9 * u, cy + chh - 38 * u, ctl)
-                    group {
-                        show: mv_i == r.index and hl_ed > 0.5
-                        body {
-                            color: mix(tint, ink, 0.07)
-                            shadow: 0, 10 * u, 26 * u, 50%, deep
-                            box { from: cx, cy; size: cww, chh; corner: 14 * u }
-                        }
-                        box { from: cx, cy; size: cww, chh; corner: 14 * u; color: mint; opacity: 10% * clit }
-                        box { from: cx, cy; size: cww, chh; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 90% }
-                        body {
-                            color: mix(off, mint, clit)
-                            ellipse { at: cdx, cdy; radius: mix(19, 22, ctl) * u }
-                        }
-                        group {
-                            show: r.custom < 0.5 and r.pk >= 0
-                            PIcon(k: max(r.pk, 0), cx: cdx, cy: cdy, lit: 0, c: mix(ink, onmint, clit), a: 1, s: 3 + r.index * 17, f: 0, z: 0.78 + 0.12 * ctl)
-                        }
-                        image r.img { at: cdx - (11 + 2 * ctl) * u, cdy - (11 + 2 * ctl) * u; size: (22 + 4 * ctl) * u, (22 + 4 * ctl) * u; tint: mix(ink, onmint, clit); show: r.custom > 0.5 }
-                        group {
-                            show: r.dk >= 0
-                            HDev(k: max(r.dk, 0), cx: cdx, cy: cdy, c: mix(ink, onmint, clit), a: 1, s: 5 + r.index * 13, f: 0, z: 0.92 + 0.15 * ctl)
-                        }
-                        text r.name { at: ctx, cny; anchor: left center; size: 13.5 + ctl; weight: 600; width: cww - mix(72, 36, ctl) * u; lines: 1; color: ink; show: csm < 0.5; family: "Space Grotesk" }
-                        text r.sub { at: ctx, cny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: cww - mix(72, 36, ctl) * u; lines: 1; color: if(clit > 0.5, mint, faint); show: csm < 0.5; family: "Space Grotesk" }
-                    }
-                }
-                //  ── a tile's two buttons: a right click brings them out of its middle, two half tiles side by side over it, each with its icon and its name under
-                //  it. One that toggles is lit while its entity is on; one that is only run (a shell_command, a script…) lights up a few seconds when pressed, with
-                //  a ring of light going out from its disc. A click outside them, a right click or Escape puts them back. ──
                 group {
-                    show: qa_v > 0.01
-                    opacity: clamp(qa_k * 1.6, 0, 1) * qa_v
-                    box { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; color: deep; opacity: 40% }
-                }
-                zone box qa_scrim_z { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; active: qa_open }
-                on press qa_scrim_z { qa_open = false }
-                on press right qa_scrim_z { qa_open = false }
-                for r in hl_items {
-                    let qww = r.cs * hw + (r.cs - 1) * gap
-                    let qcx = gx + r.col * (hw + gap) + qww / 2
-                    let qcy = r.yu * u + (r.rs * th + (r.rs - 1) * gap) / 2
-                    let qk = max(qa_k, 0)
-                    //  each button's light and push (pressed: 1 at once, then back to 0 in its time), and where it is (the zones and their rules are here,
-                    //  in the tile's own copy, as the tiles' are: inside the `repeat` below, a press on them did not reach its rule)
-                    prop qf0 = 0 ~2600ms
-                    prop qf1 = 0 ~2600ms
-                    prop qp0 = 0 ~spring(420, 16)
-                    prop qp1 = 0 ~spring(420, 16)
-                    let qx0 = mix(qcx, qcx + if(r.qa >= 2, -0.5, 0) * (hw + gap), qk)
-                    let qx1 = mix(qcx, qcx + 0.5 * (hw + gap), qk)
-                    group {
-                        show: qa_i == r.index and qa_v > 0.01
-                        opacity: qa_v
-                        repeat i in 0..2 {
-                            //  where it lands: the two side by side about the tile's middle (one alone, in the middle), and on its way out of it
-                            let bx = qcx + if(r.qa >= 2, i - 0.5, 0) * (hw + gap)
-                            let x = mix(qcx, bx, qk)
-                            let y = qcy
-                            let dyc = y - 11 * u                          // the disc's middle
-                            let qf = pick(i, qf0, qf1)
-                            let qp = pick(i, qp0, qp1)
-                            let hov = pick(i, qa_b0_z.hover, qa_b1_z.hover)
-                            let run = pick(i, r.ar1, r.ar2)
-                            let flash = if(run > 0.5, clamp(qf * 3, 0, 1), 0)
-                            let lit = max(pick(i, r.ao1, r.ao2), flash)
-                            let wave = clamp((1 - qf) * 2.2, 0, 1)        // the ring's way out, in the first part of the light
-                            let av = pick(i, r.av1, r.av2)
-                            group {
-                                show: i < r.qa
-                                opacity: if(av > 0.5, 100%, 45%)
-                                pivot: x, y
-                                scale: (0.3 + 0.7 * qk) * (1 - 0.06 * qp)
-                                body {
-                                    color: card
-                                    shadow: 0, 8 * u, 22 * u, 45%, deep
-                                    rim: 10%
-                                    box { at: x, y; size: hw, th; corner: 14 * u }
-                                }
-                                box { at: x, y; size: hw, th; corner: 14 * u; color: ink; opacity: 6% + 6% * hov }
-                                box { at: x, y; size: hw, th; corner: 14 * u; color: mint; opacity: 16% * lit }
-                                box { at: x, y; size: hw, th; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * flash }
-                                //  the ring of light, out of the disc
-                                arc { at: x, dyc; radius: (16 + 20 * wave) * u; span: 360deg; width: 2 * u; color: mint; opacity: 80% * (1 - wave) * if(run > 0.5 and qf > 0.02, 1, 0) }
-                                body {
-                                    color: mix(off, mint, lit)
-                                    shadow: 0, 0, 10 * u * lit, 45% * lit, mint
-                                    rim: 16% * lit
-                                    ellipse { at: x, dyc; radius: 16 * u }
-                                }
-                                let qd = pick(i, r.ad1, r.ad2)         // one of the add-on's own drawings (the Apple TV's…), or -1
-                                //  (its file, tinted as the tiles' own pictures are: drawn in pencil in each copy it took too many of the scene's properties)
-                                image r.ai1 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 0 }
-                                image r.ai2 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 1 }
-                                group {
-                                    show: qd < 0 and pick(i, r.ak1, r.ak2) >= 0
-                                    PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + r.index * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
-                                }
-                                //  a command's own: a prompt, › and _
-                                group {
-                                    show: qd < 0 and pick(i, r.ak1, r.ak2) < 0
-                                    box { at: x - 3.2 * u, dyc - 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: 45deg; color: mix(ink, onmint, lit) }
-                                    box { at: x - 3.2 * u, dyc + 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: -45deg; color: mix(ink, onmint, lit) }
-                                    box { at: x + 4 * u, dyc + 5 * u; size: 7 * u, 2 * u; corner: 1 * u; color: mix(ink, onmint, lit) }
-                                }
-                                text r.an1 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 0; family: "Space Grotesk" }
-                                text r.an2 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 1; family: "Space Grotesk" }
-                            }
-                        }
-                        zone box qa_b0_z { at: qx0, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 1 and r.av1 > 0.5; label: "{r.an1}" }
-                        zone box qa_b1_z { at: qx1, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 2 and r.av2 > 0.5; label: "{r.an2}" }
-                        on press qa_b0_z { emit qa_tap(r.index * 10 + 1); qf0: 1 ~0ms; qf0: 0 after 30ms; qp0: 1 ~0ms; qp0: 0 after 20ms }
-                        on press qa_b1_z { emit qa_tap(r.index * 10 + 2); qf1: 1 ~0ms; qf1: 0 after 30ms; qp1: 1 ~0ms; qp1: 0 after 20ms }
-                        on press right qa_b0_z { qa_open = false }
-                        on press right qa_b1_z { qa_open = false }
-                    }
-                }
-              }
-            }
-            //  how far down the list is, when it does not all fit
-            box { from: W - 7 * u, gtop + hl_sp / max(content, 1) * vh; size: 3 * u, vh * vh / max(content, vh); corner: 1.5 * u; color: ink; opacity: if(most > 0.5, 25%, 0%) }
+                opacity: en1
+                move: 0, (1 - en1) * 12 * u
+                //  ── the head: how it is, and the refresh arrow and the gear ──
+                ellipse { at: 24 * u, 28 * u; radius: 4 * u; color: pick(hl_state, faint, mint, alert, faint) }
+                ellipse { at: 24 * u, 28 * u; radius: 8 * u; color: mint; opacity: if(hl_state == 1, 18%, 0%) }
+                text hl_status { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: faint; opacity: (1 - hl_ed) * (1 - hl_ne); family: "Space Grotesk" }
+                text t_noed { at: 38 * u, 28 * u; anchor: left center; size: 11.5; weight: 600; width: W - 190 * u; lines: 2; color: alert; opacity: hl_ne * (1 - hl_ed); family: "Space Grotesk" }
+                text t_hint { at: 38 * u, 28 * u; anchor: left center; size: 12.5; weight: 600; width: W - 190 * u; lines: 1; color: mint; opacity: hl_ed; family: "Space Grotesk" }
 
-            }
-            group {
-            opacity: en3 * (1 - st_k)
-            move: 0, (1 - en3) * 12 * u
-            //  ── when there is nothing to show ──
-            group {
-                show: hl_state == 0 and hl_items.count == 0
-                arc { at: W / 2, H / 2 - 18 * u; radius: 14 * u; span: 270deg; width: 3 * u; color: mint; rotate: mod(hl_spin * 260, 360) * 1deg }
-                text t_connecting { at: W / 2, H / 2 + 14 * u; anchor: center; size: 13; weight: 600; color: faint; family: "Space Grotesk" }
-            }
-            group {
-                show: hl_state >= 2 and hl_items.count == 0
-                HUi(k: if(hl_state == 2, 7, 8), cx: W / 2, cy: H / 2 - 52 * u, c: if(hl_state == 2, alert, mint), a: 1, s: 461, f: fr, z: 1.45)
-                text t_title { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
-                text hl_msg { at: W / 2, H / 2 + 4 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
-                zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: t_edit_cfg }
-                on press hl_cfg_z { st_open = true }
+                //  the pencil: edit mode (lit, a tick, while it is on)
                 body {
-                    color: mint
-                    shadow: 0, 0, 10 * u, 35% + 15% * hl_cfg_z.hover, mint
-                    rim: 16%
-                    box { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u }
+                    color: mix(ink, mint, hl_ed)
+                    opacity: 8% + 10% * hl_ed_z.hover + 82% * hl_ed
+                    shadow: 0, 0, 10 * u * hl_ed, 35% * hl_ed, mint
+                    ellipse { at: W - 121 * u, 28 * u; radius: 16 * u }
                 }
-                text t_edit_cfg { at: W / 2, H / 2 + 74 * u; anchor: center; size: 13.5; weight: 700; color: onmint; family: "Space Grotesk" }
-            }
-            group {
-                show: hl_state == 1 and hl_items.count == 0
-                HUi(k: 9, cx: W / 2, cy: H / 2 - 40 * u, c: mint, a: 1, s: 471, f: fr, z: 1.45)
-                text t_empty { at: W / 2, H / 2 - 4 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
-                text t_empty_hint { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
-            }
+                HUi(k: if(hl_editing, 1, 0), cx: W - 121 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_ed_z.hover), onmint, hl_ed), a: 1, s: 401, f: if(hl_ed_z.hover > 0.5, fr, 0), z: 0.73)
+                zone box hl_ed_z { at: W - 121 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_ed; active: not st_open }
+                on press hl_ed_z { toggle hl_editing; rz_i = -1 }
 
-            }
-            //  ── the settings (the gear): over the tiles, under the cards ──
-            group {
-                opacity: en2 * st_k
-                show: st_k > 0.01
-                move: 0, (1 - st_k) * 10 * u
-                let stw = W - 28 * u
-                //  the tabs (the theme's lit piece under the chosen one), or, on an entity or a room, the way back and its title
+                ellipse { at: W - 37 * u, 28 * u; radius: 16 * u; color: ink; opacity: 8% + 10% * hl_rf_z.hover }
+                HUi(k: 2, cx: W - 37 * u, cy: 28 * u, c: mix(ink, mint, hl_rf_z.hover), a: 1, s: 411, f: if(hl_rf_z.hover > 0.5, fr, 0), z: 0.75)
+                zone box hl_rf_z { at: W - 37 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_refresh }
+                on press hl_rf_z { emit hl_refresh }
+
+                body {
+                    color: mix(ink, mint, st_k)
+                    opacity: 8% + 10% * hl_gear_z.hover + 82% * st_k
+                    shadow: 0, 0, 10 * u * st_k, 35% * st_k, mint
+                    ellipse { at: W - 79 * u, 28 * u; radius: 16 * u }
+                }
+                HUi(k: 3, cx: W - 79 * u, cy: 28 * u, c: mix(mix(ink, mint, hl_gear_z.hover), onmint, st_k), a: 1, s: 421, f: if(hl_gear_z.hover > 0.5, fr, 0), z: 0.7)
+                zone box hl_gear_z { at: W - 79 * u, 28 * u; size: 34 * u, 34 * u; corner: 17 * u; cursor: pointer; label: t_edit_cfg }
+                on press hl_gear_z { toggle st_open }
+
+                box { at: W / 2, 50 * u; size: W - 2 * gx, 1.5; color: ink; opacity: 12% }
+
+                //  ── the demo: no token yet. A banner on what to do, over the example's rooms, which can be played with ──
                 group {
-                    show: st_page == 0
-                    let tbw2 = stw / 2
-                    box { from: 14 * u, 62 * u; size: stw, 32 * u; corner: 16 * u; color: ink; opacity: 7% }
-                    PThumb(x: 14 * u + tbw2 / 2 + st_tk * tbw2, y: 78 * u, w: tbw2 - 6 * u, h: 26 * u, rad: 13 * u, th: 32 * u, a: 1)
-                    repeat i in 0..2 {
-                        text pick(i, t_st_settings, t_st_entities) { at: 14 * u + i * tbw2 + tbw2 / 2, 78 * u; anchor: center; size: 12.5; weight: 700; color: mix(faint, onmint, clamp(1 - abs(st_tk - i), 0, 1)); family: "Space Grotesk" }
-                        zone box st_tab_z.$i { from: 14 * u + i * tbw2, 62 * u; size: tbw2, 32 * u; corner: 16 * u; cursor: pointer; label: pick(i, t_st_settings, t_st_entities); role: tab; selected: st_tab == i }
-                    }
-                    on press st_tab_z.0 { st_tab = 0 }
-                    on press st_tab_z.1 { st_tab = 1 }
+                    show: hl_demo
+                    opacity: 1 - st_k
+                    box { from: 14 * u, 60 * u; size: W - 28 * u, 62 * u; corner: 12 * u; color: mint; opacity: 14% }
+                    PRound(x: 16.6 * u, y: 62.6 * u, w: W - 33.2 * u, h: 56.8 * u, r: 9.7 * u, s: 5, wd: 1.5 * u, c: mint, a: 0.7, f: 0)
+                    PIcon(k: 8, cx: 38 * u, cy: 91 * u, lit: 0, c: mint, a: 1, s: 11, f: 0, z: 1)
+                    text t_demo_title { at: 62 * u, 76 * u; anchor: left center; size: 13.5; weight: 700; width: W - 90 * u; lines: 1; color: mint; family: "Space Grotesk" }
+                    text t_demo_hint { at: 62 * u, 86 * u; anchor: left top; size: 11.5; weight: 600; width: W - 90 * u; lines: 2; color: ink; family: "Space Grotesk" }
+                }
                 }
                 group {
-                    show: st_page > 0
-                    ellipse { at: 30 * u, 78 * u; radius: 15 * u; color: ink; opacity: 8% + 10% * st_back_z.hover }
-                    HUi(k: 27, cx: 30 * u, cy: 78 * u, c: mix(ink, mint, st_back_z.hover), a: 1, s: 801, f: if(st_back_z.hover > 0.5, fr, 0), z: 0.62)
-                    zone box st_back_z { at: 30 * u, 78 * u; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: t_st_back }
-                    on press st_back_z { emit st_back }
-                    text st_title { at: 54 * u, 78 * u; anchor: left center; size: 15; weight: 700; width: W - 80 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                }
-                //  the page: one list that scrolls, everything in it placed by the logic
-                let stv = max(H - 104 * u - 10 * u, 1)
-                let st_most = max(0, st_content * u - stv)
-                //  (above the placed field, and below it: the field itself is left to the shell)
-                let fld_t = clamp(104 * u + (st_fy + 18) * u - st_sp, 104 * u, 104 * u + stv)
-                let fld_b = clamp(fld_t + 38 * u, 104 * u, 104 * u + stv)
-                zone box st_view_z { from: 0, 104 * u; size: W, if(st_fa >= 0, fld_t - 104 * u, stv) }
-                zone box st_view_b { from: 0, fld_b; size: W, 104 * u + stv - fld_b; active: st_fa >= 0 }
-                on scroll st_view_z { st_sp: clamp(st_sp - wheel * 60 * u, 0, st_most) }
-                on scroll st_view_b { st_sp: clamp(st_sp - wheel * 60 * u, 0, st_most) }
-                box { from: W - 7 * u, 104 * u + st_sp / max(st_content * u, 1) * stv; size: 3 * u, stv * stv / max(st_content * u, stv); corner: 1.5 * u; color: ink; opacity: if(st_most > 0.5, 25%, 0%) }
+                opacity: en2 * (1 - st_k)
+                move: 0, (1 - en2) * 12 * u
+                //  ── the rooms and their tiles ──
+                //  One list that scrolls as the shell's own do (the wheel, a drag, the spring they glide with): what it holds is laid out by the logic, in a single piece
+                //  as tall as all of it, so everything below is in that piece's own place, from its top (`hl_sc` is how far it has gone). Under the tiles, a zone the
+                //  size of the view takes the wheel and the drag; a drag that starts on a tile reaches it too (any zone under the press does), but not in edit mode.
+                zone box hl_view_z { from: 0, gtop; size: W, vh }
+                on scroll hl_view_z while not sl_open and not st_open { hl_sp: clamp(hl_sp - wheel * 80 * u, 0, most) }
+                on press hl_view_z { hl_grab = hl_sp }
+                on drag hl_view_z while not hl_editing and mv_i < 0 and rz_i < 0 { hl_sp: clamp(hl_grab - drag.dy, 0, most) }
                 group {
-                  clip box { from: 0, 104 * u; size: W, stv }
+                  clip box { from: 0, gtop; size: W, vh }
                   group {
-                    move: 0, 104 * u - st_sp
-                    //  the rows
-                    for r in st_rows {
-                        let rx = 14 * u + r.x * u
-                        let ry = r.y * u
-                        let rw = if(r.w > 0, r.w * u, stw)
-                        let rh = r.h * u
-                        let act = if(r.index == st_fa, 1, 0)
-                        //  a section's title
-                        text r.label { at: rx + 2 * u, ry + rh / 2; anchor: left center; size: 11.5; weight: 700; color: mint; show: r.kind == 0; family: "Space Grotesk" }
-                        //  a note
-                        text r.label { at: rx + 2 * u, ry; anchor: left top; size: 11; weight: 500; width: rw - 4 * u; lines: 3; color: faint; show: r.kind == 4; family: "Space Grotesk" }
-                        //  a field: its label above, its box, what it says (or its placeholder); the one the shell's field is on shows the text being written, and a caret
-                        group {
-                            show: r.kind == 1
-                            text r.label { at: rx + 2 * u, ry + 8 * u; anchor: left center; size: 11.5; weight: 600; width: rw; lines: 1; color: faint; family: "Space Grotesk" }
-                            box { from: rx, ry + 18 * u; size: rw, 38 * u; corner: 12 * u; color: ink; opacity: 7% + 4% * st_fz.hover + 5% * act }
-                            PRound(x: rx + 1.6 * u, y: ry + 19.6 * u, w: rw - 3.2 * u, h: 34.8 * u, r: 10.5 * u, s: 900 + r.index, wd: 1.3 * u, c: mix(faint, mint, act), a: 0.3 + 0.5 * act, f: if(act > 0.5 and field_kb, fr, 0))
-                            text r.val { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: ink; show: act < 0.5 and r.on > 0.5; family: "Space Grotesk" }
-                            text r.ph { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: faint; opacity: 60%; show: r.on < 0.5 and (act < 0.5 or not st_fvon); family: "Space Grotesk" }
+                    move: 0, gtop - hl_sp
+                    //  a room's head: its name, and after it the temperature and the humidity, each with its sign, when the room has a sensor for them
+                    for rm in hl_rooms {
+                        prop hry = 0 ~quick
+                        follow hry = rm.yu * u
+                        let hy = mix(rm.yu * u, hry, hl_ed)          // (in edit mode the heads move on a spring too, as the tiles make room)
+                        row {
+                            at: gx + 4 * u, hy + 4 * u
+                            gap: 6 * u
+                            align: center
+                            show: hy - hl_sc > -40 * u and hy - hl_sc < vh
+                            text rm.name { size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                            space 4 * u
+                            group { size: 16 * u, 16 * u; show: rm.has_t > 0.5; HUi(k: 4, cx: 8 * u, cy: 8 * u, c: faint, a: 1, s: 431, f: 0, z: 0.62) }
+                            text rm.temp { size: 12.5; weight: 600; color: faint; show: rm.has_t > 0.5; family: "Space Grotesk" }
+                            space 2 * u
+                            group { size: 15 * u, 16 * u; show: rm.has_h > 0.5; HUi(k: 5, cx: 7.5 * u, cy: 8 * u, c: faint, a: 1, s: 441, f: 0, z: 0.58) }
+                            text rm.hum { size: 12.5; weight: 600; color: faint; show: rm.has_h > 0.5; family: "Space Grotesk" }
                         }
-                        //  (the field's label and a margin round it too: the shell's field is put there while the pointer is still on its way, so it is already the shell's
-                        //  when the pointer reaches the box and stops; a compositor only finds what is under a pointer when it moves)
-                        zone box st_fz { from: rx - 6 * u, ry - 3 * u; size: rw + 12 * u, 62 * u; corner: 12 * u; cursor: pointer; active: r.kind == 1 and act < 0.5 and st_k > 0.9; label: "{r.label}" }
-                        on enter st_fz while not field_kb { emit st_fld(r.index) }
-                        on press st_fz { emit st_fld(r.index) }
-                        //  a suggestion under a field: what Home Assistant calls it, and its id
+                    }
+                    for r in hl_items {
+                        let held = rz_i == r.index
+                        let tcs = if(held, rz_w, r.cs)
+                        let trs = if(held, rz_h, r.rs)
+                        let cx0 = gx + r.col * (hw + gap)
+                        let cy0 = r.yu * u
+                        let tww = tcs * hw + (tcs - 1) * gap        // the tile's own size: as many half columns as it takes, and the gaps between them
+                        let small = if(tcs <= 1.5, 1, 0)            // half a column: the icon alone, in the middle
+                        let thh = trs * th + (trs - 1) * gap
+                        let tall = if(trs >= 2, 1, 0)               // two rows or more: the disc at the top, the name and the rest along the bottom
+                        let seen = cy0 - hl_sc > -thh and cy0 - hl_sc < vh
+                        //  a light shows the slider's value while the slider is on it
+                        let bv = if(sl_open and sl_i == r.index, sl_vs, r.bri)
+                        //  a light with a colour of its own is lit in it instead of the accent (the card's, while it is chosen there)
+                        let live = if(sl_open and sl_i == r.index and sl_ck > 0.5, 1, 0)
+                        let kh = if(live > 0.5, sl_hs, r.hu)
+                        let ks = if(live > 0.5, sl_ss, r.sa)
+                        let kk = if(r.ct > 0.5 and (r.hk > 0.5 or live > 0.5), 1, 0)
+                        //  (the colours are drawn a little softer than the light's, as the shell's accents are; a dark one takes a light icon)
+                        let kdark = if(kk > 0.5 and 0.3 * (1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))) < 0.6, 1, 0)
+                        let lit = r.on * r.avail
+                        let dx = if(small > 0.5, cx0 + tww / 2, cx0 + mix(33, 36, tall) * u)          // the disc's middle
+                        let dy = if(small > 0.5, cy0 + thh / 2, mix(cy0 + thh / 2, cy0 + 36 * u, tall))
+                        let carried = if(mv_i == r.index, 1, 0)
+                        //  where it is drawn: its place, or in edit mode its spring to it (the one carried follows the pointer, and glides to its place once let go of)
+                        prop tpx = 0 ~quick
+                        prop tpy = 0 ~quick
+                        follow tpx = if(carried > 0.5, mv_cx - tww / 2, cx0)
+                        follow tpy = if(carried > 0.5, mv_cy - thh / 2, cy0)
+                        let ex = if(carried > 0.5, mv_cx - tww / 2, mix(cx0, tpx, hl_ed))
+                        let ey = if(carried > 0.5, mv_cy - thh / 2, mix(cy0, tpy, hl_ed))
+                        let tx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)                   // where the name starts, and how wide it may be
+                        let tmax = tww - mix(if(r.kind == 1, 112, 72), 36, tall) * u
+                        let ny = mix(cy0 + thh / 2 - 9 * u, cy0 + thh - if(r.kind == 0 and lit > 0.5, 46, 38) * u, tall)
+                        //  the place the carried tile would land on, while it is carried
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mint; opacity: 10% * carried * hl_ed; show: carried > 0.5 }
+                        box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * carried * hl_ed; show: carried > 0.5 }
                         group {
-                            show: r.kind == 5
-                            box { from: rx, ry; size: rw, rh - 2 * u; corner: 10 * u; color: mix(ink, mint, st_sg_z.hover); opacity: 5% + 8% * st_sg_z.hover }
-                            text r.label { at: rx + 12 * u, ry + rh / 2 - 7 * u; anchor: left center; size: 12.5; weight: 600; width: rw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                            text r.sub { at: rx + 12 * u, ry + rh / 2 + 8 * u; anchor: left center; size: 10.5; weight: 500; width: rw - 24 * u; lines: 1; color: faint; family: "Space Grotesk" }
-                        }
-                        zone box st_sg_z { from: rx, ry; size: rw, rh - 2 * u; corner: 10 * u; cursor: pointer; active: r.kind == 5 and st_k > 0.9; label: "{r.label}" }
-                        on press st_sg_z { emit st_do(r.index) }
-                        //  a button: a pill, plain, in the accent, or for deleting (red, filled once it asks again)
-                        group {
-                            show: r.kind == 6
-                            let lit = if(r.tone == 1, 1, 0)
-                            box { from: rx, ry; size: rw, rh; corner: rh / 2; color: if(r.tone >= 2, alert, ink); opacity: if(r.tone == 0, 9% + 9% * st_bt_z.hover, if(r.tone == 2, 12% + 10% * st_bt_z.hover, 0%)) }
+                            opacity: if(r.avail > 0.5, 100%, 45%) * (1 - 0.1 * carried)
+                            move: ex - cx0, ey - cy0
+                            zone box hl_tile_z { from: cx0, cy0; size: tww, thh; corner: 14 * u; cursor: pointer; active: seen and sl_k < 0.05 and qa_v < 0.05 and not hl_editing; label: "{r.name}"; role: toggle; checked: r.on > 0.5 }
+                            on press hl_tile_z { hl_grab = hl_sp; emit hl_tap(r.index) }
+                            //  (a tile with its two buttons, a column wide or more, brings them out instead of its card)
+                            on press right hl_tile_z while r.qa > 0.5 and r.cs >= 2 { qa_i = r.index; qa_open = true }
+                            on press right hl_tile_z while r.kind == 0 and r.avail > 0.5 and r.prn < 0.5 and not (r.qa > 0.5 and r.cs >= 2) { sl_i = r.index; sl_pk = r.pk; sl_dk = r.dk; sl_v = r.bri; sl_dirty = false; sl_col = r.cc; sl_tint = r.ct; sl_ck = r.hk; sl_h = r.hu; sl_s = r.sa; sl_cdirty = false; sl_open = true }
+                            on press right hl_tile_z while r.prn > 0.5 and not (r.qa > 0.5 and r.cs >= 2) { pr_i = r.index; pr_pk = r.pk; pr_dk = r.dk; pr_open = true }
+                            on press right hl_tile_z while r.tvr > 0.5 and not (r.qa > 0.5 and r.cs >= 2) { tv_i = r.index; tv_pk = r.pk; tv_dk = r.dk; tv_tab = 0; tv_open = true }
+                            //  the plate: a veil, flushed with the accent while it is on; in edit mode an outline, the accent's while it is pulled
+                            box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: ink; opacity: 7% + 5% * hl_tile_z.hover }
+                            box { from: cx0, cy0; size: tww, thh; corner: 14 * u; color: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk); opacity: 13% * lit }
+                            box { from: cx0, cy0; size: tww, thh; corner: 14 * u; stroke: 1.5 * u; color: if(held or carried > 0.5, mint, ink); opacity: hl_ed * if(held or carried > 0.5, 90%, 22%) }
+                            //  the disc: hollow when off, lit and glowing when on (a little larger in a tall tile)
                             body {
-                                color: if(r.tone == 3, alert, mint)
-                                opacity: if(r.tone == 1 or r.tone == 3, 100%, 0%)
-                                shadow: 0, 0, 10 * u * lit, 30% + 15% * st_bt_z.hover, mint
-                                rim: 16%
-                                box { from: rx, ry; size: rw, rh; corner: rh / 2 }
+                                color: mix(off, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), lit)
+                                shadow: 0, 0, 10 * u * lit, 45% * lit, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk)
+                                rim: 16% * lit
+                                ellipse { at: dx, dy; radius: mix(19, 22, tall) * u }
                             }
-                            text r.label { at: rx + rw / 2, ry + rh / 2; anchor: center; size: 12.5; weight: 700; width: rw - 16 * u; lines: 1; align: center; color: if(r.tone == 1 or r.tone == 3, onmint, if(r.tone == 2, alert, mix(ink, mint, st_bt_z.hover))); family: "Space Grotesk" }
+                            //  the pencil's icon (the default): drawn in strokes, still unless the tile is on or under the pointer
+                            group {
+                                show: r.custom < 0.5 and r.pk >= 0
+                                PIcon(k: max(r.pk, 0), cx: dx, cy: dy, lit: 0, c: mix(ink, if(kdark > 0.5, ink, onmint), lit), a: 1, s: 3 + r.index * 17, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0), z: 0.78 + 0.12 * tall)
+                            }
+                            //  an icon of its own: a white svg, tinted as the Material ones are
+                            image r.img { at: dx - (11 + 2 * tall) * u, dy - (11 + 2 * tall) * u; size: (22 + 4 * tall) * u, (22 + 4 * tall) * u; tint: mix(ink, if(kdark > 0.5, ink, onmint), lit); show: r.custom > 0.5 }
+                            //  the add-on's own icons, in pencil (tira-led.svg and the rest): still unless the tile is on or under the pointer
+                            group {
+                                show: r.dk >= 0
+                                HDev(k: max(r.dk, 0), cx: dx, cy: dy, c: mix(ink, if(kdark > 0.5, ink, onmint), lit), a: 1, s: 5 + r.index * 13, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0), z: 0.92 + 0.15 * tall)
+                            }
+                            //  the name and how it is
+                            text r.name { at: tx, ny; anchor: left center; size: 13.5 + tall; weight: 600; width: tmax; lines: 1; color: ink; show: small < 0.5; family: "Space Grotesk" }
+                            text r.sub { at: tx, ny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: tmax; lines: 1; show: small < 0.5; color: if(lit > 0.5, mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk), faint); family: "Space Grotesk" }
+                            //  a light: how bright, along the bottom
+                            group {
+                                show: r.kind == 0 and lit > 0.5 and small < 0.5
+                                let bx = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
+                                let bw = mix(tww - 76 * u, tww - 36 * u, tall)
+                                //  (the Control Center's little slider, at the foot of a lit light, as the add-on template has it; it boils under the pointer)
+                                PSliderMiniTint(x0: bx, y: cy0 + thh - 13 * u, w: bw, lv: bv, h: 8 * u, f: if(hl_tile_z.hover > 0.5 or (sl_open and sl_i == r.index), fr, 0), c: mix(mint, rgb(1 - 0.85 * ks * (1 - clamp(abs(kh * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 2), 0, 1)), 1 - 0.85 * ks * (1 - clamp(2 - abs(kh * 6 - 4), 0, 1))), kk))
+                            }
+                            //  a printer: the print's progress along the bottom, while one runs
+                            group {
+                                show: r.prn > 0.5 and r.pp >= 0 and not (r.kind == 0 and lit > 0.5) and small < 0.5
+                                let px0 = mix(cx0 + 62 * u, cx0 + 18 * u, tall)
+                                let pw0 = mix(tww - if(r.kind == 1, 116, 76) * u, tww - 36 * u, tall)
+                                box { from: px0, cy0 + thh - 13 * u; size: pw0, 3 * u; corner: 1.5 * u; color: ink; opacity: 12% }
+                                box { from: px0, cy0 + thh - 13 * u; size: max(3 * u, pw0 * r.pp), 3 * u; corner: 1.5 * u; color: mint }
+                            }
+                            //  a switch: the Control Center's (addon-pencil.plm's PSwitch: grey and hollow off, lit and wider on, the knob stretching as it travels), top right in
+                            //  a tall tile; its pencil outline boils while it is on or under the pointer, as the shell's
+                            group {
+                                show: r.kind == 1 and small < 0.5
+                                let sy = mix(cy0 + thh / 2, cy0 + 30 * u, tall)
+                                PSwitch(sx: cx0 + tww - 36 * u, sy: sy, on: lit, av: 1, s: 7 + r.index, f: if(lit > 0.5 or hl_tile_z.hover > 0.5, fr, 0))
+                            }
+                            //  edit mode: the handle in the corner. While it is held its zone covers the panel, so the drag is not lost as the tile grows under it;
+                            //  the size it would take, in cells, in the middle of the tile
+                            group {
+                                opacity: hl_ed
+                                ellipse { at: cx0 + tww - 15 * u, cy0 + thh - 15 * u; radius: 11 * u; color: mint; opacity: if(held, 100%, 80% + 20% * hl_grip_z.hover) }
+                                HUi(k: 6, cx: cx0 + tww - 15 * u, cy: cy0 + thh - 15 * u, c: onmint, a: 1, s: 451, f: 0, z: 0.5)
+                                box { at: cx0 + tww / 2, cy0 + thh / 2; size: 64 * u, 30 * u; corner: 15 * u; color: deep; opacity: if(held, 80%, 0%) }
+                                text t_rz { at: cx0 + tww / 2, cy0 + thh / 2; anchor: center; size: 14; weight: 700; color: mint; opacity: if(held, 100%, 0%); family: "Space Grotesk" }
+                            }
+                            //  edit mode: the tile itself is carried to another place (it follows the pointer; the others make room, and an outline shows where it lands)
+                            zone box hl_mv_z { from: cx0 - 1500 * u * carried, cy0 - 1500 * u * carried; size: tww + 3000 * u * carried, thh + 3000 * u * carried; corner: 14 * u; cursor: if(carried > 0.5, grabbing, grab); active: hl_editing and rz_i < 0 and ((seen and mv_i < 0) or carried > 0.5); label: "{r.name}" }
+                            //  (it is carried by its middle: where that was when it was taken, plus how far the pointer has gone; its own place changes under it as the others make room)
+                            //  (its zone stays while it is carried even when its place goes out of view, or the drag was lost and the tile stuck; held near the
+                            //  list's top or bottom, the list scrolls, and the tile stays under the pointer)
+                            on press hl_mv_z { mv_ox = cx0 + tww / 2; mv_oy = cy0 + thh / 2; mv_s0 = hl_sc; mv_cx = cx0 + tww / 2; mv_cy = cy0 + thh / 2; mv_i = r.index }
+                            on drag hl_mv_z while mv_i == r.index { mv_cx = mv_ox + drag.dx; mv_cy = mv_oy + drag.dy + hl_sc - mv_s0; hl_sp: clamp(hl_sp + if(mv_cy - hl_sc > vh - 45 * u, 16 * u, if(mv_cy - hl_sc < 35 * u, -16 * u, 0)), 0, most) }
+                            on release hl_mv_z while mv_i == r.index { emit hl_move(r.index); mv_i = -1 }
+                            zone box hl_grip_z { at: if(held, W / 2, cx0 + tww - 15 * u), if(held, hl_sc + vh / 2, cy0 + thh - 15 * u); size: if(held, W, 30 * u), if(held, vh, 30 * u); cursor: grab; active: hl_editing and seen and (rz_i < 0 or held); label: "{t_resize} {r.name}" }
+                            on press hl_grip_z { rz_w0 = r.cs; rz_h0 = r.rs; rz_w = r.cs; rz_h = r.rs; rz_i = r.index }
+                            on drag hl_grip_z while held { rz_w = clamp(rz_w0 + round(drag.dx / (hw + gap)), 1, 2 * cols); rz_h = clamp(rz_h0 + round(drag.dy / (th + gap)), 1, 3) }
+                            on release hl_grip_z { rz_i = -1 }
                         }
-                        zone box st_bt_z { from: rx, ry; size: rw, rh; corner: rh / 2; cursor: pointer; active: r.kind == 6 and st_k > 0.9; label: "{r.label}" }
-                        on press st_bt_z { emit st_do(r.index) }
                     }
-                    //  the switches: a name, and the Control Center's switch at the right; the whole row is the button
-                    for w in st_sws {
-                        let wy = w.y * u
-                        box { from: 14 * u, wy; size: stw, 40 * u; corner: 12 * u; color: ink; opacity: 4% * st_sw_z.hover }
-                        text w.label { at: 16 * u, wy + 20 * u; anchor: left center; size: 13; weight: 600; width: stw - 60 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                        PSwitch(sx: W - 35 * u, sy: wy + 20 * u, on: if(w.on > 0.5, 1, 0), av: 1, s: 950 + w.index, f: if(st_sw_z.hover > 0.5, fr, 0))
-                        zone box st_sw_z { from: 14 * u, wy; size: stw, 40 * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; label: "{w.label}"; role: toggle; checked: w.on > 0.5 }
-                        on press st_sw_z { emit st_sw(w.index) }
+                    //  The carried tile again, over all the others (the rows are drawn in order, so in its own row it would pass under the ones after it): lifted, on an
+                    //  opaque plate with a shadow, at the pointer. (`z:` would do it, but inside a `for` it mixes up the rows' `r.index`.) Its row is `hl_carry`, the carried
+                    //  tile's own, copied there by the logic: drawn once, not once for each of the 32 rows the panel can hold.
+                    for r in hl_carry {
+                        let ccs = r.cs
+                        let crs = r.rs
+                        let cww = ccs * hw + (ccs - 1) * gap
+                        let chh = crs * th + (crs - 1) * gap
+                        let csm = if(ccs <= 1.5, 1, 0)
+                        let ctl = if(crs >= 2, 1, 0)
+                        let cx = mv_cx - cww / 2
+                        let cy = mv_cy - chh / 2
+                        let clit = r.on * r.avail
+                        let cdx = if(csm > 0.5, cx + cww / 2, cx + mix(33, 36, ctl) * u)
+                        let cdy = if(csm > 0.5, cy + chh / 2, mix(cy + chh / 2, cy + 36 * u, ctl))
+                        let ctx = mix(cx + 62 * u, cx + 18 * u, ctl)
+                        let cny = mix(cy + chh / 2 - 9 * u, cy + chh - 38 * u, ctl)
+                        group {
+                            show: mv_i >= 0 and hl_ed > 0.5
+                            body {
+                                color: mix(tint, ink, 0.07)
+                                shadow: 0, 10 * u, 26 * u, 50%, deep
+                                box { from: cx, cy; size: cww, chh; corner: 14 * u }
+                            }
+                            box { from: cx, cy; size: cww, chh; corner: 14 * u; color: mint; opacity: 10% * clit }
+                            box { from: cx, cy; size: cww, chh; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 90% }
+                            body {
+                                color: mix(off, mint, clit)
+                                ellipse { at: cdx, cdy; radius: mix(19, 22, ctl) * u }
+                            }
+                            group {
+                                show: r.custom < 0.5 and r.pk >= 0
+                                PIcon(k: max(r.pk, 0), cx: cdx, cy: cdy, lit: 0, c: mix(ink, onmint, clit), a: 1, s: 3 + mv_i * 17, f: 0, z: 0.78 + 0.12 * ctl)
+                            }
+                            image r.img { at: cdx - (11 + 2 * ctl) * u, cdy - (11 + 2 * ctl) * u; size: (22 + 4 * ctl) * u, (22 + 4 * ctl) * u; tint: mix(ink, onmint, clit); show: r.custom > 0.5 }
+                            group {
+                                show: r.dk >= 0
+                                HDev(k: max(r.dk, 0), cx: cdx, cy: cdy, c: mix(ink, onmint, clit), a: 1, s: 5 + mv_i * 13, f: 0, z: 0.92 + 0.15 * ctl)
+                            }
+                            text r.name { at: ctx, cny; anchor: left center; size: 13.5 + ctl; weight: 600; width: cww - mix(72, 36, ctl) * u; lines: 1; color: ink; show: csm < 0.5; family: "Space Grotesk" }
+                            text r.sub { at: ctx, cny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: cww - mix(72, 36, ctl) * u; lines: 1; color: if(clit > 0.5, mint, faint); show: csm < 0.5; family: "Space Grotesk" }
+                        }
                     }
-                    //  the text being written in the field the shell's field is on, measured for the caret
+                    //  ── a tile's two buttons: a right click brings them out of its middle, two half tiles side by side over it, each with its icon and its name under
+                    //  it. One that toggles is lit while its entity is on; one that is only run (a shell_command, a script…) lights up a few seconds when pressed, with
+                    //  a ring of light going out from its disc. A click outside them, a right click or Escape puts them back. ──
                     group {
-                        show: st_fa >= 0
-                        text st_fv { at: 14 * u + st_fx * u + 14 * u, st_fy * u + 37 * u; anchor: left center; size: 13.5; weight: 500; width: st_fw * u - 28 * u; lines: 1; color: ink; measure: stf; family: "Space Grotesk" }
-                        box { from: 14 * u + st_fx * u + 15 * u + min(stf.width, st_fw * u - 30 * u), st_fy * u + 28 * u; size: 2 * u, 18 * u; color: mint; opacity: if(field_kb, 1, 0) * (0.55 + 0.45 * sin(hl_clk * 6)) }
+                        show: qa_v > 0.01
+                        opacity: clamp(qa_k * 1.6, 0, 1) * qa_v
+                        box { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; color: deep; opacity: 40% }
                     }
-                    //  a choice among a few (the language, a tile's kind, its room, a printer): the theme's lit piece under the chosen one
-                    for c in st_chips {
-                        let chx = 14 * u + c.x * u
-                        let chy = c.y * u
-                        let chw = c.w * u
-                        box { from: chx, chy; size: chw, 30 * u; corner: 15 * u; color: ink; opacity: if(c.sel > 0.5, 0%, 8% + 8% * st_ch_z.hover) }
+                    zone box qa_scrim_z { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; active: qa_open }
+                    on press qa_scrim_z { qa_open = false }
+                    on press right qa_scrim_z { qa_open = false }
+                    for r in hl_qbtn {
+                        let qww = r.cs * hw + (r.cs - 1) * gap
+                        let qcx = gx + r.col * (hw + gap) + qww / 2
+                        let qcy = r.yu * u + (r.rs * th + (r.rs - 1) * gap) / 2
+                        let qk = max(qa_k, 0)
+                        //  each button's light and push (pressed: 1 at once, then back to 0 in its time), and where it is (the zones and their rules are here,
+                        //  in the tile's own copy, as the tiles' are: inside the `repeat` below, a press on them did not reach its rule)
+                        prop qf0 = 0 ~2600ms
+                        prop qf1 = 0 ~2600ms
+                        prop qp0 = 0 ~spring(420, 16)
+                        prop qp1 = 0 ~spring(420, 16)
+                        let qx0 = mix(qcx, qcx + if(r.qa >= 2, -0.5, 0) * (hw + gap), qk)
+                        let qx1 = mix(qcx, qcx + 0.5 * (hw + gap), qk)
                         group {
-                            show: c.sel > 0.5
-                            PThumb(x: chx + chw / 2, y: chy + 15 * u, w: chw, h: 30 * u, rad: 15 * u, th: 30 * u, a: 1)
+                            show: qa_i >= 0 and qa_v > 0.01
+                            opacity: qa_v
+                            repeat i in 0..2 {
+                                //  where it lands: the two side by side about the tile's middle (one alone, in the middle), and on its way out of it
+                                let bx = qcx + if(r.qa >= 2, i - 0.5, 0) * (hw + gap)
+                                let x = mix(qcx, bx, qk)
+                                let y = qcy
+                                let dyc = y - 11 * u                          // the disc's middle
+                                let qf = pick(i, qf0, qf1)
+                                let qp = pick(i, qp0, qp1)
+                                let hov = pick(i, qa_b0_z.hover, qa_b1_z.hover)
+                                let run = pick(i, r.ar1, r.ar2)
+                                let flash = if(run > 0.5, clamp(qf * 3, 0, 1), 0)
+                                let lit = max(pick(i, r.ao1, r.ao2), flash)
+                                let wave = clamp((1 - qf) * 2.2, 0, 1)        // the ring's way out, in the first part of the light
+                                let av = pick(i, r.av1, r.av2)
+                                group {
+                                    show: i < r.qa
+                                    opacity: if(av > 0.5, 100%, 45%)
+                                    pivot: x, y
+                                    scale: (0.3 + 0.7 * qk) * (1 - 0.06 * qp)
+                                    body {
+                                        color: card
+                                        shadow: 0, 8 * u, 22 * u, 45%, deep
+                                        rim: 10%
+                                        box { at: x, y; size: hw, th; corner: 14 * u }
+                                    }
+                                    box { at: x, y; size: hw, th; corner: 14 * u; color: ink; opacity: 6% + 6% * hov }
+                                    box { at: x, y; size: hw, th; corner: 14 * u; color: mint; opacity: 16% * lit }
+                                    box { at: x, y; size: hw, th; corner: 14 * u; stroke: 1.5 * u; color: mint; opacity: 70% * flash }
+                                    //  the ring of light, out of the disc
+                                    arc { at: x, dyc; radius: (16 + 20 * wave) * u; span: 360deg; width: 2 * u; color: mint; opacity: 80% * (1 - wave) * if(run > 0.5 and qf > 0.02, 1, 0) }
+                                    body {
+                                        color: mix(off, mint, lit)
+                                        shadow: 0, 0, 10 * u * lit, 45% * lit, mint
+                                        rim: 16% * lit
+                                        ellipse { at: x, dyc; radius: 16 * u }
+                                    }
+                                    let qd = pick(i, r.ad1, r.ad2)         // one of the add-on's own drawings (the Apple TV's…), or -1
+                                    //  (its file, tinted as the tiles' own pictures are: drawn in pencil in each copy it took too many of the scene's properties)
+                                    image r.ai1 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 0 }
+                                    image r.ai2 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 1 }
+                                    group {
+                                        show: qd < 0 and pick(i, r.ak1, r.ak2) >= 0
+                                        PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + qa_i * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
+                                    }
+                                    //  a command's own: a prompt, › and _
+                                    group {
+                                        show: qd < 0 and pick(i, r.ak1, r.ak2) < 0
+                                        box { at: x - 3.2 * u, dyc - 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: 45deg; color: mix(ink, onmint, lit) }
+                                        box { at: x - 3.2 * u, dyc + 2.4 * u; size: 7 * u, 2 * u; corner: 1 * u; rotate: -45deg; color: mix(ink, onmint, lit) }
+                                        box { at: x + 4 * u, dyc + 5 * u; size: 7 * u, 2 * u; corner: 1 * u; color: mix(ink, onmint, lit) }
+                                    }
+                                    text r.an1 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 0; family: "Space Grotesk" }
+                                    text r.an2 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 1; family: "Space Grotesk" }
+                                }
+                            }
+                            zone box qa_b0_z { at: qx0, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_k > 0.6 and r.qa >= 1 and r.av1 > 0.5; label: "{r.an1}" }
+                            zone box qa_b1_z { at: qx1, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_k > 0.6 and r.qa >= 2 and r.av2 > 0.5; label: "{r.an2}" }
+                            on press qa_b0_z { emit qa_tap(qa_i * 10 + 1); qf0: 1 ~0ms; qf0: 0 after 30ms; qp0: 1 ~0ms; qp0: 0 after 20ms }
+                            on press qa_b1_z { emit qa_tap(qa_i * 10 + 2); qf1: 1 ~0ms; qf1: 0 after 30ms; qp1: 1 ~0ms; qp1: 0 after 20ms }
+                            on press right qa_b0_z { qa_open = false }
+                            on press right qa_b1_z { qa_open = false }
                         }
-                        text c.label { at: chx + chw / 2, chy + 15 * u; anchor: center; size: 12; weight: 700; width: chw - 10 * u; lines: 1; align: center; color: if(c.sel > 0.5, onmint, mix(ink, mint, st_ch_z.hover)); family: "Space Grotesk" }
-                        zone box st_ch_z { from: chx, chy; size: chw, 30 * u; corner: 15 * u; cursor: pointer; active: st_k > 0.9; label: "{c.label}"; role: tab; selected: c.sel > 0.5 }
-                        on press st_ch_z { emit st_chip(c.index) }
-                    }
-                    //  the icons to choose from: the pencil's and the add-on's own
-                    for c in st_icons {
-                        let icx = 14 * u + c.x * u
-                        let icy = c.y * u
-                        box { from: icx, icy; size: 44 * u, 44 * u; corner: 12 * u; color: if(c.sel > 0.5, mint, ink); opacity: if(c.sel > 0.5, 18%, 6% + 8% * st_ic_z.hover) }
-                        group {
-                            show: c.sel > 0.5
-                            PRound(x: icx + 1.5 * u, y: icy + 1.5 * u, w: 41 * u, h: 41 * u, r: 10.5 * u, s: 1000 + c.index, wd: 1.4 * u, c: mint, a: 0.8, f: 0)
-                        }
-                        group {
-                            show: c.pk >= 0
-                            PIcon(k: max(c.pk, 0), cx: icx + 22 * u, cy: icy + 22 * u, lit: 0, c: if(c.sel > 0.5, mint, ink), a: 1, s: 1100 + c.index * 7, f: if(st_ic_z.hover > 0.5, fr, 0), z: 0.8)
-                        }
-                        group {
-                            show: c.dk >= 0
-                            HDev(k: max(c.dk, 0), cx: icx + 22 * u, cy: icy + 22 * u, c: if(c.sel > 0.5, mint, ink), a: 1, s: 1200 + c.index * 7, f: if(st_ic_z.hover > 0.5, fr, 0), z: 0.95)
-                        }
-                        zone box st_ic_z { from: icx, icy; size: 44 * u, 44 * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; role: tab; selected: c.sel > 0.5 }
-                        on press st_ic_z { emit st_icon(c.index) }
-                    }
-                    //  the entities' list: a room's head, and its tiles (each opened to edit with a click)
-                    for e in st_ents {
-                        let ey = e.y * u
-                        group {
-                            show: e.kind == 0
-                            text e.name { at: 16 * u, ey + 17 * u; anchor: left center; size: 14.5; weight: 700; width: stw - 60 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                            text e.sub { at: 16 * u, ey + 33 * u; anchor: left center; size: 10.5; weight: 500; width: stw - 60 * u; lines: 1; color: faint; family: "Space Grotesk" }
-                        }
-                        group {
-                            show: e.kind == 1
-                            box { from: 14 * u, ey; size: stw, 48 * u; corner: 12 * u; color: ink; opacity: 6% + 6% * st_en_z.hover }
-                            PIcon(k: max(e.pk, 0), cx: 38 * u, cy: ey + 24 * u, lit: 0, c: mix(ink, mint, st_en_z.hover), a: 1, s: 1300 + e.index * 7, f: if(st_en_z.hover > 0.5, fr, 0), z: 0.72)
-                            text e.name { at: 62 * u, ey + 16 * u; anchor: left center; size: 13; weight: 700; width: stw - 100 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                            text e.sub { at: 62 * u, ey + 33 * u; anchor: left center; size: 10.5; weight: 500; width: stw - 100 * u; lines: 1; color: faint; family: "Space Grotesk" }
-                        }
-                        let chy2 = ey + if(e.kind == 0, 21, 24) * u
-                        PLn(ax: W - 38 * u, ay: chy2 - 6 * u, bx: W - 32 * u, by: chy2, s: 1400 + e.index, wd: 1.8 * u, c: mix(faint, mint, st_en_z.hover), a: 1, f: if(st_en_z.hover > 0.5, fr, 0))
-                        PLn(ax: W - 32 * u, ay: chy2, bx: W - 38 * u, by: chy2 + 6 * u, s: 1450 + e.index, wd: 1.8 * u, c: mix(faint, mint, st_en_z.hover), a: 1, f: if(st_en_z.hover > 0.5, fr, 0))
-                        zone box st_en_z { from: 14 * u, ey; size: stw, if(e.kind == 0, 42, 48) * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; label: "{e.name}" }
-                        on press st_en_z { emit st_ent(e.index) }
                     }
                   }
                 }
-            }
-            //  ── the brightness slider: a card over the panel, which a click outside it, its X or a right click shuts ──
-            group {
-                opacity: sl_k
-                let cw = min(W - 40 * u, 400 * u)
-                let ch = if(sl_col > 0.5, 298, 186) * u          // (taller with the colours)
-                let cl = (W - cw) / 2
-                let ct = (H - ch) / 2 + 10 * u * (1 - sl_k)
-                let tl = cl + 22 * u
-                let tw2 = cw - 44 * u
-                let ty = ct + 98 * u
-                let kx = tl + 17 * u + (tw2 - 34 * u) * sl_vs
-                let lk = if(sl_tint > 0.5 and sl_ck > 0.5, 1, 0)      // the light's own colour, known, and asked for ("tint"): the disc and the track take it
-                let ldark = if(lk > 0.5 and 0.3 * (1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))) < 0.6, 1, 0)
-                //  first the veil over the tiles, which shuts it (declared before the card, so the card's zones win over it)
-                //  (over all of Vitreus's glass, not only the content: past it by the glass's margin at the sides and the foot (14) and the title bar on top (38),
-                //  both in Vitreus's `cu`, 1.5525, with the glass's own corner, `rc`: 26, or 7 with the square themes, Retro and Cyber, times its `u`, 1.35)
-                let sl_gm = 14 * 1.5525
-                let sl_gt = 38 * 1.5525
-                let sl_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
-                box { from: -sl_gm, -sl_gt; size: W + 2 * sl_gm, H + sl_gt + sl_gm; corner: sl_gr; color: deep; opacity: 45% }
-                zone box sl_scrim_z { from: -sl_gm, -sl_gt; size: W + 2 * sl_gm, H + sl_gt + sl_gm; corner: sl_gr }
-                on press sl_scrim_z { sl_open = false }
-                on press right sl_scrim_z { sl_open = false }
-                body {
-                    color: card
-                    shadow: 0, 10 * u, 30 * u, 45%, deep
-                    rim: 10%
-                    box { from: cl, ct; size: cw, ch; corner: 20 * u }
-                }
-                zone box sl_card_z { from: cl, ct; size: cw, ch; corner: 20 * u }
-                on press right sl_card_z { sl_open = false }
-                //  the light: its disc, its name, the value
-                body {
-                    color: mix(off, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), if(sl_vs > 0.004, 1, 0))
-                    shadow: 0, 0, 10 * u * if(sl_vs > 0.004, 1, 0), 45%, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk)
-                    rim: 16%
-                    ellipse { at: cl + 42 * u, ct + 42 * u; radius: 20 * u }
+                //  how far down the list is, when it does not all fit
+                box { from: W - 7 * u, gtop + hl_sp / max(content, 1) * vh; size: 3 * u, vh * vh / max(content, vh); corner: 1.5 * u; color: ink; opacity: if(most > 0.5, 25%, 0%) }
+
                 }
                 group {
-                    show: not sl_custom and sl_pk >= 0
-                    PIcon(k: max(sl_pk, 0), cx: cl + 42 * u, cy: ct + 42 * u, lit: 0, c: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink), a: 1, s: 21, f: fr, z: 0.8)
-                }
-                for r in hl_items {
-                    image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink); show: sl_custom and r.index == sl_i }
+                opacity: en3 * (1 - st_k)
+                move: 0, (1 - en3) * 12 * u
+                //  ── when there is nothing to show ──
+                group {
+                    show: hl_state == 0 and hl_items.count == 0
+                    arc { at: W / 2, H / 2 - 18 * u; radius: 14 * u; span: 270deg; width: 3 * u; color: mint; rotate: mod(hl_spin * 260, 360) * 1deg }
+                    text t_connecting { at: W / 2, H / 2 + 14 * u; anchor: center; size: 13; weight: 600; color: faint; family: "Space Grotesk" }
                 }
                 group {
-                    show: sl_dk >= 0
-                    HDev(k: max(sl_dk, 0), cx: cl + 42 * u, cy: ct + 42 * u, c: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink), a: 1, s: 481, f: fr, z: 0.92)
-                }
-                text sl_name { at: cl + 72 * u, ct + 34 * u; anchor: left center; size: 15; weight: 700; width: cw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                text t_brightness { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
-                text number(sl_vs * 100, 0, " %") { at: cl + cw - 58 * u, ct + 42 * u; anchor: right center; size: 24; weight: 700; color: ink; family: "Space Grotesk" }
-                ellipse { at: cl + cw - 30 * u, ct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * sl_x_z.hover }
-                HUi(k: 10, cx: cl + cw - 30 * u, cy: ct + 28 * u, c: mix(faint, ink, sl_x_z.hover), a: 1, s: 491, f: if(sl_x_z.hover > 0.5, fr, 0), z: 0.62)
-                zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
-                on press sl_x_z { sl_open = false }
-                //  the track: the Control Center's slider, coloured in with the accent (or the light's colour); it boils under the pointer and while it is dragged
-                PSliderTint(x0: tl, y: ty, w: tw2, lv: sl_vs, h: 18 * u, f: if(sl_tr_z.hover > 0.5 or sl_dirty, fr, 0), c: mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk))
-                zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: "{t_brightness}: {sl_name}"; role: slider; value: "{sl_vs * 100} %" }
-                on press sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
-                on drag sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
-                on scroll sl_card_z { sl_v = clamp(sl_v + wheel * 0.05, 0, 1); sl_dirty = true }
-                on release sl_tr_z { emit hl_bri(sl_v); sl_dirty = false }
-                //  a pause in the moving sends it too, so the light follows the finger without a request per frame
-                on still sl_v for 280ms while sl_open and sl_dirty { emit hl_bri(sl_v); sl_dirty = false }
-                //  the quick ones: off, a quarter, half, three quarters, full
-                let pw = (tw2 - 4 * 8 * u) / 5
-                repeat i in 0..5 {
-                    let px = tl + i * (pw + 8 * u)
-                    let pv = i * 0.25
-                    let here = abs(sl_v - pv) < 0.01
-                    zone box sl_p_z.$i { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: "{t_brightness}: {i * 25} %" }
-                    on press sl_p_z.$i { sl_v = pv; emit hl_bri(pv); sl_dirty = false }
-                    box { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; color: mint; opacity: if(here, 100%, 0%) }
-                    box { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; color: ink; opacity: if(here, 0%, 8% + 8% * sl_p_z.$i.hover) }
-                    text t_off { at: px + pw / 2, ct + 151 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i == 0; family: "Space Grotesk" }
-                    text pick(i, "", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + 151 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i > 0; family: "Space Grotesk" }
-                }
-                //  the colour, for a light that has one: a rainbow to drag along, and a row of made ones (two whites, then around the wheel). Choosing one on a
-                //  light that is off turns it on, at full brightness.
-                group {
-                    show: sl_col > 0.5
-                    box { from: tl, ct + 184 * u; size: tw2, 1.5; color: ink; opacity: 10% }
-                    text t_color { at: tl, ct + 204 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
-                    let hy = ct + 230 * u
-                    let hx = tl + 11 * u + (tw2 - 22 * u) * sl_hs
+                    show: hl_state >= 2 and hl_items.count == 0
+                    HUi(k: if(hl_state == 2, 7, 8), cx: W / 2, cy: H / 2 - 52 * u, c: if(hl_state == 2, alert, mint), a: 1, s: 461, f: fr, z: 1.45)
+                    text t_title { at: W / 2, H / 2 - 16 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                    text hl_msg { at: W / 2, H / 2 + 4 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
+                    zone box hl_cfg_z { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u; cursor: pointer; label: t_edit_cfg }
+                    on press hl_cfg_z { st_open = true }
                     body {
-                        gradient: tl, hy to tl + tw2, hy, #ff2626, #ffff26, #26ff26, #26ffff, #2626ff, #ff26ff, #ff2626          // lint: colour the hue bar: the colours a light can be, to pick one from
+                        color: mint
+                        shadow: 0, 0, 10 * u, 35% + 15% * hl_cfg_z.hover, mint
                         rim: 16%
-                        box { from: tl, hy - 11 * u; size: tw2, 22 * u; corner: 11 * u }
+                        box { at: W / 2, H / 2 + 74 * u; size: 210 * u, 36 * u; corner: 18 * u }
                     }
-                    //  in pencil, as the sliders: a crooked outline round it, and a ring for a knob around the hue (faded while the colour is a white, which has none)
-                    PRound(x: tl, y: hy - 11 * u, w: tw2, h: 22 * u, r: 11 * u, s: 87, wd: 1.5 * u, c: ink, a: 0.55, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
-                    PCir(cx: hx, cy: hy, rad: 13 * u, s: 89, wd: 1.6 * u, c: ink, a: if(sl_ck > 0.5 and sl_s > 0.05, 0.95, 0.45), gapk: -1, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
-                    ellipse { at: hx, hy; radius: 8 * u; color: rgb(0.15 + 0.85 * clamp(abs(sl_hs * 6 - 3) - 1, 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 2), 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 4), 0, 1)); opacity: if(sl_ck > 0.5 and sl_s > 0.05, 100%, 40%) }
-                    zone box sl_hue_z { from: tl - 6 * u, hy - 18 * u; size: tw2 + 12 * u, 36 * u; corner: 18 * u; cursor: pointer; label: "{t_color}: {sl_name}"; role: slider; value: "{sl_hs * 360}" }
-                    on press sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); sl_cdirty = true }
-                    on drag sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_cdirty = true }
-                    on release sl_hue_z { emit hl_color(round(sl_h * 360) * 1000 + round(sl_s * 100)); sl_cdirty = false }
-                    //  a pause in the dragging sends it too, as the brightness does
-                    on still sl_h for 280ms while sl_open and sl_cdirty { emit hl_color(round(sl_h * 360) * 1000 + round(sl_s * 100)); sl_cdirty = false }
-                    //  the made ones: hue and saturation, each drawn in the colour it sends
-                    let sgap = (tw2 - 28 * u) / 9
-                    repeat i in 0..10 {
-                        let sx = tl + 14 * u + i * sgap
-                        let sy = ct + 270 * u
-                        let ph = pick(i, 0, 0.09, 0, 0.07, 0.14, 0.33, 0.5, 0.64, 0.76, 0.89)
-                        let ps = pick(i, 0, 0.5, 1, 1, 1, 1, 1, 1, 1, 1)
-                        let here = sl_ck > 0.5 and abs(sl_s - ps) < 0.02 and (ps < 0.01 or abs(sl_h - ph) < 0.01)
-                        zone box sl_sw_z.$i { at: sx, sy; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: "{t_color} {i + 1}" }
-                        on press sl_sw_z.$i { sl_h = ph; sl_s = ps; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); emit hl_color(round(ph * 360) * 1000 + round(ps * 100)); sl_cdirty = false }
-                        box { at: sx, sy; size: 34 * u, 34 * u; corner: 17 * u; stroke: 2 * u; color: ink; opacity: if(here, 90%, 12% * sl_sw_z.$i.hover) }
-                        body {
-                            color: rgb(1 - 0.85 * ps * (1 - clamp(abs(ph * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ps * (1 - clamp(2 - abs(ph * 6 - 2), 0, 1)), 1 - 0.85 * ps * (1 - clamp(2 - abs(ph * 6 - 4), 0, 1)))
-                            rim: 16%
-                            ellipse { at: sx, sy; radius: (12 + if(here, 0, 1) * sl_sw_z.$i.hover) * u }
-                        }
-                    }
+                    text t_edit_cfg { at: W / 2, H / 2 + 74 * u; anchor: center; size: 13.5; weight: 700; color: onmint; family: "Space Grotesk" }
                 }
-            }
+                group {
+                    show: hl_state == 1 and hl_items.count == 0
+                    HUi(k: 9, cx: W / 2, cy: H / 2 - 40 * u, c: mint, a: 1, s: 471, f: fr, z: 1.45)
+                    text t_empty { at: W / 2, H / 2 - 4 * u; anchor: center; size: 15; weight: 700; color: ink; family: "Space Grotesk" }
+                    text t_empty_hint { at: W / 2, H / 2 + 16 * u; anchor: center top; size: 12; weight: 500; width: W - 70 * u; align: center; color: faint; family: "Space Grotesk" }
+                }
 
-            //  ── the printer's card: over the panel like the slider's, shut by a click outside it, its X or a right click ──
-            group {
-                opacity: pr_k
-                show: pr_k > 0.01
-                let pcw = min(W - 28 * u, 460 * u)
-                let pch = 320 * u
-                let pcl = (W - pcw) / 2
-                let pct = (H - pch) / 2 + 10 * u * (1 - pr_k)
-                let plit = if(pr_st == 1, 1, 0)
-                //  the veil, as the slider's (over all of Vitreus's glass)
-                let pr_gm = 14 * 1.5525
-                let pr_gt = 38 * 1.5525
-                let pr_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
-                box { from: -pr_gm, -pr_gt; size: W + 2 * pr_gm, H + pr_gt + pr_gm; corner: pr_gr; color: deep; opacity: 45% }
-                zone box pr_scrim_z { from: -pr_gm, -pr_gt; size: W + 2 * pr_gm, H + pr_gt + pr_gm; corner: pr_gr }
-                on press pr_scrim_z { pr_open = false }
-                on press right pr_scrim_z { pr_open = false }
-                body {
-                    color: card
-                    shadow: 0, 10 * u, 30 * u, 45%, deep
-                    rim: 10%
-                    box { from: pcl, pct; size: pcw, pch; corner: 20 * u }
                 }
-                zone box pr_card_z { from: pcl, pct; size: pcw, pch; corner: 20 * u }
-                on press right pr_card_z { pr_open = false }
-                //  the head: the printer's disc (lit while it prints), the job and its state, and the X
-                body {
-                    color: mix(off, mint, plit)
-                    shadow: 0, 0, 10 * u * plit, 45%, mint
-                    rim: 16%
-                    ellipse { at: pcl + 42 * u, pct + 42 * u; radius: 20 * u }
-                }
+                //  ── the settings (the gear): over the tiles, under the cards ──
                 group {
-                    show: not pr_custom and pr_pk >= 0
-                    PIcon(k: max(pr_pk, 0), cx: pcl + 42 * u, cy: pct + 42 * u, lit: 0, c: mix(ink, onmint, plit), a: 1, s: 23, f: fr * plit, z: 0.8)
-                }
-                for r in hl_items {
-                    image r.img { at: pcl + 31 * u, pct + 31 * u; size: 22 * u, 22 * u; tint: mix(ink, onmint, plit); show: pr_custom and r.index == pr_i }
-                }
-                group {
-                    show: pr_dk >= 0
-                    HDev(k: max(pr_dk, 0), cx: pcl + 42 * u, cy: pct + 42 * u, c: mix(ink, onmint, plit), a: 1, s: 501, f: fr * plit, z: 0.92)
-                }
-                text pr_task { at: pcl + 72 * u, pct + 33 * u; anchor: left center; size: 15; weight: 700; width: pcw - 130 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                row {
-                    at: pcl + 72 * u, pct + 46 * u
-                    gap: 6 * u
-                    align: center
-                    ellipse { radius: 3.5 * u; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert) }
-                    text pr_status { size: 11.5; weight: 600; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert); family: "Space Grotesk" }
-                }
-                ellipse { at: pcl + pcw - 30 * u, pct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * pr_x_z.hover }
-                HUi(k: 10, cx: pcl + pcw - 30 * u, cy: pct + 28 * u, c: mix(faint, ink, pr_x_z.hover), a: 1, s: 511, f: if(pr_x_z.hover > 0.5, fr, 0), z: 0.62)
-                zone box pr_x_z { at: pcl + pcw - 30 * u, pct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
-                on press pr_x_z { pr_open = false }
-                //  the picture: the model's cover, or the camera (live, a frame every two seconds; a click on it opens it full size in the browser)
-                let pis = 140 * u
-                let pix = pcl + 20 * u
-                let piy = pct + 84 * u
-                box { from: pix, piy; size: pis, pis; corner: 14 * u; color: ink; opacity: 6% }
-                HUi(k: 11, cx: pix + pis / 2, cy: piy + pis / 2, c: faint, a: if(pr_has_pic, 0, 0.6), s: 521, f: 0, z: 1.45)
-                group {
-                    clip box { from: pix, piy; size: pis, pis; corner: 14 * u }
-                    for p in pr_pic { image p.img { at: pix, piy; size: pis, pis; fit: cover; show: pr_has_pic } }
-                }
-                group {
-                    show: pr_cam and pr_has_pic
-                    box { from: pix + 8 * u, piy + pis - 30 * u; size: 70 * u, 22 * u; corner: 11 * u; color: deep; opacity: 75% }
-                    ellipse { at: pix + 20 * u, piy + pis - 19 * u; radius: 3.5 * u; color: alert }
-                    text t_live { at: pix + 29 * u, piy + pis - 19 * u; anchor: left center; size: 10; weight: 700; color: ink; family: "Space Grotesk" }
-                    ellipse { at: pix + pis - 19 * u, piy + 19 * u; radius: 12 * u; color: deep; opacity: 60% + 20% * pr_pic_z.hover }
-                    HUi(k: 12, cx: pix + pis - 19 * u, cy: piy + 19 * u, c: ink, a: 1, s: 531, f: if(pr_pic_z.hover > 0.5, fr, 0), z: 0.52)
-                }
-                zone box pr_pic_z { from: pix, piy; size: pis, pis; corner: 14 * u; cursor: pointer; active: pr_cam and pr_has_pic; label: t_open_cam }
-                on press pr_pic_z { emit pr_act(4) }
-                //  beside it: the progress, its bar, the time left, when it started and when it ends
-                let prx = pix + pis + 18 * u
-                let prw = pcl + pcw - 20 * u - prx
-                text t_progress { at: prx, piy + 8 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
-                text pr_pct { at: prx, piy + 34 * u; anchor: left center; size: 30; weight: 700; color: ink; family: "Space Grotesk" }
-                box { from: prx, piy + 58 * u; size: prw, 6 * u; corner: 3 * u; color: ink; opacity: 10% }
-                body {
-                    gradient: prx, piy to prx + prw, piy, mintlo, minthi
-                    shadow: 0, 0, 8 * u * plit, 30%, mint
-                    box { from: prx, piy + 58 * u; size: max(6 * u, prw * pr_progs), 6 * u; corner: 3 * u }
-                }
-                HUi(k: 13, cx: prx + 8 * u, cy: piy + 90 * u, c: faint, a: 1, s: 541, f: 0, z: 0.6)
-                text pr_left { at: prx + 24 * u, piy + 90 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                HUi(k: 14, cx: prx + 8 * u, cy: piy + 114 * u, c: faint, a: 1, s: 551, f: 0, z: 0.6)
-                text pr_start { at: prx + 24 * u, piy + 114 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                HUi(k: 15, cx: prx + 8 * u, cy: piy + 138 * u, c: faint, a: 1, s: 561, f: 0, z: 0.6)
-                text pr_end { at: prx + 24 * u, piy + 138 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
-                //  the buttons: pause or resume, stop (pressed twice: the first asks), and the camera
-                let pbw = (pcw - 40 * u - 2 * 8 * u) / 3
-                let pby = pct + pch - 54 * u
-                let pb0 = pr_has_btn and (pr_st == 1 or pr_st == 2)
-                let pb1 = pr_has_btn and (pr_st == 1 or pr_st == 2 or pr_st == 5)
-                repeat i in 0..3 {
-                    let bx = pcl + 20 * u + i * (pbw + 8 * u)
-                    let on = pick(i, if(pb0, 1, 0), if(pb1, 1, 0), if(pr_has_cam, 1, 0))
-                    let hot = pick(i, 0, if(pr_arm, 1, 0), if(pr_cam, 1, 0))      // filled: stop armed (red), the camera on (the accent)
+                    opacity: en2 * st_k
+                    show: st_k > 0.01
+                    move: 0, (1 - st_k) * 10 * u
+                    let stw = W - 28 * u
+                    //  the tabs (the theme's lit piece under the chosen one), or, on an entity or a room, the way back and its title
                     group {
-                        opacity: if(on > 0.5, 100%, 35%)
-                        box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: ink; opacity: (8% + 8% * pr_b_z.$i.hover) * (1 - hot) }
-                        box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: if(i == 1, alert, mint); opacity: 90% * hot }
-                        //  the icon and the word, each centred on the button's middle line by itself (a row would centre the icon font's tall line box, not its
-                        //  glyph, and the pair came out low), and side by side centred as one: the word's width is measured
-                        let lw = pbm.$i.width
-                        let gx0 = bx + pbw / 2 - (lw + 23 * u) / 2
-                        HUi(k: pick(i + 3 * if(pr_st == 2, 1, 0), 16, 17, 18, 19, 17, 18), cx: gx0 + 8.5 * u, cy: pby + 18 * u, c: if(hot > 0.5, onmint, if(i == 1, alert, ink)), a: 1, s: 571 + i * 10, f: if(pr_b_z.$i.hover > 0.5, fr, 0), z: 0.62)
-                        text pick(i, t_b0, t_b1, t_b2) { at: gx0 + 23 * u, pby + 18 * u; anchor: left center; size: 12.5; weight: 700; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); measure: pbm.$i; family: "Space Grotesk" }
-                        zone box pr_b_z.$i { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; cursor: pointer; active: on > 0.5; label: pick(i, "{t_pause} / {t_resume}", "{t_stop}", "{t_camera}") }
-                    }
-                }
-                on press pr_b_z.0 { emit pr_act(if(pr_st == 2, 1, 0)) }
-                on press pr_b_z.1 while pr_arm { emit pr_act(2); pr_arm = false }
-                on press pr_b_z.1 while not pr_arm { pr_arm = true }
-                on press pr_b_z.2 { toggle pr_cam }
-            }
-
-            //  ── an Apple TV's card: over the panel like the others, shut by a click outside it, its X, a right click or Escape ──
-            group {
-                opacity: tv_k
-                show: tv_k > 0.01
-                //  all of it a little smaller when the panel is not tall enough for it (`v` is its `u`)
-                //  how tall it is: with the remote's tab, without it (no remote), or a speaker's (no tabs, a volume row under the buttons)
-                let tvh = if(tv_spk, 332, (mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)))
-                let tsc = min(1, (H - 16 * u) / (tvh * u))
-                let v = u * tsc
-                let tcw = min(W - 28 * u, 460 * v)
-                let tch = tvh * v
-                let tcl = (W - tcw) / 2
-                let tct = (H - tch) / 2 + 10 * v * (1 - tv_k)
-                let tlit = if(tv_st == 2, 1, 0)
-                let tv_gm = 14 * 1.5525
-                let tv_gt = 38 * 1.5525
-                let tv_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
-                box { from: -tv_gm, -tv_gt; size: W + 2 * tv_gm, H + tv_gt + tv_gm; corner: tv_gr; color: deep; opacity: 45% }
-                zone box tv_scrim_z { from: -tv_gm, -tv_gt; size: W + 2 * tv_gm, H + tv_gt + tv_gm; corner: tv_gr }
-                on press tv_scrim_z { tv_open = false }
-                on press right tv_scrim_z { tv_open = false }
-                body {
-                    color: card
-                    shadow: 0, 10 * v, 30 * v, 45%, deep
-                    rim: 10%
-                    box { from: tcl, tct; size: tcw, tch; corner: 20 * v }
-                }
-                zone box tv_card_z { from: tcl, tct; size: tcw, tch; corner: 20 * v }
-                on press right tv_card_z { tv_open = false }
-                on scroll tv_card_z while tv_spk { tv_vol = clamp(tv_vol + wheel * 0.05, 0, 1); tv_vdirty = true }
-                //  a pause in the moving sends it too, so the speaker follows the finger without a request per frame
-                on still tv_vol for 280ms while tv_open and tv_vdirty { emit tv_vol(tv_vol); tv_vdirty = false }
-                //  the head: its disc (lit while it plays), its name, how it is and in which app, the power and the X
-                body {
-                    color: mix(off, mint, tlit)
-                    shadow: 0, 0, 10 * v * tlit, 45%, mint
-                    rim: 16%
-                    ellipse { at: tcl + 42 * v, tct + 42 * v; radius: 20 * v }
-                }
-                group {
-                    show: not tv_custom and tv_pk >= 0
-                    PIcon(k: max(tv_pk, 0), cx: tcl + 42 * v, cy: tct + 42 * v, lit: 0, c: mix(ink, onmint, tlit), a: 1, s: 25, f: fr * tlit, z: 0.8 * tsc)
-                }
-                for r in hl_items {
-                    image r.img { at: tcl + 31 * v, tct + 31 * v; size: 22 * v, 22 * v; tint: mix(ink, onmint, tlit); show: tv_custom and r.index == tv_i }
-                }
-                group {
-                    show: tv_dk >= 0
-                    HDev(k: max(tv_dk, 0), cx: tcl + 42 * v, cy: tct + 42 * v, c: mix(ink, onmint, tlit), a: 1, s: 601, f: fr * tlit, z: 0.92 * tsc)
-                }
-                text tv_name { at: tcl + 72 * v, tct + 33 * v; anchor: left center; size: 15 * tsc; weight: 700; width: tcw - 170 * v; lines: 1; color: ink; family: "Space Grotesk" }
-                row {
-                    at: tcl + 72 * v, tct + 46 * v
-                    gap: 6 * v
-                    align: center
-                    ellipse { radius: 3.5 * v; color: pick(tv_st, faint, ink, mint, ink) }
-                    text tv_status { size: 11.5 * tsc; weight: 600; width: tcw - 170 * v; lines: 1; color: pick(tv_st, faint, ink, mint, ink); family: "Space Grotesk" }
-                }
-                //  (a speaker has none: a DLNA renderer is not switched on or off)
-                group {
-                    show: not tv_spk
-                    body {
-                        color: mix(ink, mint, if(tv_st > 0, 1, 0))
-                        opacity: if(tv_st > 0, 90%, 8% + 10% * tv_pw_z.hover)
-                        ellipse { at: tcl + tcw - 64 * v, tct + 28 * v; radius: 13 * v }
-                    }
-                    HUi(k: 20, cx: tcl + tcw - 64 * v, cy: tct + 28 * v, c: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)), a: 1, s: 611, f: if(tv_pw_z.hover > 0.5, fr, 0), z: 0.6 * tsc)
-                    zone box tv_pw_z { at: tcl + tcw - 64 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
-                }
-                on press tv_pw_z { emit tv_cmd(10) }
-                ellipse { at: tcl + tcw - 30 * v, tct + 28 * v; radius: 13 * v; color: ink; opacity: 8% + 10% * tv_x_z.hover }
-                HUi(k: 10, cx: tcl + tcw - 30 * v, cy: tct + 28 * v, c: mix(faint, ink, tv_x_z.hover), a: 1, s: 621, f: if(tv_x_z.hover > 0.5, fr, 0), z: 0.62 * tsc)
-                zone box tv_x_z { at: tcl + tcw - 30 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_close }
-                on press tv_x_z { tv_open = false }
-                on key Escape while tv_open { tv_open = false }
-                //  the tabs: what is playing, and the remote (only with a remote entity)
-                let tbw = (tcw - 40 * v) / 2
-                group {
-                    show: tv_has_rm
-                    box { from: tcl + 20 * v, tct + 78 * v; size: tcw - 40 * v, 32 * v; corner: 16 * v; color: ink; opacity: 7% }
-                    //  the lit piece under the chosen tab: the theme's (a glowing pill, or the Proxy theme's slanted slab), sliding between the two
-                    PThumb(x: tcl + 20 * v + tbw / 2 + tv_tk * tbw, y: tct + 94 * v, w: tbw - 6 * v, h: 26 * v, rad: 13 * v, th: 32 * v, a: 1)
-                    repeat i in 0..2 {
-                        HUi(k: pick(i, 14, 21), cx: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 - 2 * v, cy: tct + 94 * v, c: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)), a: 1, s: 631 + i * 10, f: 0, z: 0.58 * tsc)
-                        text pick(i, t_tab0, t_tab1) { at: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 + 10 * v, tct + 94 * v; anchor: left center; size: 12.5 * tsc; weight: 700; color: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)); measure: tbm.$i; family: "Space Grotesk" }
-                        zone box tv_tab_z.$i { from: tcl + 20 * v + i * tbw, tct + 78 * v; size: tbw, 32 * v; corner: 16 * v; cursor: pointer; label: pick(i, t_tab0, t_tab1); role: tab; selected: tv_tab == i }
-                    }
-                    on press tv_tab_z.0 { tv_tab = 0 }
-                    on press tv_tab_z.1 { tv_tab = 1 }
-                }
-                let cy0 = tct + if(tv_has_rm, 124, 80) * v
-                //  ── what is playing ──
-                group {
-                    opacity: 1 - tv_tk
-                    show: tv_tk < 0.99
-                    let as = 116 * v
-                    let ax = tcl + 20 * v
-                    box { from: ax, cy0; size: as, as; corner: 14 * v; color: ink; opacity: 6% }
-                    //  no artwork (many apps give the Apple TV none, and Home Assistant has none to give): the app's name on a wash of the accent instead
-                    group {
-                        show: not tv_has_pic
-                        body {
-                            gradient: ax, cy0 to ax + as, cy0 + as, mix(card, mint, 0.28), mix(card, mint, 0.06)
-                            rim: 10%
-                            box { from: ax, cy0; size: as, as; corner: 14 * v }
+                        show: st_page == 0
+                        let tbw2 = stw / 2
+                        box { from: 14 * u, 62 * u; size: stw, 32 * u; corner: 16 * u; color: ink; opacity: 7% }
+                        PThumb(x: 14 * u + tbw2 / 2 + st_tk * tbw2, y: 78 * u, w: tbw2 - 6 * u, h: 26 * u, rad: 13 * u, th: 32 * u, a: 1)
+                        repeat i in 0..2 {
+                            text pick(i, t_st_settings, t_st_entities) { at: 14 * u + i * tbw2 + tbw2 / 2, 78 * u; anchor: center; size: 12.5; weight: 700; color: mix(faint, onmint, clamp(1 - abs(st_tk - i), 0, 1)); family: "Space Grotesk" }
+                            zone box st_tab_z.$i { from: 14 * u + i * tbw2, 62 * u; size: tbw2, 32 * u; corner: 16 * u; cursor: pointer; label: pick(i, t_st_settings, t_st_entities); role: tab; selected: st_tab == i }
                         }
-                        HUi(k: 22, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_has_appic or tv_spk, 0, 0.85), s: 651, f: 0, z: 1.1 * tsc)
-                        //  (a speaker's: the pencil speaker)
-                        HDev(k: 8, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_spk and not tv_has_appic, 0.85, 0), s: 656, f: 0, z: 1.6 * tsc)
-                        //  the app's icon, rounded as on the Apple TV's home screen
-                        group {
-                            show: tv_has_appic
-                            clip box { from: ax + as / 2 - 28 * v, cy0 + as / 2 - 44 * v; size: 56 * v, 56 * v; corner: 13 * v }
-                            for p in tv_appic { image p.img { at: ax + as / 2 - 28 * v, cy0 + as / 2 - 44 * v; size: 56 * v, 56 * v; fit: cover } }
-                        }
-                        text tv_app { at: ax + as / 2, cy0 + as / 2 + if(tv_has_appic, 30, 20) * v; anchor: center; size: 14 * tsc; weight: 700; width: as - 16 * v; lines: 1; align: center; color: ink; show: tv_app_on; family: "Space Grotesk" }
+                        on press st_tab_z.0 { st_tab = 0 }
+                        on press st_tab_z.1 { st_tab = 1 }
                     }
                     group {
-                        clip box { from: ax, cy0; size: as, as; corner: 14 * v }
-                        for p in tv_pic { image p.img { at: ax, cy0; size: as, as; fit: cover; show: tv_has_pic } }
+                        show: st_page > 0
+                        ellipse { at: 30 * u, 78 * u; radius: 15 * u; color: ink; opacity: 8% + 10% * st_back_z.hover }
+                        HUi(k: 27, cx: 30 * u, cy: 78 * u, c: mix(ink, mint, st_back_z.hover), a: 1, s: 801, f: if(st_back_z.hover > 0.5, fr, 0), z: 0.62)
+                        zone box st_back_z { at: 30 * u, 78 * u; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: t_st_back }
+                        on press st_back_z { emit st_back }
+                        text st_title { at: 54 * u, 78 * u; anchor: left center; size: 15; weight: 700; width: W - 80 * u; lines: 1; color: ink; family: "Space Grotesk" }
                     }
-                    let mx = ax + as + 18 * v
-                    let mw = tcl + tcw - 20 * v - mx
-                    text tv_title { at: mx, cy0 + 4 * v; anchor: left top; size: 16 * tsc; weight: 700; width: mw; lines: 2; color: ink; family: "Space Grotesk" }
-                    text tv_sub { at: mx, cy0 + 62 * v; anchor: left center; size: 12.5 * tsc; weight: 600; width: mw; lines: 1; color: faint; family: "Space Grotesk" }
+                    //  the page: one list that scrolls, everything in it placed by the logic
+                    let stv = max(H - 104 * u - 10 * u, 1)
+                    let st_most = max(0, st_content * u - stv)
+                    //  (above the placed field, and below it: the field itself is left to the shell)
+                    let fld_t = clamp(104 * u + (st_fy + 18) * u - st_sp, 104 * u, 104 * u + stv)
+                    let fld_b = clamp(fld_t + 38 * u, 104 * u, 104 * u + stv)
+                    zone box st_view_z { from: 0, 104 * u; size: W, if(st_fa >= 0, fld_t - 104 * u, stv) }
+                    zone box st_view_b { from: 0, fld_b; size: W, 104 * u + stv - fld_b; active: st_fa >= 0 }
+                    on scroll st_view_z { st_sp: clamp(st_sp - wheel * 60 * u, 0, st_most) }
+                    on scroll st_view_b { st_sp: clamp(st_sp - wheel * 60 * u, 0, st_most) }
+                    box { from: W - 7 * u, 104 * u + st_sp / max(st_content * u, 1) * stv; size: 3 * u, stv * stv / max(st_content * u, stv); corner: 1.5 * u; color: ink; opacity: if(st_most > 0.5, 25%, 0%) }
                     group {
-                        show: tv_has_prog
-                        box { from: mx, cy0 + as - 28 * v; size: mw, 5 * v; corner: 2.5 * v; color: ink; opacity: 10% }
-                        body {
-                            gradient: mx, cy0 to mx + mw, cy0, mintlo, minthi
-                            shadow: 0, 0, 8 * v * tlit, 30%, mint
-                            box { from: mx, cy0 + as - 28 * v; size: max(5 * v, mw * tv_progs), 5 * v; corner: 2.5 * v }
-                        }
-                        //  a click on the bar goes there (a little taller than the bar, so it is easy to hit); it thickens under the pointer
-                        box { from: mx, cy0 + as - 29 * v; size: mw, 7 * v; corner: 3.5 * v; color: ink; opacity: 8% * tv_sk_z.hover }
-                        zone box tv_sk_z { from: mx - 4 * v, cy0 + as - 40 * v; size: mw + 8 * v, 28 * v; corner: 8 * v; cursor: pointer; active: tv_st >= 2 and tv_tk < 0.5; label: t_progress; role: slider; value: "{tv_pos}" }
-                        on press tv_sk_z { tv_prog = clamp((local.x - mx) / mw, 0, 1); emit tv_seek(clamp((local.x - mx) / mw, 0, 1)) }
-                        text tv_pos { at: mx, cy0 + as - 8 * v; anchor: left center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
-                        text tv_rem { at: mx + mw, cy0 + as - 8 * v; anchor: right center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
-                    }
-                    //  the transport: volume down, previous, play/pause (lit), next, volume up; a speaker's only play/pause and next (its volume is the slider below)
-                    let ty0 = cy0 + as + 44 * v
-                    repeat i in 0..5 {
-                        let bx = tcl + tcw / 2 + if(tv_spk, pick(i, 0, 0, -38, 38, 0), (i - 2) * 70) * v
-                        let code = pick(i, 9, 11, 7, 12, 8)
-                        let big = if(i == 2, 1, 0)
-                        let live = if(i == 0 or i == 4 or tv_st > 0, 1, 0)
-                        group {
-                            show: not tv_spk or i == 2 or i == 3
-                            opacity: if(live > 0.5, 100%, 35%)
-                            ellipse { at: bx, ty0; radius: 21 * v; color: ink; opacity: if(tv_fl == code, 24%, 8% + 8% * tv_m_z.$i.hover) * (1 - big) }
-                            body {
-                                color: mint
-                                shadow: 0, 0, 12 * v, 35% + 15% * tv_m_z.$i.hover, mint
-                                rim: 16%
-                                opacity: big
-                                ellipse { at: bx, ty0; radius: (27 + if(tv_fl == 7, -2, 1) * tv_m_z.$i.hover) * v }
+                      clip box { from: 0, 104 * u; size: W, stv }
+                      group {
+                        move: 0, 104 * u - st_sp
+                        //  the rows
+                        for r in st_rows {
+                            let rx = 14 * u + r.x * u
+                            let ry = r.y * u
+                            let rw = if(r.w > 0, r.w * u, stw)
+                            let rh = r.h * u
+                            let act = if(r.index == st_fa, 1, 0)
+                            //  a section's title
+                            text r.label { at: rx + 2 * u, ry + rh / 2; anchor: left center; size: 11.5; weight: 700; color: mint; show: r.kind == 0; family: "Space Grotesk" }
+                            //  a note
+                            text r.label { at: rx + 2 * u, ry; anchor: left top; size: 11; weight: 500; width: rw - 4 * u; lines: 3; color: faint; show: r.kind == 4; family: "Space Grotesk" }
+                            //  a field: its label above, its box, what it says (or its placeholder); the one the shell's field is on shows the text being written, and a caret
+                            group {
+                                show: r.kind == 1
+                                text r.label { at: rx + 2 * u, ry + 8 * u; anchor: left center; size: 11.5; weight: 600; width: rw; lines: 1; color: faint; family: "Space Grotesk" }
+                                box { from: rx, ry + 18 * u; size: rw, 38 * u; corner: 12 * u; color: ink; opacity: 7% + 4% * st_fz.hover + 5% * act }
+                                PRound(x: rx + 1.6 * u, y: ry + 19.6 * u, w: rw - 3.2 * u, h: 34.8 * u, r: 10.5 * u, s: 900 + r.index, wd: 1.3 * u, c: mix(faint, mint, act), a: 0.3 + 0.5 * act, f: if(act > 0.5 and field_kb, fr, 0))
+                                text r.val { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: ink; show: act < 0.5 and r.on > 0.5; family: "Space Grotesk" }
+                                text r.ph { at: rx + 14 * u, ry + 37 * u; anchor: left center; size: 13.5; weight: 500; width: rw - 28 * u; lines: 1; color: faint; opacity: 60%; show: r.on < 0.5 and (act < 0.5 or not st_fvon); family: "Space Grotesk" }
                             }
-                            HUi(k: pick(i + if(i == 2 and tv_st == 2, 3, 0), 23, 24, 19, 25, 26, 16), cx: bx, cy: ty0, c: if(big > 0.5, onmint, ink), a: 1, s: 661 + i * 10, f: if(tv_m_z.$i.hover > 0.5, fr, 0), z: (22 + 8 * big) / 26 * tsc)
-                            zone box tv_m_z.$i { at: bx, ty0; size: (44 + 12 * big) * v, (44 + 12 * big) * v; corner: (22 + 6 * big) * v; cursor: pointer; active: live > 0.5 and tv_tk < 0.5; label: pick(i, t_voldown, t_prev, t_playpause, t_next, t_volup) }
+                            //  (the field's label and a margin round it too: the shell's field is put there while the pointer is still on its way, so it is already the shell's
+                            //  when the pointer reaches the box and stops; a compositor only finds what is under a pointer when it moves)
+                            zone box st_fz { from: rx - 6 * u, ry - 3 * u; size: rw + 12 * u, 62 * u; corner: 12 * u; cursor: pointer; active: r.kind == 1 and act < 0.5 and st_k > 0.9; label: "{r.label}" }
+                            on enter st_fz while not field_kb { emit st_fld(r.index) }
+                            on press st_fz { emit st_fld(r.index) }
+                            //  a suggestion under a field: what Home Assistant calls it, and its id
+                            group {
+                                show: r.kind == 5
+                                box { from: rx, ry; size: rw, rh - 2 * u; corner: 10 * u; color: mix(ink, mint, st_sg_z.hover); opacity: 5% + 8% * st_sg_z.hover }
+                                text r.label { at: rx + 12 * u, ry + rh / 2 - 7 * u; anchor: left center; size: 12.5; weight: 600; width: rw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                                text r.sub { at: rx + 12 * u, ry + rh / 2 + 8 * u; anchor: left center; size: 10.5; weight: 500; width: rw - 24 * u; lines: 1; color: faint; family: "Space Grotesk" }
+                            }
+                            zone box st_sg_z { from: rx, ry; size: rw, rh - 2 * u; corner: 10 * u; cursor: pointer; active: r.kind == 5 and st_k > 0.9; label: "{r.label}" }
+                            on press st_sg_z { emit st_do(r.index) }
+                            //  a button: a pill, plain, in the accent, or for deleting (red, filled once it asks again)
+                            group {
+                                show: r.kind == 6
+                                let lit = if(r.tone == 1, 1, 0)
+                                box { from: rx, ry; size: rw, rh; corner: rh / 2; color: if(r.tone >= 2, alert, ink); opacity: if(r.tone == 0, 9% + 9% * st_bt_z.hover, if(r.tone == 2, 12% + 10% * st_bt_z.hover, 0%)) }
+                                body {
+                                    color: if(r.tone == 3, alert, mint)
+                                    opacity: if(r.tone == 1 or r.tone == 3, 100%, 0%)
+                                    shadow: 0, 0, 10 * u * lit, 30% + 15% * st_bt_z.hover, mint
+                                    rim: 16%
+                                    box { from: rx, ry; size: rw, rh; corner: rh / 2 }
+                                }
+                                text r.label { at: rx + rw / 2, ry + rh / 2; anchor: center; size: 12.5; weight: 700; width: rw - 16 * u; lines: 1; align: center; color: if(r.tone == 1 or r.tone == 3, onmint, if(r.tone == 2, alert, mix(ink, mint, st_bt_z.hover))); family: "Space Grotesk" }
+                            }
+                            zone box st_bt_z { from: rx, ry; size: rw, rh; corner: rh / 2; cursor: pointer; active: r.kind == 6 and st_k > 0.9; label: "{r.label}" }
+                            on press st_bt_z { emit st_do(r.index) }
                         }
-                        on press tv_m_z.$i { emit tv_cmd(code); tv_fl = code }
-                    }
-                    //  a speaker's volume: the Control Center's slider between a quieter and a louder speaker, each a nudge of 5 %; the wheel anywhere on the card too
-                    group {
-                        show: tv_spk
-                        let vy = ty0 + 54 * v
-                        let vl = tcl + 62 * v
-                        let vw = tcw - 124 * v
-                        repeat j in 0..2 {
-                            let vx = if(j == 0, tcl + 34 * v, tcl + tcw - 34 * v)
-                            ellipse { at: vx, vy; radius: 16 * v; color: ink; opacity: if(tv_fl == 30 + j, 22%, 6% + 8% * tv_vb_z.$j.hover) }
-                            HUi(k: pick(j, 23, 26), cx: vx, cy: vy, c: mix(faint, ink, tv_vb_z.$j.hover), a: 1, s: 781 + j * 10, f: if(tv_vb_z.$j.hover > 0.5, fr, 0), z: 0.7 * tsc)
-                            zone box tv_vb_z.$j { at: vx, vy; size: 32 * v, 32 * v; corner: 16 * v; cursor: pointer; label: pick(j, t_voldown, t_volup) }
-                            on press tv_vb_z.$j { tv_vol = clamp(tv_vol + pick(j, -0.05, 0.05), 0, 1); tv_fl = 30 + j; emit tv_vol(tv_vol) }
+                        //  the switches: a name, and the Control Center's switch at the right; the whole row is the button
+                        for w in st_sws {
+                            let wy = w.y * u
+                            box { from: 14 * u, wy; size: stw, 40 * u; corner: 12 * u; color: ink; opacity: 4% * st_sw_z.hover }
+                            text w.label { at: 16 * u, wy + 20 * u; anchor: left center; size: 13; weight: 600; width: stw - 60 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                            PSwitch(sx: W - 35 * u, sy: wy + 20 * u, on: if(w.on > 0.5, 1, 0), av: 1, s: 950 + w.index, f: if(st_sw_z.hover > 0.5, fr, 0))
+                            zone box st_sw_z { from: 14 * u, wy; size: stw, 40 * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; label: "{w.label}"; role: toggle; checked: w.on > 0.5 }
+                            on press st_sw_z { emit st_sw(w.index) }
                         }
-                        PSlider(x0: vl, y: vy, w: vw, lv: tv_vols, h: 14 * v, f: if(tv_vt_z.hover > 0.5 or tv_vdirty, fr, 0))
-                        zone box tv_vt_z { from: vl - 6 * v, vy - 18 * v; size: vw + 12 * v, 36 * v; corner: 18 * v; cursor: pointer; label: "{t_volume}: {tv_name}"; role: slider; value: "{tv_vols * 100} %" }
-                        on press tv_vt_z { tv_vol = clamp((local.x - vl) / vw, 0, 1); tv_vdirty = true }
-                        on drag tv_vt_z { tv_vol = clamp((local.x - vl) / vw, 0, 1); tv_vdirty = true }
-                        on release tv_vt_z { emit tv_vol(tv_vol); tv_vdirty = false }
-                        on scroll tv_vt_z { tv_vol = clamp(tv_vol + wheel * 0.05, 0, 1); tv_vdirty = true }
+                        //  the text being written in the field the shell's field is on, measured for the caret
+                        group {
+                            show: st_fa >= 0
+                            text st_fv { at: 14 * u + st_fx * u + 14 * u, st_fy * u + 37 * u; anchor: left center; size: 13.5; weight: 500; width: st_fw * u - 28 * u; lines: 1; color: ink; measure: stf; family: "Space Grotesk" }
+                            box { from: 14 * u + st_fx * u + 15 * u + min(stf.width, st_fw * u - 30 * u), st_fy * u + 28 * u; size: 2 * u, 18 * u; color: mint; opacity: if(field_kb, 1, 0) * (0.55 + 0.45 * sin(hl_clk * 6)) }
+                        }
+                        //  a choice among a few (the language, a tile's kind, its room, a printer): the theme's lit piece under the chosen one
+                        for c in st_chips {
+                            let chx = 14 * u + c.x * u
+                            let chy = c.y * u
+                            let chw = c.w * u
+                            box { from: chx, chy; size: chw, 30 * u; corner: 15 * u; color: ink; opacity: if(c.sel > 0.5, 0%, 8% + 8% * st_ch_z.hover) }
+                            group {
+                                show: c.sel > 0.5
+                                PThumb(x: chx + chw / 2, y: chy + 15 * u, w: chw, h: 30 * u, rad: 15 * u, th: 30 * u, a: 1)
+                            }
+                            text c.label { at: chx + chw / 2, chy + 15 * u; anchor: center; size: 12; weight: 700; width: chw - 10 * u; lines: 1; align: center; color: if(c.sel > 0.5, onmint, mix(ink, mint, st_ch_z.hover)); family: "Space Grotesk" }
+                            zone box st_ch_z { from: chx, chy; size: chw, 30 * u; corner: 15 * u; cursor: pointer; active: st_k > 0.9; label: "{c.label}"; role: tab; selected: c.sel > 0.5 }
+                            on press st_ch_z { emit st_chip(c.index) }
+                        }
+                        //  the icons to choose from: the pencil's and the add-on's own
+                        for c in st_icons {
+                            let icx = 14 * u + c.x * u
+                            let icy = c.y * u
+                            box { from: icx, icy; size: 44 * u, 44 * u; corner: 12 * u; color: if(c.sel > 0.5, mint, ink); opacity: if(c.sel > 0.5, 18%, 6% + 8% * st_ic_z.hover) }
+                            group {
+                                show: c.sel > 0.5
+                                PRound(x: icx + 1.5 * u, y: icy + 1.5 * u, w: 41 * u, h: 41 * u, r: 10.5 * u, s: 1000 + c.index, wd: 1.4 * u, c: mint, a: 0.8, f: 0)
+                            }
+                            group {
+                                show: c.pk >= 0
+                                PIcon(k: max(c.pk, 0), cx: icx + 22 * u, cy: icy + 22 * u, lit: 0, c: if(c.sel > 0.5, mint, ink), a: 1, s: 1100 + c.index * 7, f: if(st_ic_z.hover > 0.5, fr, 0), z: 0.8)
+                            }
+                            group {
+                                show: c.dk >= 0
+                                HDev(k: max(c.dk, 0), cx: icx + 22 * u, cy: icy + 22 * u, c: if(c.sel > 0.5, mint, ink), a: 1, s: 1200 + c.index * 7, f: if(st_ic_z.hover > 0.5, fr, 0), z: 0.95)
+                            }
+                            zone box st_ic_z { from: icx, icy; size: 44 * u, 44 * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; role: tab; selected: c.sel > 0.5 }
+                            on press st_ic_z { emit st_icon(c.index) }
+                        }
+                        //  the entities' list: a room's head, and its tiles (each opened to edit with a click)
+                        for e in st_ents {
+                            let ey = e.y * u
+                            group {
+                                show: e.kind == 0
+                                text e.name { at: 16 * u, ey + 17 * u; anchor: left center; size: 14.5; weight: 700; width: stw - 60 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                                text e.sub { at: 16 * u, ey + 33 * u; anchor: left center; size: 10.5; weight: 500; width: stw - 60 * u; lines: 1; color: faint; family: "Space Grotesk" }
+                            }
+                            group {
+                                show: e.kind == 1
+                                box { from: 14 * u, ey; size: stw, 48 * u; corner: 12 * u; color: ink; opacity: 6% + 6% * st_en_z.hover }
+                                PIcon(k: max(e.pk, 0), cx: 38 * u, cy: ey + 24 * u, lit: 0, c: mix(ink, mint, st_en_z.hover), a: 1, s: 1300 + e.index * 7, f: if(st_en_z.hover > 0.5, fr, 0), z: 0.72)
+                                text e.name { at: 62 * u, ey + 16 * u; anchor: left center; size: 13; weight: 700; width: stw - 100 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                                text e.sub { at: 62 * u, ey + 33 * u; anchor: left center; size: 10.5; weight: 500; width: stw - 100 * u; lines: 1; color: faint; family: "Space Grotesk" }
+                            }
+                            let chy2 = ey + if(e.kind == 0, 21, 24) * u
+                            PLn(ax: W - 38 * u, ay: chy2 - 6 * u, bx: W - 32 * u, by: chy2, s: 1400 + e.index, wd: 1.8 * u, c: mix(faint, mint, st_en_z.hover), a: 1, f: if(st_en_z.hover > 0.5, fr, 0))
+                            PLn(ax: W - 32 * u, ay: chy2, bx: W - 38 * u, by: chy2 + 6 * u, s: 1450 + e.index, wd: 1.8 * u, c: mix(faint, mint, st_en_z.hover), a: 1, f: if(st_en_z.hover > 0.5, fr, 0))
+                            zone box st_en_z { from: 14 * u, ey; size: stw, if(e.kind == 0, 42, 48) * u; corner: 12 * u; cursor: pointer; active: st_k > 0.9; label: "{e.name}" }
+                            on press st_en_z { emit st_ent(e.index) }
+                        }
+                      }
                     }
                 }
-                //  ── the remote: laid out as the Siri Remote, on its side: the clickpad, and beside it its buttons in two columns (back and TV, play/pause and
-                //  the volume's rocker, mute under them) ──
+                //  ── the brightness slider: a card over the panel, which a click outside it, its X or a right click shuts ──
                 group {
-                    opacity: tv_tk
-                    show: tv_tk > 0.01 and tv_has_rm
-                    let qr = 80 * v
-                    let rl = tcl + tcw / 2 - 149 * v
-                    let qx = rl + qr
-                    let qy = cy0 + qr + 2 * v
-                    //  the clickpad: a dark round pad, its four edges and its middle; the wheel over it moves up and down
-                    zone box tv_pad_z { at: qx, qy; size: 2 * qr, 2 * qr; corner: qr }
+                    opacity: sl_k
+                    let cw = min(W - 40 * u, 400 * u)
+                    let ch = if(sl_col > 0.5, 298, 186) * u          // (taller with the colours)
+                    let cl = (W - cw) / 2
+                    let ct = (H - ch) / 2 + 10 * u * (1 - sl_k)
+                    let tl = cl + 22 * u
+                    let tw2 = cw - 44 * u
+                    let ty = ct + 98 * u
+                    let kx = tl + 17 * u + (tw2 - 34 * u) * sl_vs
+                    let lk = if(sl_tint > 0.5 and sl_ck > 0.5, 1, 0)      // the light's own colour, known, and asked for ("tint"): the disc and the track take it
+                    let ldark = if(lk > 0.5 and 0.3 * (1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1))) + 0.59 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1))) + 0.11 * (1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))) < 0.6, 1, 0)
+                    //  first the veil over the tiles, which shuts it (declared before the card, so the card's zones win over it)
+                    //  (over all of Vitreus's glass, not only the content: past it by the glass's margin at the sides and the foot (14) and the title bar on top (38),
+                    //  both in Vitreus's `cu`, 1.5525, with the glass's own corner, `rc`: 26, or 7 with the square themes, Retro and Cyber, times its `u`, 1.35)
+                    let sl_gm = 14 * 1.5525
+                    let sl_gt = 38 * 1.5525
+                    let sl_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
+                    box { from: -sl_gm, -sl_gt; size: W + 2 * sl_gm, H + sl_gt + sl_gm; corner: sl_gr; color: deep; opacity: 45% }
+                    zone box sl_scrim_z { from: -sl_gm, -sl_gt; size: W + 2 * sl_gm, H + sl_gt + sl_gm; corner: sl_gr }
+                    on press sl_scrim_z { sl_open = false }
+                    on press right sl_scrim_z { sl_open = false }
                     body {
-                        color: deep
-                        opacity: 70%
-                        rim: 8%
-                        ellipse { at: qx, qy; radius: qr }
-                    }
-                    repeat k in 0..4 {
-                        let ddx = pick(k, 0, 0, -1, 1)
-                        let ddy = pick(k, -1, 1, 0, 0)
-                        //  the edge, lit under the pointer and when pressed
-                        arc { at: qx, qy; radius: 56 * v; span: 48deg; width: 40 * v; rotate: pick(k, 0, 180, 270, 90) * 1deg; color: ink; opacity: if(tv_fl == k, 22%, 9% * tv_d_z.$k.hover) }
-                        ellipse { at: qx + ddx * 64 * v, qy + ddy * 64 * v; radius: 3 * v; color: ink; opacity: if(tv_fl == k, 100%, 40% + 40% * tv_d_z.$k.hover) }
-                        zone box tv_d_z.$k { from: pick(k, qx - 55 * v, qx - 55 * v, qx - qr, qx + 30 * v), pick(k, qy - qr, qy + 30 * v, qy - 45 * v, qy - 45 * v); size: pick(k, 110 * v, 110 * v, qr - 30 * v, qr - 30 * v), pick(k, qr - 30 * v, qr - 30 * v, 90 * v, 90 * v); cursor: pointer; active: tv_tk > 0.5; label: pick(k, t_up, t_down, t_left, t_right) }
-                    }
-                    repeat k in 0..4 {
-                        on press tv_d_z.$k { emit tv_cmd(k); tv_fl = k }
-                        on scroll tv_d_z.$k { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
-                    }
-                    on scroll tv_pad_z { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
-                    //  the middle: a click selects, held it is a long press
-                    body {
-                        color: ink
-                        opacity: if(tv_fl == 4 or tv_fl == 15, 26%, 10% + 6% * tv_ok_z.hover)
+                        color: card
+                        shadow: 0, 10 * u, 30 * u, 45%, deep
                         rim: 10%
-                        ellipse { at: qx, qy; radius: 29 * v }
+                        box { from: cl, ct; size: cw, ch; corner: 20 * u }
                     }
-                    zone box tv_ok_z { at: qx, qy; size: 58 * v, 58 * v; corner: 29 * v; cursor: pointer; label: t_select }
-                    on press tv_ok_z { tv_hd = false; tv_fl = 4 }
-                    on hold tv_ok_z for 600ms { tv_hd = true; tv_fl = 15; emit tv_cmd(15) }
-                    on release tv_ok_z while not tv_hd { emit tv_cmd(4) }
-                    on scroll tv_ok_z { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
-                    //  the buttons: first column back, play/pause, mute; second TV (held: the control centre) and the volume's rocker, + over −
-                    let ca = rl + 2 * qr + 36 * v + 22 * v
-                    let cb = ca + 58 * v
-                    repeat i in 0..4 {
-                        let bx = if(i == 1, cb, ca)
-                        let by = qy + pick(i, -54, -54, 0, 54) * v
-                        let code = pick(i, 5, 6, 7, 17)
-                        ellipse { at: bx, by; radius: 22 * v; color: ink; opacity: if(tv_fl == code or (i == 1 and tv_fl == 16), 26%, 10% + 8% * tv_r_z.$i.hover) }
-                        HUi(k: pick(i, 27, 28, 29, 30), cx: bx, cy: by, c: ink, a: 1, s: 711 + i * 10, f: if(tv_r_z.$i.hover > 0.5, fr, 0), z: 0.82 * tsc)
-                        zone box tv_r_z.$i { at: bx, by; size: 44 * v, 44 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_back, t_home, t_playpause, t_mute) }
+                    zone box sl_card_z { from: cl, ct; size: cw, ch; corner: 20 * u }
+                    on press right sl_card_z { sl_open = false }
+                    //  the light: its disc, its name, the value
+                    body {
+                        color: mix(off, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk), if(sl_vs > 0.004, 1, 0))
+                        shadow: 0, 0, 10 * u * if(sl_vs > 0.004, 1, 0), 45%, mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk)
+                        rim: 16%
+                        ellipse { at: cl + 42 * u, ct + 42 * u; radius: 20 * u }
                     }
-                    on press tv_r_z.0 { emit tv_cmd(5); tv_fl = 5 }
-                    on press tv_r_z.1 { tv_hd = false; tv_fl = 6 }
-                    on hold tv_r_z.1 for 600ms { tv_hd = true; tv_fl = 16; emit tv_cmd(16) }
-                    on release tv_r_z.1 while not tv_hd { emit tv_cmd(6) }
-                    on press tv_r_z.2 { emit tv_cmd(7); tv_fl = 7 }
-                    on press tv_r_z.3 { emit tv_cmd(17); tv_fl = 17 }
-                    box { from: cb - 22 * v, qy - 22 * v; size: 44 * v, 98 * v; corner: 22 * v; color: ink; opacity: 10% }
-                    repeat i in 0..2 {
-                        let code = pick(i, 8, 9)
-                        box { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; color: ink; opacity: if(tv_fl == code, 18%, 8% * tv_v_z.$i.hover) }
-                        HUi(k: pick(i, 31, 32), cx: cb, cy: qy + i * 54 * v, c: ink, a: 1, s: 761 + i * 10, f: if(tv_v_z.$i.hover > 0.5, fr, 0), z: 0.75 * tsc)
-                        zone box tv_v_z.$i { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_volup, t_voldown) }
-                        on press tv_v_z.$i { emit tv_cmd(code); tv_fl = code }
+                    group {
+                        show: not sl_custom and sl_pk >= 0
+                        PIcon(k: max(sl_pk, 0), cx: cl + 42 * u, cy: ct + 42 * u, lit: 0, c: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink), a: 1, s: 21, f: fr, z: 0.8)
                     }
-                    box { at: cb, qy + 27 * v; size: 22 * v, 1.5 * v; color: ink; opacity: 14% }
-                    text t_kb { at: tcl + tcw / 2, cy0 + 186 * v; anchor: center; size: 11 * tsc; weight: 600; width: tcw - 40 * v; lines: 1; align: center; color: faint; family: "Space Grotesk" }
+                    for r in hl_items {
+                        image r.img { at: cl + 31 * u, ct + 31 * u; size: 22 * u, 22 * u; tint: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink); show: sl_custom and r.index == sl_i }
+                    }
+                    group {
+                        show: sl_dk >= 0
+                        HDev(k: max(sl_dk, 0), cx: cl + 42 * u, cy: ct + 42 * u, c: if(sl_vs > 0.004 and ldark < 0.5, onmint, ink), a: 1, s: 481, f: fr, z: 0.92)
+                    }
+                    text sl_name { at: cl + 72 * u, ct + 34 * u; anchor: left center; size: 15; weight: 700; width: cw - 170 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                    text t_brightness { at: cl + 72 * u, ct + 53 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                    text number(sl_vs * 100, 0, " %") { at: cl + cw - 58 * u, ct + 42 * u; anchor: right center; size: 24; weight: 700; color: ink; family: "Space Grotesk" }
+                    ellipse { at: cl + cw - 30 * u, ct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * sl_x_z.hover }
+                    HUi(k: 10, cx: cl + cw - 30 * u, cy: ct + 28 * u, c: mix(faint, ink, sl_x_z.hover), a: 1, s: 491, f: if(sl_x_z.hover > 0.5, fr, 0), z: 0.62)
+                    zone box sl_x_z { at: cl + cw - 30 * u, ct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
+                    on press sl_x_z { sl_open = false }
+                    //  the track: the Control Center's slider, coloured in with the accent (or the light's colour); it boils under the pointer and while it is dragged
+                    PSliderTint(x0: tl, y: ty, w: tw2, lv: sl_vs, h: 18 * u, f: if(sl_tr_z.hover > 0.5 or sl_dirty, fr, 0), c: mix(mint, rgb(1 - 0.85 * sl_ss * (1 - clamp(abs(sl_hs * 6 - 3) - 1, 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 2), 0, 1)), 1 - 0.85 * sl_ss * (1 - clamp(2 - abs(sl_hs * 6 - 4), 0, 1))), lk))
+                    zone box sl_tr_z { from: tl - 6 * u, ty - 22 * u; size: tw2 + 12 * u, 44 * u; corner: 22 * u; cursor: pointer; label: "{t_brightness}: {sl_name}"; role: slider; value: "{sl_vs * 100} %" }
+                    on press sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
+                    on drag sl_tr_z { sl_v = clamp((local.x - tl) / tw2, 0, 1); sl_dirty = true }
+                    on scroll sl_card_z { sl_v = clamp(sl_v + wheel * 0.05, 0, 1); sl_dirty = true }
+                    on release sl_tr_z { emit hl_bri(sl_v); sl_dirty = false }
+                    //  a pause in the moving sends it too, so the light follows the finger without a request per frame
+                    on still sl_v for 280ms while sl_open and sl_dirty { emit hl_bri(sl_v); sl_dirty = false }
+                    //  the quick ones: off, a quarter, half, three quarters, full
+                    let pw = (tw2 - 4 * 8 * u) / 5
+                    repeat i in 0..5 {
+                        let px = tl + i * (pw + 8 * u)
+                        let pv = i * 0.25
+                        let here = abs(sl_v - pv) < 0.01
+                        zone box sl_p_z.$i { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; cursor: pointer; label: "{t_brightness}: {i * 25} %" }
+                        on press sl_p_z.$i { sl_v = pv; emit hl_bri(pv); sl_dirty = false }
+                        box { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; color: mint; opacity: if(here, 100%, 0%) }
+                        box { from: px, ct + 136 * u; size: pw, 30 * u; corner: 15 * u; color: ink; opacity: if(here, 0%, 8% + 8% * sl_p_z.$i.hover) }
+                        text t_off { at: px + pw / 2, ct + 151 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i == 0; family: "Space Grotesk" }
+                        text pick(i, "", "25 %", "50 %", "75 %", "100 %") { at: px + pw / 2, ct + 151 * u; anchor: center; size: 12; weight: 700; color: if(here, onmint, ink); show: i > 0; family: "Space Grotesk" }
+                    }
+                    //  the colour, for a light that has one: a rainbow to drag along, and a row of made ones (two whites, then around the wheel). Choosing one on a
+                    //  light that is off turns it on, at full brightness.
+                    group {
+                        show: sl_col > 0.5
+                        box { from: tl, ct + 184 * u; size: tw2, 1.5; color: ink; opacity: 10% }
+                        text t_color { at: tl, ct + 204 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                        let hy = ct + 230 * u
+                        let hx = tl + 11 * u + (tw2 - 22 * u) * sl_hs
+                        body {
+                            gradient: tl, hy to tl + tw2, hy, #ff2626, #ffff26, #26ff26, #26ffff, #2626ff, #ff26ff, #ff2626          // lint: colour the hue bar: the colours a light can be, to pick one from
+                            rim: 16%
+                            box { from: tl, hy - 11 * u; size: tw2, 22 * u; corner: 11 * u }
+                        }
+                        //  in pencil, as the sliders: a crooked outline round it, and a ring for a knob around the hue (faded while the colour is a white, which has none)
+                        PRound(x: tl, y: hy - 11 * u, w: tw2, h: 22 * u, r: 11 * u, s: 87, wd: 1.5 * u, c: ink, a: 0.55, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
+                        PCir(cx: hx, cy: hy, rad: 13 * u, s: 89, wd: 1.6 * u, c: ink, a: if(sl_ck > 0.5 and sl_s > 0.05, 0.95, 0.45), gapk: -1, f: if(sl_hue_z.hover > 0.5 or sl_cdirty, fr, 0))
+                        ellipse { at: hx, hy; radius: 8 * u; color: rgb(0.15 + 0.85 * clamp(abs(sl_hs * 6 - 3) - 1, 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 2), 0, 1), 0.15 + 0.85 * clamp(2 - abs(sl_hs * 6 - 4), 0, 1)); opacity: if(sl_ck > 0.5 and sl_s > 0.05, 100%, 40%) }
+                        zone box sl_hue_z { from: tl - 6 * u, hy - 18 * u; size: tw2 + 12 * u, 36 * u; corner: 18 * u; cursor: pointer; label: "{t_color}: {sl_name}"; role: slider; value: "{sl_hs * 360}" }
+                        on press sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); sl_cdirty = true }
+                        on drag sl_hue_z { sl_h = clamp((local.x - tl - 11 * u) / (tw2 - 22 * u), 0, 1); sl_s = 1; sl_cdirty = true }
+                        on release sl_hue_z { emit hl_color(round(sl_h * 360) * 1000 + round(sl_s * 100)); sl_cdirty = false }
+                        //  a pause in the dragging sends it too, as the brightness does
+                        on still sl_h for 280ms while sl_open and sl_cdirty { emit hl_color(round(sl_h * 360) * 1000 + round(sl_s * 100)); sl_cdirty = false }
+                        //  the made ones: hue and saturation, each drawn in the colour it sends
+                        let sgap = (tw2 - 28 * u) / 9
+                        repeat i in 0..10 {
+                            let sx = tl + 14 * u + i * sgap
+                            let sy = ct + 270 * u
+                            let ph = pick(i, 0, 0.09, 0, 0.07, 0.14, 0.33, 0.5, 0.64, 0.76, 0.89)
+                            let ps = pick(i, 0, 0.5, 1, 1, 1, 1, 1, 1, 1, 1)
+                            let here = sl_ck > 0.5 and abs(sl_s - ps) < 0.02 and (ps < 0.01 or abs(sl_h - ph) < 0.01)
+                            zone box sl_sw_z.$i { at: sx, sy; size: 32 * u, 32 * u; corner: 16 * u; cursor: pointer; label: "{t_color} {i + 1}" }
+                            on press sl_sw_z.$i { sl_h = ph; sl_s = ps; sl_ck = 1; sl_v = if(sl_v < 0.01, 1, sl_v); emit hl_color(round(ph * 360) * 1000 + round(ps * 100)); sl_cdirty = false }
+                            box { at: sx, sy; size: 34 * u, 34 * u; corner: 17 * u; stroke: 2 * u; color: ink; opacity: if(here, 90%, 12% * sl_sw_z.$i.hover) }
+                            body {
+                                color: rgb(1 - 0.85 * ps * (1 - clamp(abs(ph * 6 - 3) - 1, 0, 1)), 1 - 0.85 * ps * (1 - clamp(2 - abs(ph * 6 - 2), 0, 1)), 1 - 0.85 * ps * (1 - clamp(2 - abs(ph * 6 - 4), 0, 1)))
+                                rim: 16%
+                                ellipse { at: sx, sy; radius: (12 + if(here, 0, 1) * sl_sw_z.$i.hover) * u }
+                            }
+                        }
+                    }
                 }
-                //  the keyboard, while the remote is showing (the card has it then)
-                on key Up while tv_open and tv_tab == 1 { emit tv_cmd(0); tv_fl = 0 }
-                on key Down while tv_open and tv_tab == 1 { emit tv_cmd(1); tv_fl = 1 }
-                on key Left while tv_open and tv_tab == 1 { emit tv_cmd(2); tv_fl = 2 }
-                on key Right while tv_open and tv_tab == 1 { emit tv_cmd(3); tv_fl = 3 }
-                on key Return while tv_open and tv_tab == 1 { emit tv_cmd(4); tv_fl = 4 }
-                on key BackSpace while tv_open and tv_tab == 1 { emit tv_cmd(5); tv_fl = 5 }
-                on key space while tv_open and tv_tab == 1 { emit tv_cmd(7); tv_fl = 7 }
+
+                //  ── the printer's card: over the panel like the slider's, shut by a click outside it, its X or a right click ──
+                group {
+                    opacity: pr_k
+                    show: pr_k > 0.01
+                    let pcw = min(W - 28 * u, 460 * u)
+                    let pch = 320 * u
+                    let pcl = (W - pcw) / 2
+                    let pct = (H - pch) / 2 + 10 * u * (1 - pr_k)
+                    let plit = if(pr_st == 1, 1, 0)
+                    //  the veil, as the slider's (over all of Vitreus's glass)
+                    let pr_gm = 14 * 1.5525
+                    let pr_gt = 38 * 1.5525
+                    let pr_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
+                    box { from: -pr_gm, -pr_gt; size: W + 2 * pr_gm, H + pr_gt + pr_gm; corner: pr_gr; color: deep; opacity: 45% }
+                    zone box pr_scrim_z { from: -pr_gm, -pr_gt; size: W + 2 * pr_gm, H + pr_gt + pr_gm; corner: pr_gr }
+                    on press pr_scrim_z { pr_open = false }
+                    on press right pr_scrim_z { pr_open = false }
+                    body {
+                        color: card
+                        shadow: 0, 10 * u, 30 * u, 45%, deep
+                        rim: 10%
+                        box { from: pcl, pct; size: pcw, pch; corner: 20 * u }
+                    }
+                    zone box pr_card_z { from: pcl, pct; size: pcw, pch; corner: 20 * u }
+                    on press right pr_card_z { pr_open = false }
+                    //  the head: the printer's disc (lit while it prints), the job and its state, and the X
+                    body {
+                        color: mix(off, mint, plit)
+                        shadow: 0, 0, 10 * u * plit, 45%, mint
+                        rim: 16%
+                        ellipse { at: pcl + 42 * u, pct + 42 * u; radius: 20 * u }
+                    }
+                    group {
+                        show: not pr_custom and pr_pk >= 0
+                        PIcon(k: max(pr_pk, 0), cx: pcl + 42 * u, cy: pct + 42 * u, lit: 0, c: mix(ink, onmint, plit), a: 1, s: 23, f: fr * plit, z: 0.8)
+                    }
+                    for r in hl_items {
+                        image r.img { at: pcl + 31 * u, pct + 31 * u; size: 22 * u, 22 * u; tint: mix(ink, onmint, plit); show: pr_custom and r.index == pr_i }
+                    }
+                    group {
+                        show: pr_dk >= 0
+                        HDev(k: max(pr_dk, 0), cx: pcl + 42 * u, cy: pct + 42 * u, c: mix(ink, onmint, plit), a: 1, s: 501, f: fr * plit, z: 0.92)
+                    }
+                    text pr_task { at: pcl + 72 * u, pct + 33 * u; anchor: left center; size: 15; weight: 700; width: pcw - 130 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                    row {
+                        at: pcl + 72 * u, pct + 46 * u
+                        gap: 6 * u
+                        align: center
+                        ellipse { radius: 3.5 * u; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert) }
+                        text pr_status { size: 11.5; weight: 600; color: pick(pr_st, faint, mint, ink, mint, alert, faint, alert); family: "Space Grotesk" }
+                    }
+                    ellipse { at: pcl + pcw - 30 * u, pct + 28 * u; radius: 13 * u; color: ink; opacity: 8% + 10% * pr_x_z.hover }
+                    HUi(k: 10, cx: pcl + pcw - 30 * u, cy: pct + 28 * u, c: mix(faint, ink, pr_x_z.hover), a: 1, s: 511, f: if(pr_x_z.hover > 0.5, fr, 0), z: 0.62)
+                    zone box pr_x_z { at: pcl + pcw - 30 * u, pct + 28 * u; size: 28 * u, 28 * u; corner: 14 * u; cursor: pointer; label: t_close }
+                    on press pr_x_z { pr_open = false }
+                    //  the picture: the model's cover, or the camera (live, a frame every two seconds; a click on it opens it full size in the browser)
+                    let pis = 140 * u
+                    let pix = pcl + 20 * u
+                    let piy = pct + 84 * u
+                    box { from: pix, piy; size: pis, pis; corner: 14 * u; color: ink; opacity: 6% }
+                    HUi(k: 11, cx: pix + pis / 2, cy: piy + pis / 2, c: faint, a: if(pr_has_pic, 0, 0.6), s: 521, f: 0, z: 1.45)
+                    group {
+                        clip box { from: pix, piy; size: pis, pis; corner: 14 * u }
+                        for p in pr_pic { image p.img { at: pix, piy; size: pis, pis; fit: cover; show: pr_has_pic } }
+                    }
+                    group {
+                        show: pr_cam and pr_has_pic
+                        box { from: pix + 8 * u, piy + pis - 30 * u; size: 70 * u, 22 * u; corner: 11 * u; color: deep; opacity: 75% }
+                        ellipse { at: pix + 20 * u, piy + pis - 19 * u; radius: 3.5 * u; color: alert }
+                        text t_live { at: pix + 29 * u, piy + pis - 19 * u; anchor: left center; size: 10; weight: 700; color: ink; family: "Space Grotesk" }
+                        ellipse { at: pix + pis - 19 * u, piy + 19 * u; radius: 12 * u; color: deep; opacity: 60% + 20% * pr_pic_z.hover }
+                        HUi(k: 12, cx: pix + pis - 19 * u, cy: piy + 19 * u, c: ink, a: 1, s: 531, f: if(pr_pic_z.hover > 0.5, fr, 0), z: 0.52)
+                    }
+                    zone box pr_pic_z { from: pix, piy; size: pis, pis; corner: 14 * u; cursor: pointer; active: pr_cam and pr_has_pic; label: t_open_cam }
+                    on press pr_pic_z { emit pr_act(4) }
+                    //  beside it: the progress, its bar, the time left, when it started and when it ends
+                    let prx = pix + pis + 18 * u
+                    let prw = pcl + pcw - 20 * u - prx
+                    text t_progress { at: prx, piy + 8 * u; anchor: left center; size: 11.5; weight: 600; color: faint; family: "Space Grotesk" }
+                    text pr_pct { at: prx, piy + 34 * u; anchor: left center; size: 30; weight: 700; color: ink; family: "Space Grotesk" }
+                    box { from: prx, piy + 58 * u; size: prw, 6 * u; corner: 3 * u; color: ink; opacity: 10% }
+                    body {
+                        gradient: prx, piy to prx + prw, piy, mintlo, minthi
+                        shadow: 0, 0, 8 * u * plit, 30%, mint
+                        box { from: prx, piy + 58 * u; size: max(6 * u, prw * pr_progs), 6 * u; corner: 3 * u }
+                    }
+                    HUi(k: 13, cx: prx + 8 * u, cy: piy + 90 * u, c: faint, a: 1, s: 541, f: 0, z: 0.6)
+                    text pr_left { at: prx + 24 * u, piy + 90 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                    HUi(k: 14, cx: prx + 8 * u, cy: piy + 114 * u, c: faint, a: 1, s: 551, f: 0, z: 0.6)
+                    text pr_start { at: prx + 24 * u, piy + 114 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                    HUi(k: 15, cx: prx + 8 * u, cy: piy + 138 * u, c: faint, a: 1, s: 561, f: 0, z: 0.6)
+                    text pr_end { at: prx + 24 * u, piy + 138 * u; anchor: left center; size: 12.5; weight: 600; width: prw - 24 * u; lines: 1; color: ink; family: "Space Grotesk" }
+                    //  the buttons: pause or resume, stop (pressed twice: the first asks), and the camera
+                    let pbw = (pcw - 40 * u - 2 * 8 * u) / 3
+                    let pby = pct + pch - 54 * u
+                    let pb0 = pr_has_btn and (pr_st == 1 or pr_st == 2)
+                    let pb1 = pr_has_btn and (pr_st == 1 or pr_st == 2 or pr_st == 5)
+                    repeat i in 0..3 {
+                        let bx = pcl + 20 * u + i * (pbw + 8 * u)
+                        let on = pick(i, if(pb0, 1, 0), if(pb1, 1, 0), if(pr_has_cam, 1, 0))
+                        let hot = pick(i, 0, if(pr_arm, 1, 0), if(pr_cam, 1, 0))      // filled: stop armed (red), the camera on (the accent)
+                        group {
+                            opacity: if(on > 0.5, 100%, 35%)
+                            box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: ink; opacity: (8% + 8% * pr_b_z.$i.hover) * (1 - hot) }
+                            box { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; color: if(i == 1, alert, mint); opacity: 90% * hot }
+                            //  the icon and the word, each centred on the button's middle line by itself (a row would centre the icon font's tall line box, not its
+                            //  glyph, and the pair came out low), and side by side centred as one: the word's width is measured
+                            let lw = pbm.$i.width
+                            let gx0 = bx + pbw / 2 - (lw + 23 * u) / 2
+                            HUi(k: pick(i + 3 * if(pr_st == 2, 1, 0), 16, 17, 18, 19, 17, 18), cx: gx0 + 8.5 * u, cy: pby + 18 * u, c: if(hot > 0.5, onmint, if(i == 1, alert, ink)), a: 1, s: 571 + i * 10, f: if(pr_b_z.$i.hover > 0.5, fr, 0), z: 0.62)
+                            text pick(i, t_b0, t_b1, t_b2) { at: gx0 + 23 * u, pby + 18 * u; anchor: left center; size: 12.5; weight: 700; color: if(hot > 0.5, onmint, if(i == 1, alert, ink)); measure: pbm.$i; family: "Space Grotesk" }
+                            zone box pr_b_z.$i { from: bx, pby; size: pbw, 36 * u; corner: 18 * u; cursor: pointer; active: on > 0.5; label: pick(i, "{t_pause} / {t_resume}", "{t_stop}", "{t_camera}") }
+                        }
+                    }
+                    on press pr_b_z.0 { emit pr_act(if(pr_st == 2, 1, 0)) }
+                    on press pr_b_z.1 while pr_arm { emit pr_act(2); pr_arm = false }
+                    on press pr_b_z.1 while not pr_arm { pr_arm = true }
+                    on press pr_b_z.2 { toggle pr_cam }
+                }
+
+                //  ── an Apple TV's card: over the panel like the others, shut by a click outside it, its X, a right click or Escape ──
+                group {
+                    opacity: tv_k
+                    show: tv_k > 0.01
+                    //  all of it a little smaller when the panel is not tall enough for it (`v` is its `u`)
+                    //  how tall it is: with the remote's tab, without it (no remote), or a speaker's (no tabs, a volume row under the buttons)
+                    let tvh = if(tv_spk, 332, (mix(324, 330, tv_tk) - if(tv_has_rm, 0, 38)))
+                    let tsc = min(1, (H - 16 * u) / (tvh * u))
+                    let v = u * tsc
+                    let tcw = min(W - 28 * u, 460 * v)
+                    let tch = tvh * v
+                    let tcl = (W - tcw) / 2
+                    let tct = (H - tch) / 2 + 10 * v * (1 - tv_k)
+                    let tlit = if(tv_st == 2, 1, 0)
+                    let tv_gm = 14 * 1.5525
+                    let tv_gt = 38 * 1.5525
+                    let tv_gr = (26 - 19 * if(look == 1 or look == 3, 1, 0)) * 1.35
+                    box { from: -tv_gm, -tv_gt; size: W + 2 * tv_gm, H + tv_gt + tv_gm; corner: tv_gr; color: deep; opacity: 45% }
+                    zone box tv_scrim_z { from: -tv_gm, -tv_gt; size: W + 2 * tv_gm, H + tv_gt + tv_gm; corner: tv_gr }
+                    on press tv_scrim_z { tv_open = false }
+                    on press right tv_scrim_z { tv_open = false }
+                    body {
+                        color: card
+                        shadow: 0, 10 * v, 30 * v, 45%, deep
+                        rim: 10%
+                        box { from: tcl, tct; size: tcw, tch; corner: 20 * v }
+                    }
+                    zone box tv_card_z { from: tcl, tct; size: tcw, tch; corner: 20 * v }
+                    on press right tv_card_z { tv_open = false }
+                    on scroll tv_card_z while tv_spk { tv_vol = clamp(tv_vol + wheel * 0.05, 0, 1); tv_vdirty = true }
+                    //  a pause in the moving sends it too, so the speaker follows the finger without a request per frame
+                    on still tv_vol for 280ms while tv_open and tv_vdirty { emit tv_vol(tv_vol); tv_vdirty = false }
+                    //  the head: its disc (lit while it plays), its name, how it is and in which app, the power and the X
+                    body {
+                        color: mix(off, mint, tlit)
+                        shadow: 0, 0, 10 * v * tlit, 45%, mint
+                        rim: 16%
+                        ellipse { at: tcl + 42 * v, tct + 42 * v; radius: 20 * v }
+                    }
+                    group {
+                        show: not tv_custom and tv_pk >= 0
+                        PIcon(k: max(tv_pk, 0), cx: tcl + 42 * v, cy: tct + 42 * v, lit: 0, c: mix(ink, onmint, tlit), a: 1, s: 25, f: fr * tlit, z: 0.8 * tsc)
+                    }
+                    for r in hl_items {
+                        image r.img { at: tcl + 31 * v, tct + 31 * v; size: 22 * v, 22 * v; tint: mix(ink, onmint, tlit); show: tv_custom and r.index == tv_i }
+                    }
+                    group {
+                        show: tv_dk >= 0
+                        HDev(k: max(tv_dk, 0), cx: tcl + 42 * v, cy: tct + 42 * v, c: mix(ink, onmint, tlit), a: 1, s: 601, f: fr * tlit, z: 0.92 * tsc)
+                    }
+                    text tv_name { at: tcl + 72 * v, tct + 33 * v; anchor: left center; size: 15 * tsc; weight: 700; width: tcw - 170 * v; lines: 1; color: ink; family: "Space Grotesk" }
+                    row {
+                        at: tcl + 72 * v, tct + 46 * v
+                        gap: 6 * v
+                        align: center
+                        ellipse { radius: 3.5 * v; color: pick(tv_st, faint, ink, mint, ink) }
+                        text tv_status { size: 11.5 * tsc; weight: 600; width: tcw - 170 * v; lines: 1; color: pick(tv_st, faint, ink, mint, ink); family: "Space Grotesk" }
+                    }
+                    //  (a speaker has none: a DLNA renderer is not switched on or off)
+                    group {
+                        show: not tv_spk
+                        body {
+                            color: mix(ink, mint, if(tv_st > 0, 1, 0))
+                            opacity: if(tv_st > 0, 90%, 8% + 10% * tv_pw_z.hover)
+                            ellipse { at: tcl + tcw - 64 * v, tct + 28 * v; radius: 13 * v }
+                        }
+                        HUi(k: 20, cx: tcl + tcw - 64 * v, cy: tct + 28 * v, c: if(tv_st > 0, onmint, mix(faint, ink, tv_pw_z.hover)), a: 1, s: 611, f: if(tv_pw_z.hover > 0.5, fr, 0), z: 0.6 * tsc)
+                        zone box tv_pw_z { at: tcl + tcw - 64 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_power; role: toggle; checked: tv_st > 0 }
+                    }
+                    on press tv_pw_z { emit tv_cmd(10) }
+                    ellipse { at: tcl + tcw - 30 * v, tct + 28 * v; radius: 13 * v; color: ink; opacity: 8% + 10% * tv_x_z.hover }
+                    HUi(k: 10, cx: tcl + tcw - 30 * v, cy: tct + 28 * v, c: mix(faint, ink, tv_x_z.hover), a: 1, s: 621, f: if(tv_x_z.hover > 0.5, fr, 0), z: 0.62 * tsc)
+                    zone box tv_x_z { at: tcl + tcw - 30 * v, tct + 28 * v; size: 28 * v, 28 * v; corner: 14 * v; cursor: pointer; label: t_close }
+                    on press tv_x_z { tv_open = false }
+                    on key Escape while tv_open { tv_open = false }
+                    //  the tabs: what is playing, and the remote (only with a remote entity)
+                    let tbw = (tcw - 40 * v) / 2
+                    group {
+                        show: tv_has_rm
+                        box { from: tcl + 20 * v, tct + 78 * v; size: tcw - 40 * v, 32 * v; corner: 16 * v; color: ink; opacity: 7% }
+                        //  the lit piece under the chosen tab: the theme's (a glowing pill, or the Proxy theme's slanted slab), sliding between the two
+                        PThumb(x: tcl + 20 * v + tbw / 2 + tv_tk * tbw, y: tct + 94 * v, w: tbw - 6 * v, h: 26 * v, rad: 13 * v, th: 32 * v, a: 1)
+                        repeat i in 0..2 {
+                            HUi(k: pick(i, 14, 21), cx: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 - 2 * v, cy: tct + 94 * v, c: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)), a: 1, s: 631 + i * 10, f: 0, z: 0.58 * tsc)
+                            text pick(i, t_tab0, t_tab1) { at: tcl + 20 * v + i * tbw + tbw / 2 - tbm.$i.width / 2 + 10 * v, tct + 94 * v; anchor: left center; size: 12.5 * tsc; weight: 700; color: mix(faint, onmint, clamp(1 - abs(tv_tk - i), 0, 1)); measure: tbm.$i; family: "Space Grotesk" }
+                            zone box tv_tab_z.$i { from: tcl + 20 * v + i * tbw, tct + 78 * v; size: tbw, 32 * v; corner: 16 * v; cursor: pointer; label: pick(i, t_tab0, t_tab1); role: tab; selected: tv_tab == i }
+                        }
+                        on press tv_tab_z.0 { tv_tab = 0 }
+                        on press tv_tab_z.1 { tv_tab = 1 }
+                    }
+                    let cy0 = tct + if(tv_has_rm, 124, 80) * v
+                    //  ── what is playing ──
+                    group {
+                        opacity: 1 - tv_tk
+                        show: tv_tk < 0.99
+                        let as = 116 * v
+                        let ax = tcl + 20 * v
+                        box { from: ax, cy0; size: as, as; corner: 14 * v; color: ink; opacity: 6% }
+                        //  no artwork (many apps give the Apple TV none, and Home Assistant has none to give): the app's name on a wash of the accent instead
+                        group {
+                            show: not tv_has_pic
+                            body {
+                                gradient: ax, cy0 to ax + as, cy0 + as, mix(card, mint, 0.28), mix(card, mint, 0.06)
+                                rim: 10%
+                                box { from: ax, cy0; size: as, as; corner: 14 * v }
+                            }
+                            HUi(k: 22, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_has_appic or tv_spk, 0, 0.85), s: 651, f: 0, z: 1.1 * tsc)
+                            //  (a speaker's: the pencil speaker)
+                            HDev(k: 8, cx: ax + as / 2, cy: cy0 + as / 2 - if(tv_app_on, 14, 0) * v, c: mint, a: if(tv_spk and not tv_has_appic, 0.85, 0), s: 656, f: 0, z: 1.6 * tsc)
+                            //  the app's icon, rounded as on the Apple TV's home screen
+                            group {
+                                show: tv_has_appic
+                                clip box { from: ax + as / 2 - 28 * v, cy0 + as / 2 - 44 * v; size: 56 * v, 56 * v; corner: 13 * v }
+                                for p in tv_appic { image p.img { at: ax + as / 2 - 28 * v, cy0 + as / 2 - 44 * v; size: 56 * v, 56 * v; fit: cover } }
+                            }
+                            text tv_app { at: ax + as / 2, cy0 + as / 2 + if(tv_has_appic, 30, 20) * v; anchor: center; size: 14 * tsc; weight: 700; width: as - 16 * v; lines: 1; align: center; color: ink; show: tv_app_on; family: "Space Grotesk" }
+                        }
+                        group {
+                            clip box { from: ax, cy0; size: as, as; corner: 14 * v }
+                            for p in tv_pic { image p.img { at: ax, cy0; size: as, as; fit: cover; show: tv_has_pic } }
+                        }
+                        let mx = ax + as + 18 * v
+                        let mw = tcl + tcw - 20 * v - mx
+                        text tv_title { at: mx, cy0 + 4 * v; anchor: left top; size: 16 * tsc; weight: 700; width: mw; lines: 2; color: ink; family: "Space Grotesk" }
+                        text tv_sub { at: mx, cy0 + 62 * v; anchor: left center; size: 12.5 * tsc; weight: 600; width: mw; lines: 1; color: faint; family: "Space Grotesk" }
+                        group {
+                            show: tv_has_prog
+                            box { from: mx, cy0 + as - 28 * v; size: mw, 5 * v; corner: 2.5 * v; color: ink; opacity: 10% }
+                            body {
+                                gradient: mx, cy0 to mx + mw, cy0, mintlo, minthi
+                                shadow: 0, 0, 8 * v * tlit, 30%, mint
+                                box { from: mx, cy0 + as - 28 * v; size: max(5 * v, mw * tv_progs), 5 * v; corner: 2.5 * v }
+                            }
+                            //  a click on the bar goes there (a little taller than the bar, so it is easy to hit); it thickens under the pointer
+                            box { from: mx, cy0 + as - 29 * v; size: mw, 7 * v; corner: 3.5 * v; color: ink; opacity: 8% * tv_sk_z.hover }
+                            zone box tv_sk_z { from: mx - 4 * v, cy0 + as - 40 * v; size: mw + 8 * v, 28 * v; corner: 8 * v; cursor: pointer; active: tv_st >= 2 and tv_tk < 0.5; label: t_progress; role: slider; value: "{tv_pos}" }
+                            on press tv_sk_z { tv_prog = clamp((local.x - mx) / mw, 0, 1); emit tv_seek(clamp((local.x - mx) / mw, 0, 1)) }
+                            text tv_pos { at: mx, cy0 + as - 8 * v; anchor: left center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
+                            text tv_rem { at: mx + mw, cy0 + as - 8 * v; anchor: right center; size: 11 * tsc; weight: 600; color: faint; family: "Space Grotesk" }
+                        }
+                        //  the transport: volume down, previous, play/pause (lit), next, volume up; a speaker's only play/pause and next (its volume is the slider below)
+                        let ty0 = cy0 + as + 44 * v
+                        repeat i in 0..5 {
+                            let bx = tcl + tcw / 2 + if(tv_spk, pick(i, 0, 0, -38, 38, 0), (i - 2) * 70) * v
+                            let code = pick(i, 9, 11, 7, 12, 8)
+                            let big = if(i == 2, 1, 0)
+                            let live = if(i == 0 or i == 4 or tv_st > 0, 1, 0)
+                            group {
+                                show: not tv_spk or i == 2 or i == 3
+                                opacity: if(live > 0.5, 100%, 35%)
+                                ellipse { at: bx, ty0; radius: 21 * v; color: ink; opacity: if(tv_fl == code, 24%, 8% + 8% * tv_m_z.$i.hover) * (1 - big) }
+                                body {
+                                    color: mint
+                                    shadow: 0, 0, 12 * v, 35% + 15% * tv_m_z.$i.hover, mint
+                                    rim: 16%
+                                    opacity: big
+                                    ellipse { at: bx, ty0; radius: (27 + if(tv_fl == 7, -2, 1) * tv_m_z.$i.hover) * v }
+                                }
+                                HUi(k: pick(i + if(i == 2 and tv_st == 2, 3, 0), 23, 24, 19, 25, 26, 16), cx: bx, cy: ty0, c: if(big > 0.5, onmint, ink), a: 1, s: 661 + i * 10, f: if(tv_m_z.$i.hover > 0.5, fr, 0), z: (22 + 8 * big) / 26 * tsc)
+                                zone box tv_m_z.$i { at: bx, ty0; size: (44 + 12 * big) * v, (44 + 12 * big) * v; corner: (22 + 6 * big) * v; cursor: pointer; active: live > 0.5 and tv_tk < 0.5; label: pick(i, t_voldown, t_prev, t_playpause, t_next, t_volup) }
+                            }
+                            on press tv_m_z.$i { emit tv_cmd(code); tv_fl = code }
+                        }
+                        //  a speaker's volume: the Control Center's slider between a quieter and a louder speaker, each a nudge of 5 %; the wheel anywhere on the card too
+                        group {
+                            show: tv_spk
+                            let vy = ty0 + 54 * v
+                            let vl = tcl + 62 * v
+                            let vw = tcw - 124 * v
+                            repeat j in 0..2 {
+                                let vx = if(j == 0, tcl + 34 * v, tcl + tcw - 34 * v)
+                                ellipse { at: vx, vy; radius: 16 * v; color: ink; opacity: if(tv_fl == 30 + j, 22%, 6% + 8% * tv_vb_z.$j.hover) }
+                                HUi(k: pick(j, 23, 26), cx: vx, cy: vy, c: mix(faint, ink, tv_vb_z.$j.hover), a: 1, s: 781 + j * 10, f: if(tv_vb_z.$j.hover > 0.5, fr, 0), z: 0.7 * tsc)
+                                zone box tv_vb_z.$j { at: vx, vy; size: 32 * v, 32 * v; corner: 16 * v; cursor: pointer; label: pick(j, t_voldown, t_volup) }
+                                on press tv_vb_z.$j { tv_vol = clamp(tv_vol + pick(j, -0.05, 0.05), 0, 1); tv_fl = 30 + j; emit tv_vol(tv_vol) }
+                            }
+                            PSlider(x0: vl, y: vy, w: vw, lv: tv_vols, h: 14 * v, f: if(tv_vt_z.hover > 0.5 or tv_vdirty, fr, 0))
+                            zone box tv_vt_z { from: vl - 6 * v, vy - 18 * v; size: vw + 12 * v, 36 * v; corner: 18 * v; cursor: pointer; label: "{t_volume}: {tv_name}"; role: slider; value: "{tv_vols * 100} %" }
+                            on press tv_vt_z { tv_vol = clamp((local.x - vl) / vw, 0, 1); tv_vdirty = true }
+                            on drag tv_vt_z { tv_vol = clamp((local.x - vl) / vw, 0, 1); tv_vdirty = true }
+                            on release tv_vt_z { emit tv_vol(tv_vol); tv_vdirty = false }
+                            on scroll tv_vt_z { tv_vol = clamp(tv_vol + wheel * 0.05, 0, 1); tv_vdirty = true }
+                        }
+                    }
+                    //  ── the remote: laid out as the Siri Remote, on its side: the clickpad, and beside it its buttons in two columns (back and TV, play/pause and
+                    //  the volume's rocker, mute under them) ──
+                    group {
+                        opacity: tv_tk
+                        show: tv_tk > 0.01 and tv_has_rm
+                        let qr = 80 * v
+                        let rl = tcl + tcw / 2 - 149 * v
+                        let qx = rl + qr
+                        let qy = cy0 + qr + 2 * v
+                        //  the clickpad: a dark round pad, its four edges and its middle; the wheel over it moves up and down
+                        zone box tv_pad_z { at: qx, qy; size: 2 * qr, 2 * qr; corner: qr }
+                        body {
+                            color: deep
+                            opacity: 70%
+                            rim: 8%
+                            ellipse { at: qx, qy; radius: qr }
+                        }
+                        repeat k in 0..4 {
+                            let ddx = pick(k, 0, 0, -1, 1)
+                            let ddy = pick(k, -1, 1, 0, 0)
+                            //  the edge, lit under the pointer and when pressed
+                            arc { at: qx, qy; radius: 56 * v; span: 48deg; width: 40 * v; rotate: pick(k, 0, 180, 270, 90) * 1deg; color: ink; opacity: if(tv_fl == k, 22%, 9% * tv_d_z.$k.hover) }
+                            ellipse { at: qx + ddx * 64 * v, qy + ddy * 64 * v; radius: 3 * v; color: ink; opacity: if(tv_fl == k, 100%, 40% + 40% * tv_d_z.$k.hover) }
+                            zone box tv_d_z.$k { from: pick(k, qx - 55 * v, qx - 55 * v, qx - qr, qx + 30 * v), pick(k, qy - qr, qy + 30 * v, qy - 45 * v, qy - 45 * v); size: pick(k, 110 * v, 110 * v, qr - 30 * v, qr - 30 * v), pick(k, qr - 30 * v, qr - 30 * v, 90 * v, 90 * v); cursor: pointer; active: tv_tk > 0.5; label: pick(k, t_up, t_down, t_left, t_right) }
+                        }
+                        repeat k in 0..4 {
+                            on press tv_d_z.$k { emit tv_cmd(k); tv_fl = k }
+                            on scroll tv_d_z.$k { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
+                        }
+                        on scroll tv_pad_z { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
+                        //  the middle: a click selects, held it is a long press
+                        body {
+                            color: ink
+                            opacity: if(tv_fl == 4 or tv_fl == 15, 26%, 10% + 6% * tv_ok_z.hover)
+                            rim: 10%
+                            ellipse { at: qx, qy; radius: 29 * v }
+                        }
+                        zone box tv_ok_z { at: qx, qy; size: 58 * v, 58 * v; corner: 29 * v; cursor: pointer; label: t_select }
+                        on press tv_ok_z { tv_hd = false; tv_fl = 4 }
+                        on hold tv_ok_z for 600ms { tv_hd = true; tv_fl = 15; emit tv_cmd(15) }
+                        on release tv_ok_z while not tv_hd { emit tv_cmd(4) }
+                        on scroll tv_ok_z { emit tv_cmd(if(wheel > 0, 0, 1)); tv_fl = if(wheel > 0, 0, 1) }
+                        //  the buttons: first column back, play/pause, mute; second TV (held: the control centre) and the volume's rocker, + over −
+                        let ca = rl + 2 * qr + 36 * v + 22 * v
+                        let cb = ca + 58 * v
+                        repeat i in 0..4 {
+                            let bx = if(i == 1, cb, ca)
+                            let by = qy + pick(i, -54, -54, 0, 54) * v
+                            let code = pick(i, 5, 6, 7, 17)
+                            ellipse { at: bx, by; radius: 22 * v; color: ink; opacity: if(tv_fl == code or (i == 1 and tv_fl == 16), 26%, 10% + 8% * tv_r_z.$i.hover) }
+                            HUi(k: pick(i, 27, 28, 29, 30), cx: bx, cy: by, c: ink, a: 1, s: 711 + i * 10, f: if(tv_r_z.$i.hover > 0.5, fr, 0), z: 0.82 * tsc)
+                            zone box tv_r_z.$i { at: bx, by; size: 44 * v, 44 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_back, t_home, t_playpause, t_mute) }
+                        }
+                        on press tv_r_z.0 { emit tv_cmd(5); tv_fl = 5 }
+                        on press tv_r_z.1 { tv_hd = false; tv_fl = 6 }
+                        on hold tv_r_z.1 for 600ms { tv_hd = true; tv_fl = 16; emit tv_cmd(16) }
+                        on release tv_r_z.1 while not tv_hd { emit tv_cmd(6) }
+                        on press tv_r_z.2 { emit tv_cmd(7); tv_fl = 7 }
+                        on press tv_r_z.3 { emit tv_cmd(17); tv_fl = 17 }
+                        box { from: cb - 22 * v, qy - 22 * v; size: 44 * v, 98 * v; corner: 22 * v; color: ink; opacity: 10% }
+                        repeat i in 0..2 {
+                            let code = pick(i, 8, 9)
+                            box { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; color: ink; opacity: if(tv_fl == code, 18%, 8% * tv_v_z.$i.hover) }
+                            HUi(k: pick(i, 31, 32), cx: cb, cy: qy + i * 54 * v, c: ink, a: 1, s: 761 + i * 10, f: if(tv_v_z.$i.hover > 0.5, fr, 0), z: 0.75 * tsc)
+                            zone box tv_v_z.$i { from: cb - 22 * v, qy - 22 * v + i * 49 * v; size: 44 * v, 49 * v; corner: 22 * v; cursor: pointer; active: tv_tk > 0.5; label: pick(i, t_volup, t_voldown) }
+                            on press tv_v_z.$i { emit tv_cmd(code); tv_fl = code }
+                        }
+                        box { at: cb, qy + 27 * v; size: 22 * v, 1.5 * v; color: ink; opacity: 14% }
+                        text t_kb { at: tcl + tcw / 2, cy0 + 186 * v; anchor: center; size: 11 * tsc; weight: 600; width: tcw - 40 * v; lines: 1; align: center; color: faint; family: "Space Grotesk" }
+                    }
+                    //  the keyboard, while the remote is showing (the card has it then)
+                    on key Up while tv_open and tv_tab == 1 { emit tv_cmd(0); tv_fl = 0 }
+                    on key Down while tv_open and tv_tab == 1 { emit tv_cmd(1); tv_fl = 1 }
+                    on key Left while tv_open and tv_tab == 1 { emit tv_cmd(2); tv_fl = 2 }
+                    on key Right while tv_open and tv_tab == 1 { emit tv_cmd(3); tv_fl = 3 }
+                    on key Return while tv_open and tv_tab == 1 { emit tv_cmd(4); tv_fl = 4 }
+                    on key BackSpace while tv_open and tv_tab == 1 { emit tv_cmd(5); tv_fl = 5 }
+                    on key space while tv_open and tv_tab == 1 { emit tv_cmd(7); tv_fl = 7 }
+                }
             }
         }
     }
