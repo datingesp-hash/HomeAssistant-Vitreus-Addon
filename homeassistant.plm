@@ -188,6 +188,8 @@ scene HomeAssistant {
     text t_resize = ""                                // "Resize" in "Resize Lamp", a handle's name
     text hl_msg = ""
     model hl_items max 32 { name: text; icon: text; sub: text; on: number; kind: number; bri: number; avail: number; col: number; cs: number; rs: number; yu: number; img: image 48, 48; custom: number; prn: number; pp: number; cc: number; hk: number; hu: number; sa: number; tvr: number; pk: number; dk: number; ct: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number; ad1: number; ad2: number; ai1: image 48, 48; ai2: image 48, 48 }      // `qa` how many buttons a right click brings out of it (0 none; config.json's "actions"), each one's name (`an`), pencil icon (`ak`, -1: a command's), whether it is only run (`ar`), on (`ao`) and there (`av`) · `dk` which of the add-on's own icons it is, in pencil (HDev; -1 none) · `pk` the pencil icon it is drawn with (addon-pencil.plm's PIcon: 0 bulb … 8 house), -1: a picture of its own · `tvr` 1: an Apple TV (or another player) with a card of its own (right click) · `cc` 1: a light whose colour is chosen here (config.json's "color") · `ct` 1: one drawn in its own colour rather than the accent ("tint") · `hk` 1: its colour is known, `hu` its hue and `sa` its saturation (0 to 1) · kind 0 a light, 1 a switch · `prn` 1: it has a printer's card (right click) · `pp` the print's progress while one runs (-1 none) · an icon of its own (an svg, `custom` 1) instead of a Material one · its column, how many columns and rows it takes, its top (unscaled)
+    model hl_carry max 1 { name: text; sub: text; on: number; avail: number; cs: number; rs: number; img: image 48, 48; custom: number; pk: number; dk: number }      // the tile being carried (`mv_i`'s row), copied by the logic: drawn once over the others
+    model hl_qbtn max 1 { col: number; cs: number; rs: number; yu: number; qa: number; an1: text; an2: text; ak1: number; ak2: number; ar1: number; ar2: number; ao1: number; ao2: number; av1: number; av2: number; ad1: number; ad2: number; ai1: image 48, 48; ai2: image 48, 48 }      // the tile whose two buttons are out (`qa_i`'s row), likewise
     model hl_rooms max 12 { name: text; temp: text; hum: text; has_t: number; has_h: number; yu: number }      // a room's head: its name, and its sensors' readings if it has them
     fact hl_cols = 2                                  // how many columns the logic laid the tiles out in (from the panel's width)
     fact hl_content = 0                               // how tall it all is, unscaled
@@ -630,8 +632,9 @@ scene HomeAssistant {
                         }
                     }
                     //  The carried tile again, over all the others (the rows are drawn in order, so in its own row it would pass under the ones after it): lifted, on an
-                    //  opaque plate with a shadow, at the pointer. (`z:` would do it, but inside a `for` it mixes up the rows' `r.index`.)
-                    for r in hl_items {
+                    //  opaque plate with a shadow, at the pointer. (`z:` would do it, but inside a `for` it mixes up the rows' `r.index`.) Its row is `hl_carry`, the carried
+                    //  tile's own, copied there by the logic: drawn once, not once for each of the 32 rows the panel can hold.
+                    for r in hl_carry {
                         let ccs = r.cs
                         let crs = r.rs
                         let cww = ccs * hw + (ccs - 1) * gap
@@ -646,7 +649,7 @@ scene HomeAssistant {
                         let ctx = mix(cx + 62 * u, cx + 18 * u, ctl)
                         let cny = mix(cy + chh / 2 - 9 * u, cy + chh - 38 * u, ctl)
                         group {
-                            show: mv_i == r.index and hl_ed > 0.5
+                            show: mv_i >= 0 and hl_ed > 0.5
                             body {
                                 color: mix(tint, ink, 0.07)
                                 shadow: 0, 10 * u, 26 * u, 50%, deep
@@ -660,12 +663,12 @@ scene HomeAssistant {
                             }
                             group {
                                 show: r.custom < 0.5 and r.pk >= 0
-                                PIcon(k: max(r.pk, 0), cx: cdx, cy: cdy, lit: 0, c: mix(ink, onmint, clit), a: 1, s: 3 + r.index * 17, f: 0, z: 0.78 + 0.12 * ctl)
+                                PIcon(k: max(r.pk, 0), cx: cdx, cy: cdy, lit: 0, c: mix(ink, onmint, clit), a: 1, s: 3 + mv_i * 17, f: 0, z: 0.78 + 0.12 * ctl)
                             }
                             image r.img { at: cdx - (11 + 2 * ctl) * u, cdy - (11 + 2 * ctl) * u; size: (22 + 4 * ctl) * u, (22 + 4 * ctl) * u; tint: mix(ink, onmint, clit); show: r.custom > 0.5 }
                             group {
                                 show: r.dk >= 0
-                                HDev(k: max(r.dk, 0), cx: cdx, cy: cdy, c: mix(ink, onmint, clit), a: 1, s: 5 + r.index * 13, f: 0, z: 0.92 + 0.15 * ctl)
+                                HDev(k: max(r.dk, 0), cx: cdx, cy: cdy, c: mix(ink, onmint, clit), a: 1, s: 5 + mv_i * 13, f: 0, z: 0.92 + 0.15 * ctl)
                             }
                             text r.name { at: ctx, cny; anchor: left center; size: 13.5 + ctl; weight: 600; width: cww - mix(72, 36, ctl) * u; lines: 1; color: ink; show: csm < 0.5; family: "Space Grotesk" }
                             text r.sub { at: ctx, cny + 19 * u; anchor: left center; size: 11.5; weight: 500; width: cww - mix(72, 36, ctl) * u; lines: 1; color: if(clit > 0.5, mint, faint); show: csm < 0.5; family: "Space Grotesk" }
@@ -682,7 +685,7 @@ scene HomeAssistant {
                     zone box qa_scrim_z { from: -40 * u, hl_sc - 40 * u; size: W + 80 * u, vh + 80 * u; active: qa_open }
                     on press qa_scrim_z { qa_open = false }
                     on press right qa_scrim_z { qa_open = false }
-                    for r in hl_items {
+                    for r in hl_qbtn {
                         let qww = r.cs * hw + (r.cs - 1) * gap
                         let qcx = gx + r.col * (hw + gap) + qww / 2
                         let qcy = r.yu * u + (r.rs * th + (r.rs - 1) * gap) / 2
@@ -696,7 +699,7 @@ scene HomeAssistant {
                         let qx0 = mix(qcx, qcx + if(r.qa >= 2, -0.5, 0) * (hw + gap), qk)
                         let qx1 = mix(qcx, qcx + 0.5 * (hw + gap), qk)
                         group {
-                            show: qa_i == r.index and qa_v > 0.01
+                            show: qa_i >= 0 and qa_v > 0.01
                             opacity: qa_v
                             repeat i in 0..2 {
                                 //  where it lands: the two side by side about the tile's middle (one alone, in the middle), and on its way out of it
@@ -740,7 +743,7 @@ scene HomeAssistant {
                                     image r.ai2 { at: x - 10 * u, dyc - 10 * u; size: 20 * u, 20 * u; tint: mix(ink, onmint, lit); show: qd >= 0 and i == 1 }
                                     group {
                                         show: qd < 0 and pick(i, r.ak1, r.ak2) >= 0
-                                        PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + r.index * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
+                                        PIcon(k: max(pick(i, r.ak1, r.ak2), 0), cx: x, cy: dyc, lit: 0, c: mix(ink, onmint, lit), a: 1, s: 37 + qa_i * 11 + i * 5, f: if(lit > 0.5 or hov > 0.5, fr, 0), z: 0.64)
                                     }
                                     //  a command's own: a prompt, › and _
                                     group {
@@ -753,10 +756,10 @@ scene HomeAssistant {
                                     text r.an2 { at: x, y + 24 * u; anchor: center; size: 11; weight: 600; width: hw - 12 * u; lines: 1; color: ink; show: i == 1; family: "Space Grotesk" }
                                 }
                             }
-                            zone box qa_b0_z { at: qx0, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 1 and r.av1 > 0.5; label: "{r.an1}" }
-                            zone box qa_b1_z { at: qx1, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_i == r.index and qa_k > 0.6 and r.qa >= 2 and r.av2 > 0.5; label: "{r.an2}" }
-                            on press qa_b0_z { emit qa_tap(r.index * 10 + 1); qf0: 1 ~0ms; qf0: 0 after 30ms; qp0: 1 ~0ms; qp0: 0 after 20ms }
-                            on press qa_b1_z { emit qa_tap(r.index * 10 + 2); qf1: 1 ~0ms; qf1: 0 after 30ms; qp1: 1 ~0ms; qp1: 0 after 20ms }
+                            zone box qa_b0_z { at: qx0, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_k > 0.6 and r.qa >= 1 and r.av1 > 0.5; label: "{r.an1}" }
+                            zone box qa_b1_z { at: qx1, qcy; size: hw, th; corner: 14 * u; cursor: pointer; active: qa_open and qa_k > 0.6 and r.qa >= 2 and r.av2 > 0.5; label: "{r.an2}" }
+                            on press qa_b0_z { emit qa_tap(qa_i * 10 + 1); qf0: 1 ~0ms; qf0: 0 after 30ms; qp0: 1 ~0ms; qp0: 0 after 20ms }
+                            on press qa_b1_z { emit qa_tap(qa_i * 10 + 2); qf1: 1 ~0ms; qf1: 0 after 30ms; qp1: 1 ~0ms; qp1: 0 after 20ms }
                             on press right qa_b0_z { qa_open = false }
                             on press right qa_b1_z { qa_open = false }
                         }

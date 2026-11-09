@@ -993,6 +993,24 @@ local function tv_poll()
     end)
 end
 
+-- The carried tile and the one whose buttons are out are drawn once, over the others, from rows of their own (`hl_carry`, `hl_qbtn`): the row of the panel
+-- they are (`mv_i`, `qa_i`) is copied there, again whenever the panel's rows change (a button lit, a tile moved while it is carried).
+local shown_rows = {}
+local one_sig = {}
+local function one(name, k)
+    local r = (k >= 0) and shown_rows[k + 1] or nil
+    local rows = r and { r } or {}
+    local sig = json.encode(rows)
+    if one_sig[name] == sig then return end
+    one_sig[name] = sig
+    model[name] = rows
+end
+local function mirror()
+    one("hl_carry", tonumber(fact.mv_i) or -1)
+    one("hl_qbtn", tonumber(fact.qa_i) or -1)
+end
+on("fact:qa_i", mirror)
+
 show = function()
     local rows, heads, byitem = {}, {}, {}
     if cfg then
@@ -1088,6 +1106,8 @@ show = function()
     fact.hl_content = content
     model.hl_items = rows
     model.hl_rooms = heads
+    shown_rows = rows
+    mirror()
 end
 
 -- curl, with the token from auth.curl. `body`: a JSON text to POST (on curl's input), or nil for a GET. `done(ok, out, err)`.
@@ -1538,6 +1558,7 @@ on("fact:mv_cx", preview)
 on("fact:mv_cy", preview)
 on("fact:mv_i", function(v)
     v = tonumber(v) or -1
+    mirror()
     if v >= 0 then
         local i = row_item(v)
         hl.mv = nil
