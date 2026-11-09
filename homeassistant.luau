@@ -1829,19 +1829,22 @@ on("fact:slot_w", function(v)
     if st then st.width_changed() end
 end)
 
--- Which monitor the panel is on: Vitreus sends its name (`slot_mon`) before `slot_open`, and the copy of this scene whose monitor has that name
--- (`screen.K.name`) is the one that draws (`hl_mon`). No copy with that name (an older Vitreus sends none): -1, and the scene goes by the size.
+-- Which monitor the panel is on: Vitreus sends its name (`slot_mon`) before `slot_open`, and the panel's one surface goes there (`hl_screen`). An older
+-- Vitreus sends none: then it is on every monitor the scene's hidden surface's copies know (`screen.K.name`), as it used to be.
 local function find_monitor()
     local name = text.slot_mon or ""
-    local k = -1
-    if name ~= "" then
+    if name == "" then
+        local all = {}
         for c = 0, 3 do
-            if text["screen." .. c .. ".name"] == name then k = c; break end
+            local n = text["screen." .. c .. ".name"]
+            if type(n) == "string" and n ~= "" then all[#all + 1] = n end
         end
+        name = table.concat(all, ", ")
     end
-    if fact.hl_mon ~= k then fact.hl_mon = k end
+    if text.hl_screen ~= name then text.hl_screen = name end
 end
 on("text:slot_mon", find_monitor)
+find_monitor()
 
 -- Vitreus tells the panel it is out again every two seconds while it is: only a real opening (shut before) asks Home Assistant at once and ends
 -- edit mode on the way out.
