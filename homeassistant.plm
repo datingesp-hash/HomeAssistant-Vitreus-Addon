@@ -1486,8 +1486,9 @@ scene HomeAssistant {
         follow dmn = if(dw_menu and widget_edit, 1, 0)
         prop dgl = 0 ~0ms
         follow dgl = if(glide, 1, 0)
-        let dk.sw = max(screen.width, 800)
-        let dk.sh = max(screen.height, 600)
+        //  the size of this surface itself: `screen.width` is the scene's first surface's, which is an empty 1x1 now (the grid came out 800x600, the cards tiny)
+        let dk.sw = max(desk.width, 800)
+        let dk.sh = max(desk.height, 600)
         let dk.gl = 16 + room_l
         let dk.gt = 16 + room_t
         let dk.cw = (dk.sw - dk.gl - 16 - room_r) / 28

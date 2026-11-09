@@ -4,7 +4,7 @@
 name        = "Home Assistant"
 description = "Your Home Assistant lights, switches, printer, Apple TV and DLNA speakers"
 author      = "datingesp-hash"
-version     = "0.5.1"
+version     = "0.5.2"
 vitreus_api = 1
 repo        = "datingesp-hash/HomeAssistant-Vitreus-Addon"
 
