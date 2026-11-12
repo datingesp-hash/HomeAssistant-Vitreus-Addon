@@ -6,7 +6,8 @@
 --
 -- Kept in widget.json in the add-on's data folder: { cards = { { entity, mon, gx, gy, gw, gh }, ... } }, up to eight:
 --   entity    what it shows
---   mon       its monitor's name ("": the first)
+--   mon       its monitor's name ("": the first). While that monitor is not plugged in the card is not shown (it does not move in with another monitor's
+--             cards), but in the desktop editor, on the first monitor, dimmed, to be found and placed: moved there, that monitor is its own.
 --   gx, gy    the cell of its top left corner on the desktop's 28 x 16 grid (the shell's widgets' grid); gw, gh how many cells it takes
 -- For Settings > Theme > Pin widgets (`widget_place`): the same, a card a line ("entity,mon,gx,gy,gw,gh", lines joined by ";"). A monitor that is not plugged in is
 -- ignored: that card stays on the monitor it is on.
@@ -69,7 +70,11 @@ return function(api)
                 end
             end
             row.gx, row.gy, row.gw, row.gh = c.gx, c.gy, c.gw, c.gh
-            row.mon = (c.mon ~= "" and copy_of(c.mon)) or 0
+            local at = (c.mon == "" and 0) or copy_of(c.mon)
+            local lost = at == nil
+            if lost then at = (fact.widget_edit == true) and 0 or -1 end
+            row.mon = at
+            if lost then row.avail = 0 end
             row.fresh = fresh[c] and 1 or 0
             out[k] = row
         end
@@ -191,6 +196,7 @@ return function(api)
         v = math.floor(tonumber(v) or 0)
         local c = cards[v // 10000 + 1]
         if c then
+            if not plugged(c.mon) then c.mon = text["screen.0.name"] or "" end       -- (shown on the first monitor without its own: placed there, it is that one's)
             c.gx = clampi((v % 10000) // 100, 0, GX - c.gw)
             c.gy = clampi(v % 100, 0, GY - c.gh)
             changed()
@@ -214,6 +220,10 @@ return function(api)
         local i = by_card[v // 1000 + 1]
         if i then api.bri(i + 1, (v % 1000) / 100) end
     end)
+
+    -- The editor opening or shutting shows or hides the cards whose monitor is not plugged in; a monitor coming or going moves them in or out.
+    on("fact:widget_edit", function() fill() end)
+    for k = 0, 3 do on("text:screen." .. k .. ".name", function() after(300, fill) end) end
 
     fact.widget_shown = #cards > 0
     text.widget_place = place()
