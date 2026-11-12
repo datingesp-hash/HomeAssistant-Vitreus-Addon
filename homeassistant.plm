@@ -1,4 +1,6 @@
 language 0.1
+// vitreus-fonts: lean   (it draws only in "Space Grotesk": Vitreus's keeper starts it without the system's other fonts, a sans, emoji and CJK fallback
+//                         only; see bin/vitreus-fonts in Vitreus. Without that Vitreus it is a comment like any other.)
 import "addon-palette.plm"
 import "addon-theme.plm"                          // the theme's own pieces (PThumb: the lit tab under the Apple TV card's chosen tab)
 import "ha-icons.plm"                             // the add-on's own icons in the same pencil (HUi: the buttons; HDev: its device icons), made by tools/icons.py
