@@ -50,6 +50,19 @@ return function(api)
     end
     local function plugged(name) return name == "" or copy_of(name) ~= nil end
 
+    -- The cards' surfaces (dk0 to dk3 in the scene, one a monitor, by the number of the scene's copy on it): only a monitor with a card on it has one, or, in
+    -- Edit mode and with the list open, every monitor (to place them on, and the list over the editor's shelf). One that is not there costs nothing.
+    local function slots(out)
+        local all = fact.widget_edit == true or fact.dw_menu == true
+        local need = {}
+        for _, row in ipairs(out) do if row.mon and row.mon >= 0 then need[row.mon] = true end end
+        for c = 0, 3 do
+            local n = text["screen." .. c .. ".name"]
+            local want = (type(n) == "string" and n ~= "" and (all or need[c])) and n or ""
+            if text["dk_s" .. c] ~= want then text["dk_s" .. c] = want end
+        end
+    end
+
     -- The cards, to the scene (the panel's own rows for their entities), and the list to choose from (every entity in config.json, ticked if it has a card).
     local rows_all = {}
     local by_card = {}             -- a card -> its entity's place in the configuration (from 0), or nil when config.json no longer has it
@@ -98,6 +111,7 @@ return function(api)
         end
         fact.dw_mrows = row + 1
         by_card = map
+        slots(out)
         local sig = json.encode({ out, ents })
         if sig == last then return end
         last = sig
@@ -146,7 +160,9 @@ return function(api)
     on("widget_menu", function()
         fact.dw_mmon = copy_of(text.widget_mon_name or "") or 0
         fact.dw_menu = not (fact.dw_menu == true)
+        fill()
     end)
+    on("fact:dw_menu", function() fill() end)
     on("fact:widget_shown", function(v)
         if v == false and #cards > 0 then cards = {}; changed() end      -- (Pin widgets: a theme without any)
     end)
