@@ -106,7 +106,8 @@ scene HomeAssistant {
     //  One copy of the panel, not one per monitor: it goes to the monitor Vitreus names (`slot_mon`), which the logic copies into `hl_screen` (with `screens:
     //  each` the whole scene was compiled once per monitor, four times: a gigabyte of memory for a panel that is only ever on one of them).
     text hl_screen = ""
-    let shown = if(slot_open, 1, 0)
+    let isout = if(slot_open, 1, 0)                   // the panel is out
+    let shown = if(slot_open or en1 > 0.004 or tail > 0.004, 1, 0)       // drawn while the content fades out too
 
     //  What the logic says (homeassistant.luau)
     fact hl_demo = false                              // no token in config.json yet: the example's rooms, played with here, and a banner on how to set it up
@@ -401,9 +402,14 @@ scene HomeAssistant {
     prop en1 = 0 ~200ms
     prop en2 = 0 ~380ms
     prop en3 = 0 ~520ms
-    on change shown while shown > 0.5 { wk: 1; en1: 1 after 200ms; en2: 1 after 200ms; en3: 1 after 200ms }
-    on change shown while shown < 0.5 { wk: 0 ~80ms; en1: 0 ~80ms; en2: 0 ~80ms; en3: 0 ~80ms; en1: 0 ~80ms after 205ms; en2: 0 ~80ms after 205ms; en3: 0 ~80ms after 205ms }
-    every 500ms while shown > 0.5 and en1 < 0.002 { en1: 1 after 200ms; en2: 1 after 200ms; en3: 1 after 200ms }
+    on change isout while isout > 0.5 { wk: 1; en1: 1 after 200ms; en2: 1 after 200ms; en3: 1 after 200ms }
+    on change isout while isout < 0.5 { wk: 0 ~80ms; en1: 0 ~80ms; en2: 0 ~80ms; en3: 0 ~80ms; en1: 0 ~80ms after 205ms; en2: 0 ~80ms after 205ms; en3: 0 ~80ms after 205ms }
+    every 500ms while isout > 0.5 and en1 < 0.002 { en1: 1 after 200ms; en2: 1 after 200ms; en3: 1 after 200ms }
+    every 250ms while isout < 0.5 and en1 > 0.004 { wk: 0 ~80ms; en1: 0 ~80ms; en2: 0 ~80ms; en3: 0 ~80ms }
+    prop tail = 0 ~400ms                               // keeps the panel drawn a moment after the content has faded, so the last frame painted is an empty one
+    on change isout while isout > 0.5 { tail: 1 ~0ms }
+    on change isout while isout < 0.5 { tail: 0 ~400ms }
+    every 250ms while isout < 0.5 and en1 < 0.004 and tail > 0.004 { tail: 0 ~400ms }
 
     let W = max(slot_w, 1)
     let H = max(slot_h, 1)
