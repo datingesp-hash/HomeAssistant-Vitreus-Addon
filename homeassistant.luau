@@ -1852,7 +1852,17 @@ end)
 
 -- Which monitor the panel is on: Vitreus sends its name (`slot_mon`) before `slot_open`, and the panel's one surface goes there (`hl_screen`). An older
 -- Vitreus sends none: then it is on every monitor the scene's hidden surface's copies know (`screen.K.name`), as it used to be.
+-- Shut, the panel is on no monitor at all (`hl_screen` empty), a second after it shut (so that opening it again at once does not make a new surface):
+-- a shut surface (`open:` false) kept its full-screen frames on the card all the same, ~30 MB.
+local shut_n = 0
 local function find_monitor()
+    if not open then
+        shut_n = shut_n + 1
+        local mine = shut_n
+        after(1000, function() if mine == shut_n and not open and text.hl_screen ~= "" then text.hl_screen = "" end end)
+        return
+    end
+    shut_n = shut_n + 1
     local name = text.slot_mon or ""
     if name == "" then
         local all = {}
